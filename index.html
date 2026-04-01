@@ -1,0 +1,537 @@
+import React, { useState, useMemo } from 'react';
+import { Plus, Edit2, Trash2, TrendingUp, Users, School, Filter, ArrowUpDown, Save, X, RefreshCw, Printer } from 'lucide-react';
+
+// --- 초기 목업 데이터 (등급 tier 직접 입력 반영) ---
+const initialData = [
+  { id: 1, year: 2026, exam: '1학기 중간고사', school: '문산고', grade: 1, className: 'SKY반', subject: '수학', name: '김민준', score: 92, tier: 1 },
+  { id: 2, year: 2026, exam: '1학기 중간고사', school: '문산고', grade: 1, className: 'SKY반', subject: '수학', name: '이서연', score: 85, tier: 2 },
+  { id: 3, year: 2026, exam: '1학기 중간고사', school: '파주고', grade: 2, className: '의대관', subject: '영어', name: '박도윤', score: 95, tier: 1 },
+  { id: 4, year: 2026, exam: '1학기 중간고사', school: '문산제일고', grade: 3, className: '수능집중반', subject: '국어', name: '최지유', score: 88, tier: 3 }, 
+  { id: 5, year: 2026, exam: '1학기 중간고사', school: '파주고', grade: 3, className: '수능집중반', subject: '과학', name: '정하준', score: 98, tier: 1 }, 
+  { id: 6, year: 2027, exam: '1학기 중간고사', school: '문산제일고', grade: 3, className: '수능집중반', subject: '수학', name: '강다은', score: 88, tier: 2 }, 
+];
+
+// --- 설정 데이터 ---
+const EXAMS = ['1학기 중간고사', '1학기 기말고사', '2학기 중간고사', '2학기 기말고사'];
+const SUBJECTS = ['국어', '영어', '수학', '과학'];
+const GRADES = [1, 2, 3];
+const YEARS = [2026, 2027, 2028];
+
+// 파스텔톤 과목 버튼 스타일 매핑
+const SUBJECT_COLORS = {
+  '전체': 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300',
+  '국어': 'bg-pink-100 text-pink-700 hover:bg-pink-200 border-pink-300',
+  '영어': 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-300',
+  '수학': 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-300',
+  '과학': 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-300',
+};
+
+export default function OpenAcademyAnalysis() {
+  const [data, setData] = useState(initialData);
+  const [view, setView] = useState('dashboard'); // 'dashboard' or 'manage'
+  const [logoError, setLogoError] = useState(false); // 로고 로드 실패 상태
+  
+  // 필터 상태 (과목은 activeSubject로 분리)
+  const [filters, setFilters] = useState({
+    year: 2026,
+    exam: '1학기 중간고사',
+    school: '전체',
+    grade: '전체',
+    className: '전체',
+  });
+  const [activeSubject, setActiveSubject] = useState('전체');
+
+  // 정렬 상태 (대시보드용, 관리용 분리)
+  const [dashboardSort, setDashboardSort] = useState({ key: 'score', direction: 'desc' });
+  const [manageSort, setManageSort] = useState({ key: 'id', direction: 'desc' });
+
+  // 폼 상태 (입력 및 수정용 - tier 추가됨)
+  const [formData, setFormData] = useState({
+    id: null, year: 2026, exam: '1학기 중간고사', school: '', grade: 1, className: '', subject: '수학', name: '', score: '', tier: ''
+  });
+  const [isEditing, setIsEditing] = useState(false);
+
+  // 동적 옵션 생성 (입력된 데이터 기반)
+  const schools = ['전체', ...Array.from(new Set(data.map(d => d.school)))];
+  const classNames = ['전체', ...Array.from(new Set(data.map(d => d.className)))];
+
+  // 필터 초기화 함수
+  const resetFilters = () => {
+    setFilters({
+      year: 2026,
+      exam: '1학기 중간고사',
+      school: '전체',
+      grade: '전체',
+      className: '전체',
+    });
+    setActiveSubject('전체');
+  };
+
+  // 데이터 필터링 로직
+  const filteredData = useMemo(() => {
+    return data.filter(item => {
+      return (
+        item.year === filters.year &&
+        item.exam === filters.exam &&
+        (filters.school === '전체' || item.school === filters.school) &&
+        (filters.grade === '전체' || item.grade === Number(filters.grade)) &&
+        (filters.className === '전체' || item.className === filters.className) &&
+        (activeSubject === '전체' || item.subject === activeSubject)
+      );
+    });
+  }, [data, filters, activeSubject]);
+
+  // 범용 정렬 함수
+  const sortData = (dataArray, sortConfig) => {
+    let sortableItems = [...dataArray];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+        
+        if (typeof aValue === 'string') {
+          aValue = aValue.toLowerCase();
+          bValue = bValue.toLowerCase();
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortableItems;
+  };
+
+  // 대시보드 정렬된 데이터
+  const sortedDashboardData = useMemo(() => sortData(filteredData, dashboardSort), [filteredData, dashboardSort]);
+  
+  // 관리 정렬된 데이터
+  const sortedManageData = useMemo(() => sortData(filteredData, manageSort), [filteredData, manageSort]);
+
+  // 등급 분포 계산 로직 (입력된 tier 기준)
+  const gradeDistribution = useMemo(() => {
+    const dist = {};
+    filteredData.forEach(item => {
+      const g = item.tier;
+      if (g) {
+        dist[g] = (dist[g] || 0) + 1;
+      }
+    });
+    return dist;
+  }, [filteredData]);
+
+  // 정렬 핸들러
+  const handleSort = (key, type = 'dashboard') => {
+    if (type === 'dashboard') {
+      const direction = (dashboardSort.key === key && dashboardSort.direction === 'asc') ? 'desc' : 'asc';
+      setDashboardSort({ key, direction });
+    } else {
+      const direction = (manageSort.key === key && manageSort.direction === 'asc') ? 'desc' : 'asc';
+      setManageSort({ key, direction });
+    }
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: name === 'year' || name === 'grade' ? (value === '전체' ? value : Number(value)) : value
+    }));
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: (name === 'year' || name === 'grade' || name === 'score' || name === 'tier') ? Number(value) : value
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (isEditing) {
+      setData(data.map(item => item.id === formData.id ? formData : item));
+      setIsEditing(false);
+    } else {
+      setData([...data, { ...formData, id: Date.now() }]);
+    }
+    // 폼 초기화 (연속 입력을 위해 이름/점수/등급만 비움)
+    setFormData(prev => ({ ...prev, id: null, name: '', score: '', tier: '' }));
+  };
+
+  const editRecord = (item) => {
+    setFormData(item);
+    setIsEditing(true);
+    setView('manage');
+  };
+
+  const deleteRecord = (id) => {
+    if (window.confirm('정말 삭제하시겠습니까?')) {
+      setData(data.filter(item => item.id !== id));
+    }
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setFormData({ id: null, year: filters.year, exam: filters.exam, school: '', grade: 1, className: '', subject: '수학', name: '', score: '', tier: '' });
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 print:bg-white print:m-0 print:p-0">
+      
+      {/* 헤더 영역 (인쇄 시 숨김) */}
+      <header className="bg-indigo-700 text-white shadow-md print:hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center space-x-3">
+            {/* 로고 영역 (에러 시 아이콘으로 대체) */}
+            {!logoError ? (
+              <img 
+                src="logo.png" 
+                alt="열린학원 로고" 
+                className="h-9 w-auto object-contain bg-white rounded p-1" 
+                onError={() => setLogoError(true)} 
+              />
+            ) : (
+              <School className="w-8 h-8 text-indigo-200" />
+            )}
+            <h1 className="text-2xl font-bold tracking-tight">문산 열린학원 <span className="text-indigo-200 font-light">성적 분석 시스템</span></h1>
+          </div>
+          <div className="flex space-x-2">
+            <button 
+              onClick={() => setView('dashboard')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${view === 'dashboard' ? 'bg-white text-indigo-700' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}
+            >
+              대시보드 분석
+            </button>
+            <button 
+              onClick={() => setView('manage')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${view === 'manage' ? 'bg-white text-indigo-700' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}
+            >
+              성적 입력/수정
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 print:py-0 print:max-w-full">
+        
+        {/* 공통 필터 영역 (인쇄 시 숨김) */}
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4 print:hidden">
+          <div className="flex justify-between items-center border-b pb-2">
+            <div className="flex items-center space-x-2 text-indigo-700 font-semibold">
+              <Filter className="w-5 h-5" />
+              <span>분석 기준 설정</span>
+            </div>
+            <button 
+              onClick={resetFilters}
+              className="flex items-center space-x-1 text-sm text-slate-500 hover:text-indigo-600 transition-colors bg-slate-100 hover:bg-indigo-50 px-3 py-1.5 rounded-md"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>필터 초기화</span>
+            </button>
+          </div>
+          
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[120px]">
+              <label className="block text-xs font-medium text-slate-500 mb-1">연도</label>
+              <select name="year" value={filters.year} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
+                {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-xs font-medium text-slate-500 mb-1">시험</label>
+              <select name="exam" value={filters.exam} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
+                {EXAMS.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-xs font-medium text-slate-500 mb-1">학교</label>
+              <select name="school" value={filters.school} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
+                {schools.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[100px]">
+              <label className="block text-xs font-medium text-slate-500 mb-1">학년</label>
+              <select name="grade" value={filters.grade} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
+                <option value="전체">전체</option>
+                {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-xs font-medium text-slate-500 mb-1">학원반</label>
+              <select name="className" value={filters.className} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
+                {classNames.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* 파스텔톤 과목 버튼 영역 */}
+          <div className="pt-2 flex flex-wrap gap-2 items-center">
+            <span className="text-xs font-medium text-slate-500 mr-2">조회 과목:</span>
+            {['전체', ...SUBJECTS].map(sub => (
+              <button
+                key={sub}
+                onClick={() => setActiveSubject(sub)}
+                className={`px-5 py-2 rounded-full text-sm font-bold transition-all border ${activeSubject === sub ? `ring-2 ring-offset-1 shadow-md ${SUBJECT_COLORS[sub]}` : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+              >
+                {sub}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {view === 'dashboard' ? (
+          /* ================= 대시보드 뷰 ================= */
+          <div className="space-y-6 print:space-y-4">
+            
+            {/* 인쇄용 헤더 (화면엔 안보이고 인쇄시에만 보임) */}
+            <div className="hidden print:block text-center border-b-2 border-indigo-700 pb-4 mb-6">
+               <h2 className="text-3xl font-bold text-slate-800">{filters.year}년 {filters.exam} 성적 분석 보고서</h2>
+               <p className="text-slate-600 mt-2 font-medium">
+                 [ 기준: {filters.school} / {filters.grade === '전체' ? '전학년' : `${filters.grade}학년`} / {filters.className} / {activeSubject} ]
+               </p>
+            </div>
+
+            {/* 기능 버튼 (화면용) */}
+            <div className="flex justify-end print:hidden">
+              <button 
+                onClick={() => window.print()}
+                className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md font-medium transition-colors shadow-sm"
+              >
+                <Printer className="w-4 h-4" />
+                <span>보고서 출력하기</span>
+              </button>
+            </div>
+
+            {/* 요약 카드 (2개로 축소 및 정렬) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center space-x-5">
+                <div className="p-4 bg-blue-100 text-blue-600 rounded-xl">
+                  <Users className="w-10 h-10" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">조회된 학생 수</p>
+                  <p className="text-3xl font-extrabold text-slate-800">{filteredData.length}명</p>
+                </div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center space-x-5">
+                <div className="p-4 bg-emerald-100 text-emerald-600 rounded-xl">
+                  <TrendingUp className="w-10 h-10" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500 mb-1">평균 점수</p>
+                  <p className="text-3xl font-extrabold text-slate-800">
+                    {filteredData.length > 0 ? (filteredData.reduce((acc, curr) => acc + curr.score, 0) / filteredData.length).toFixed(1) : 0}점
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 등급 분포도 */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print:break-inside-avoid">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">입력 등급별 분포 현황</h3>
+              <div className="flex items-end h-56 space-x-2 pt-4">
+                {[1,2,3,4,5,6,7,8,9].map(grade => {
+                  const count = gradeDistribution[grade] || 0;
+                  const maxCount = Math.max(...Object.values(gradeDistribution), 1);
+                  const heightPercent = (count / maxCount) * 100;
+
+                  return (
+                    <div key={grade} className="flex-1 flex flex-col items-center justify-end group relative">
+                      {count > 0 && (
+                        <span className="text-sm font-bold text-indigo-600 mb-1 opacity-100 transition-opacity absolute -top-6 print:text-black">
+                          {count}명
+                        </span>
+                      )}
+                      <div 
+                        className={`w-full max-w-[50px] rounded-t-md transition-all duration-500 ease-out print:border print:border-slate-800 ${grade <= 3 ? 'bg-indigo-500 print:bg-slate-400' : 'bg-slate-200 hover:bg-slate-300 print:bg-slate-100'}`}
+                        style={{ height: `${Math.max(heightPercent, count > 0 ? 5 : 0)}%` }}
+                      ></div>
+                      <span className="text-sm font-medium text-slate-600 mt-3 whitespace-nowrap">{grade}등급</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 정렬 가능한 성적 명단 테이블 */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:break-inside-avoid">
+               <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center print:bg-white print:border-b-2 print:border-slate-800 print:p-2">
+                  <h3 className="font-bold text-slate-800">상세 명단 및 성적</h3>
+                  <span className="text-xs text-slate-500 bg-white px-2 py-1 rounded border print:hidden">열 제목을 클릭하여 정렬하세요</span>
+               </div>
+               <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-semibold print:bg-slate-100 print:text-black">
+                    <tr>
+                      {[{key:'school', label:'학교'}, {key:'grade', label:'학년'}, {key:'className', label:'학원반'}, {key:'name', label:'이름'}, {key:'subject', label:'과목'}, {key:'score', label:'원점수'}, {key:'tier', label:'등급'}].map((col) => (
+                        <th 
+                          key={col.key} 
+                          onClick={() => handleSort(col.key, 'dashboard')}
+                          className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap border-b print:border-slate-300"
+                        >
+                          <div className="flex items-center justify-center space-x-1">
+                            <span>{col.label}</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400 print:hidden" />
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {sortedDashboardData.length > 0 ? sortedDashboardData.map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">{row.school}</td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">{row.grade}학년</td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">{row.className}</td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap font-medium text-slate-800">{row.name}</td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">{row.subject}</td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap font-bold text-indigo-600 print:text-black">{row.score}점</td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold print:border print:bg-white print:text-black ${row.tier <= 3 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>
+                            {row.tier}등급
+                          </span>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="7" className="px-4 py-8 text-center text-slate-500 border-b print:border-slate-300">데이터가 없습니다.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ================= 성적 입력/수정 뷰 ================= */
+          <div className="space-y-6">
+            
+            {/* 데이터 입력 폼 (강사 및 관리자용) */}
+            <div className={`bg-white p-6 rounded-xl shadow-sm border ${isEditing ? 'border-amber-400 ring-2 ring-amber-100' : 'border-indigo-200'}`}>
+              <div className="flex items-center justify-between mb-4 border-b pb-2">
+                <h3 className={`text-lg font-bold flex items-center ${isEditing ? 'text-amber-600' : 'text-indigo-700'}`}>
+                  {isEditing ? <><Edit2 className="w-5 h-5 mr-2" /> 성적 데이터 수정</> : <><Plus className="w-5 h-5 mr-2" /> 새 성적 입력</>}
+                </h3>
+                {isEditing && (
+                  <button onClick={cancelEdit} className="text-sm flex items-center text-slate-500 hover:text-slate-700">
+                    <X className="w-4 h-4 mr-1"/> 취소
+                  </button>
+                )}
+              </div>
+              
+              <form onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">연도</label>
+                  <select name="year" value={formData.year} onChange={handleFormChange} required className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">시험</label>
+                  <select name="exam" value={formData.exam} onChange={handleFormChange} required className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    {EXAMS.map(e => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">학교</label>
+                  <input type="text" name="school" value={formData.school} onChange={handleFormChange} required placeholder="예: 문산고" className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">학년</label>
+                  <select name="grade" value={formData.grade} onChange={handleFormChange} required className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">학원반</label>
+                  <input type="text" name="className" value={formData.className} onChange={handleFormChange} required placeholder="예: SKY반" className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">과목</label>
+                  <select name="subject" value={formData.subject} onChange={handleFormChange} required className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">학생 이름</label>
+                  <input type="text" name="name" value={formData.name} onChange={handleFormChange} required placeholder="이름" className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">원점수</label>
+                  <input type="number" name="score" value={formData.score} onChange={handleFormChange} required min="0" max="100" placeholder="0~100" className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                {/* 등급 직접 입력 필드 추가됨 */}
+                <div>
+                  <label className="block text-xs font-bold text-indigo-700 mb-1">산출 등급 (직접입력)</label>
+                  <input type="number" name="tier" value={formData.tier} onChange={handleFormChange} required min="1" max="9" placeholder="1~9등급" className="w-full border-2 border-indigo-200 bg-indigo-50 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <div className="col-span-2 md:col-span-5 flex items-end">
+                  <button type="submit" className={`w-full flex items-center justify-center space-x-2 text-white p-3 rounded-md font-bold transition-colors shadow-sm ${isEditing ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                    {isEditing ? <><Save className="w-5 h-5"/> <span>수정 완료</span></> : <><Plus className="w-5 h-5"/> <span>성적 등록</span></>}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* 정렬 가능한 전체 데이터 테이블 (강사/관리자용) */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+               <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                  <h3 className="font-bold text-slate-800">전체 데이터 수정 및 목록</h3>
+                  <span className="text-xs text-slate-500">현재 필터링된 데이터: {sortedManageData.length}건</span>
+               </div>
+               <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-semibold">
+                    <tr>
+                      {[{key:'year', label:'연도/시험'}, {key:'school', label:'학교/학년'}, {key:'subject', label:'반/과목'}, {key:'score', label:'이름/점수(등급)'}].map((col) => (
+                        <th 
+                          key={col.key} 
+                          onClick={() => handleSort(col.key, 'manage')}
+                          className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap"
+                        >
+                          <div className="flex items-center justify-center space-x-1">
+                            <span>{col.label}</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                      ))}
+                      <th className="px-4 py-3 text-center whitespace-nowrap text-indigo-600 font-bold">수정/삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {sortedManageData.length > 0 ? sortedManageData.map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">{row.year} {row.exam}</td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">{row.school} {row.grade}학년</td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">{row.className} / {row.subject}</td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                          <span className="font-bold">{row.name}</span> ({row.score}점 / <span className="text-indigo-600 font-bold">{row.tier}등급</span>)
+                        </td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center space-x-2">
+                            <button onClick={() => editRecord(row)} className="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition-colors border border-transparent hover:border-indigo-200" title="수정">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => deleteRecord(row.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors border border-transparent hover:border-red-200" title="삭제">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="5" className="px-4 py-8 text-center text-slate-500">데이터가 없습니다.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
