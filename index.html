@@ -43,6 +43,7 @@
       const [db, setDb] = useState(null);
       const [user, setUser] = useState(null);
       const [isLoading, setIsLoading] = useState(true); // 데이터 로딩 상태
+      const [initError, setInitError] = useState(''); // 에러 상세 메시지 상태 (새로 추가됨)
       const [data, setData] = useState([]); // 초기 데이터는 빈 배열 (클라우드에서 불러옴)
 
       const [view, setView] = useState('dashboard');
@@ -71,11 +72,10 @@
             const { getFirestore } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
             let firebaseConfig;
-            // 시스템 미리보기 환경 (자동 연결)
             if (typeof __firebase_config !== 'undefined') {
               firebaseConfig = JSON.parse(__firebase_config);
             } else {
-              // ★ 문채 선생님! 발급받으신 열쇠를 완벽하게 적용해두었습니다! ★
+              // ★ 문채 선생님의 실제 키가 적용된 부분 ★
               firebaseConfig = {
                 apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
                 authDomain: "open-school-3f74c.firebaseapp.com",
@@ -83,11 +83,11 @@
               };
             }
 
-            // 만약 깃허브 등 외부 환경인데 키를 아직 안넣었다면 로딩 중지
+            // 키가 비정상일 경우 (초기 세팅 전)
             if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('학원_API_KEY')) {
                 if(typeof __firebase_config === 'undefined') {
                    setIsLoading(false);
-                   return; // 로컬/깃허브에서 API 키가 없으면 멈춤
+                   return;
                 }
             }
 
@@ -96,11 +96,11 @@
             const database = getFirestore(app);
             setDb(database);
 
-            // 데이터베이스 접근 권한 인증 (필수 절차)
+            // 데이터베이스 접근 권한 인증
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
               await signInWithCustomToken(auth, __initial_auth_token);
             } else {
-              await signInAnonymously(auth);
+              await signInAnonymously(auth); // 여기서 Firebase Authentication '익명' 권한이 필요합니다!
             }
 
             onAuthStateChanged(auth, (u) => {
@@ -108,6 +108,7 @@
             });
           } catch (error) {
             console.error("클라우드 연결 오류:", error);
+            setInitError(error.message); // 화면에 에러를 보여주기 위해 상태 업데이트
             setIsLoading(false);
           }
         };
@@ -120,27 +121,32 @@
         
         let unsubscribe;
         const fetchData = async () => {
-           const { collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-           
-           // 저장될 공간 이름 지정
-           const colPath = typeof __app_id !== 'undefined' 
-              ? `artifacts/${__app_id}/public/data/scores` 
-              : `openacademy/data/scores`;
+           try {
+             const { collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+             
+             // 저장될 공간 이름 지정
+             const colPath = typeof __app_id !== 'undefined' 
+                ? `artifacts/${__app_id}/public/data/scores` 
+                : `openacademy/data/scores`;
 
-           const q = collection(db, colPath);
-           
-           // onSnapshot: 데이터베이스에 변화가 생길때마다 즉시 화면에 반영해주는 마법의 함수
-           unsubscribe = onSnapshot(q, (snapshot) => {
-             const items = [];
-             snapshot.forEach(doc => {
-               items.push({ docId: doc.id, ...doc.data() });
+             const q = collection(db, colPath);
+             
+             unsubscribe = onSnapshot(q, (snapshot) => {
+               const items = [];
+               snapshot.forEach(doc => {
+                 items.push({ docId: doc.id, ...doc.data() });
+               });
+               setData(items);
+               setIsLoading(false);
+             }, (error) => {
+               console.error("데이터 가져오기 실패 (규칙 문제일 수 있음):", error);
+               setInitError("데이터를 읽을 수 없습니다. Firestore 보안 규칙을 확인하세요: " + error.message);
+               setIsLoading(false);
              });
-             setData(items);
-             setIsLoading(false); // 로딩 끝!
-           }, (error) => {
-             console.error("데이터 가져오기 실패:", error);
-             setIsLoading(false);
-           });
+           } catch(error) {
+              setInitError(error.message);
+              setIsLoading(false);
+           }
         };
         fetchData();
 
@@ -229,23 +235,19 @@
             const { addDoc, updateDoc, doc, collection } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
             const colPath = typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/scores` : `openacademy/data/scores`;
             
-            // 순수 데이터만 분리 (클라우드 고유 ID인 docId는 제외하고 저장)
             const { docId, ...saveData } = formData;
 
             if (isEditing) {
-                // 수정
                 await updateDoc(doc(db, colPath, docId), saveData);
                 setIsEditing(false);
             } else {
-                // 신규 저장
                 await addDoc(collection(db, colPath), saveData);
             }
             
-            // 연속 입력을 위해 이름, 점수, 등급만 초기화
             setFormData(prev => ({ ...prev, docId: null, name: '', score: '', tier: '' }));
         } catch (error) {
             console.error("데이터 저장 오류:", error);
-            alert("저장 중 오류가 발생했습니다.");
+            alert("저장 중 오류가 발생했습니다: " + error.message);
         }
       };
 
@@ -253,7 +255,7 @@
         setFormData(item);
         setIsEditing(true);
         setView('manage');
-        window.scrollTo({ top: 0, behavior: 'smooth' }); // 수정하기 편하게 위로 올려줌
+        window.scrollTo({ top: 0, behavior: 'smooth' }); 
       };
 
       // 4. 클라우드에서 데이터 삭제 요청
@@ -275,6 +277,25 @@
         setFormData({ docId: null, year: filters.year, exam: filters.exam, school: '', grade: 1, className: '', subject: '수학', name: '', score: '', tier: '' });
       };
 
+      // ★ 에러 발생 시 정확한 원인을 보여주는 화면 ★
+      if (initError) {
+          return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
+                <i className="fas fa-exclamation-triangle text-6xl text-red-400 mb-4"></i>
+                <h2 className="text-2xl font-bold text-slate-800">연결 또는 권한 오류 발생</h2>
+                <div className="bg-red-50 text-red-600 p-4 rounded-md mt-4 font-mono text-sm inline-block text-left max-w-2xl break-all">
+                  {initError}
+                </div>
+                <p className="text-slate-600 mt-6 max-w-lg">
+                    문채 선생님, 위 오류 메시지가 <b>auth/operation-not-allowed</b> 라면,<br/>
+                    Firebase 콘솔에서 <b>[Authentication] -> [Sign-in method]</b> 탭으로 이동하여<br/>
+                    <b>'익명(Anonymous)' 로그인을 사용 설정</b>해 주세요!<br/><br/>
+                    또는 규칙(Rules) 오류라면, Firestore <b>[규칙(Rules)]</b> 탭에서 <code>allow read, write: if true;</code> 로 설정되었는지 확인해 주세요.
+                </p>
+            </div>
+          );
+      }
+
       // 클라우드 접속을 대기하는 동안 보여줄 로딩 화면
       if (isLoading) {
           return (
@@ -286,15 +307,14 @@
           );
       }
 
-      // 외부(GitHub) 접속 시, 설정값이 없어서 멈췄을 때 보여주는 안내 화면
+      // 외부(GitHub) 접속 시, 설정값이 없어서 멈췄을 때 보여주는 안내 화면 (기존)
       if (!user && !db && typeof __firebase_config === 'undefined') {
           return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
                 <i className="fas fa-database text-6xl text-slate-300 mb-4"></i>
                 <h2 className="text-2xl font-bold text-slate-800">클라우드 데이터베이스 설정 필요</h2>
                 <p className="text-slate-600 mt-4 max-w-lg">
-                    문채 선생님! 깃허브에서 시스템을 구동하시려면 학원 전용 클라우드 데이터베이스(Firebase) 주소를 소스코드 안에 입력해주셔야 합니다.<br/><br/>
-                    소스코드 내의 <b>`apiKey`</b>, <b>`projectId`</b> 부분을 선생님의 구글 Firebase 설정값으로 변경해 주세요.
+                    문채 선생님! 깃허브에서 시스템을 구동하시려면 학원 전용 클라우드 데이터베이스(Firebase) 주소를 소스코드 안에 입력해주셔야 합니다.
                 </p>
             </div>
           );
