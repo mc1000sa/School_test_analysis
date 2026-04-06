@@ -15,20 +15,8 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 
-  <!-- Babel -->
+  <!-- Babel (JSX 번역기) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- 🔥 Firebase 모듈 사전 로드 🔥 -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    window.FirebaseAPI = {
-      initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
-      getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, query, where, getDocs
-    };
-  </script>
 </head>
 <body class="bg-slate-50">
   <div id="root"></div>
@@ -36,8 +24,11 @@
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
 
+    // 🔥 브라우저 먹통 방지용: 가장 안전하게 파이어베이스를 불러오는 마법의 함수 🔥
+    const nativeImport = new Function('modulePath', 'return import(modulePath)');
+
     // =====================================================================
-    // 🔐 학원 공용 비밀번호 설정 (원하시는 비밀번호로 언제든 변경하세요!)
+    // 🔐 학원 공용 비밀번호 설정 
     // =====================================================================
     const ACADEMY_PASSWORD = "open2026"; 
 
@@ -57,7 +48,7 @@
 
     function OpenAcademyAnalysis() {
       // --- 인증 및 클라우드 상태 ---
-      const [isUnlocked, setIsUnlocked] = useState(false); // 잠금 해제 상태
+      const [isUnlocked, setIsUnlocked] = useState(false);
       const [inputPassword, setInputPassword] = useState("");
       const [loginError, setLoginError] = useState(false);
 
@@ -82,76 +73,86 @@
       const [modal, setModal] = useState({ isOpen: false, mode: 'add' });
       const [modalForm, setModalForm] = useState({ docId: null, exam: '', subject: '', detailSubject: '', score: '', tier: '', className: '' });
 
-      // 1. Firebase 초기 세팅 (비밀번호 통과 후에만 실행됨)
+      // 1. Firebase 초기 세팅 (가장 튼튼하고 안전한 방식)
       useEffect(() => {
-        if (!isUnlocked) return; // 잠겨있으면 클라우드 연결 안 함 (보안 강화)
+        if (!isUnlocked) return;
 
         const initFirebase = async () => {
           setIsLoading(true);
           try {
-            let attempts = 0;
-            while (!window.FirebaseAPI && attempts < 50) {
-               await new Promise(r => setTimeout(r, 100)); attempts++;
-            }
-            if (!window.FirebaseAPI) throw new Error("시스템을 불러올 수 없습니다.");
+            // 중복 실행 방지를 위한 getApps 추가
+            const { initializeApp, getApps, getApp } = await nativeImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+            const { getAuth, signInAnonymously } = await nativeImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+            const { getFirestore } = await nativeImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
-            const { initializeApp, getAuth, signInAnonymously, getFirestore } = window.FirebaseAPI;
+            let firebaseConfig = {
+              apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
+              authDomain: "open-school-3f74c.firebaseapp.com",
+              projectId: "open-school-3f74c"
+            };
 
-            let firebaseConfig;
-            if (typeof __firebase_config !== 'undefined') {
-              firebaseConfig = JSON.parse(__firebase_config);
-            } else {
-              firebaseConfig = {
-                apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
-                authDomain: "open-school-3f74c.firebaseapp.com",
-                projectId: "open-school-3f74c"
-              };
-            }
-
-            const app = initializeApp(firebaseConfig);
+            // 중복 앱 에러 방지
+            const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
             const auth = getAuth(app);
             const database = getFirestore(app);
             setDb(database);
 
-            await signInAnonymously(auth); // 익명 로그인 실행
+            // 익명 로그인
+            await signInAnonymously(auth);
             setUser(auth.currentUser);
             
           } catch (error) {
-            setInitError(error.message); setIsLoading(false);
+            console.error("Firebase 초기화 에러:", error);
+            setInitError(error.message); 
+            setIsLoading(false);
           }
         };
         initFirebase();
       }, [isUnlocked]);
 
-      // 2. 데이터 불러오기 (학생 명부와 성적표를 분리해서 불러옴)
+      // 2. 데이터 불러오기 (에러가 나도 먹통이 안 되게 완벽 방어)
       useEffect(() => {
-        if (!user || !db || !window.FirebaseAPI) return;
+        if (!user || !db) return;
         
         let unsubscribeScores;
         let unsubscribeStudents;
 
         const fetchData = async () => {
            try {
-             const { collection, onSnapshot } = window.FirebaseAPI;
+             const { collection, onSnapshot } = await nativeImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
              
-             // 컬렉션 경로 (students 와 scores 분리)
              const scoresPath = typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/scores` : `openacademy/data/scores`;
              const studentsPath = typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/students` : `openacademy/data/students`;
              
+             let scoresReady = false;
+             let studentsReady = false;
+
              unsubscribeScores = onSnapshot(collection(db, scoresPath), (snapshot) => {
                const items = [];
                snapshot.forEach(doc => items.push({ docId: doc.id, ...doc.data() }));
                setScoresData(items);
+               scoresReady = true;
+               if (studentsReady) setIsLoading(false);
+             }, (error) => {
+               setInitError("성적 데이터를 읽을 수 없습니다 (규칙 확인 필요): " + error.message);
+               setIsLoading(false);
              });
 
              unsubscribeStudents = onSnapshot(collection(db, studentsPath), (snapshot) => {
                const items = [];
                snapshot.forEach(doc => items.push({ studentId: doc.id, ...doc.data() }));
                setStudentsData(items);
-               setIsLoading(false); // 둘 다 불러오면 로딩 끝
+               studentsReady = true;
+               if (scoresReady) setIsLoading(false);
+             }, (error) => {
+               setInitError("학생 데이터를 읽을 수 없습니다 (규칙 확인 필요): " + error.message);
+               setIsLoading(false);
              });
 
-           } catch(error) { setInitError(error.message); setIsLoading(false); }
+           } catch(error) { 
+               setInitError("데이터베이스 연동 실패: " + error.message); 
+               setIsLoading(false); 
+           }
         };
         fetchData();
         return () => { 
@@ -160,8 +161,7 @@
         };
       }, [user, db]);
 
-      // --- 백엔드 분리 구조를 화면용으로 합치기 (Join) ---
-      // 강사님들은 내부가 쪼개져 있다는 걸 모르게, 화면에선 합쳐서 보여줍니다.
+      // --- 데이터 합치기 (Join) ---
       const joinedData = useMemo(() => {
          return scoresData.map(score => {
             const student = studentsData.find(s => s.studentId === score.studentId) || {};
@@ -170,7 +170,7 @@
                name: student.name || '알수없음',
                school: student.school || '-',
                grade: student.grade || 0,
-               year: student.year || score.year // 기준 연도
+               year: student.year || score.year
             };
          });
       }, [scoresData, studentsData]);
@@ -218,7 +218,7 @@
         return dist;
       }, [filteredDashboardData]);
 
-      // --- 🎯 관리탭(Manage) 이벤트 로직 ---
+      // --- 🎯 관리탭(Manage) 로직 ---
       const handleManageStudentChange = (e) => {
         const { name, value } = e.target;
         const val = name === 'year' || name === 'grade' ? Number(value) : value;
@@ -264,17 +264,17 @@
         setModalForm(prev => ({ ...prev, [name]: (name === 'score' || name === 'tier') ? Number(value) : value }));
       };
 
-      // 3. 클라우드 저장 (학생 ID 부여 및 분리 저장 마법)
+      // 3. 데이터 저장
       const handleModalSubmit = async (e) => {
         e.preventDefault();
-        if(!db || !window.FirebaseAPI) return;
+        if(!db) return;
 
         try {
-            const { addDoc, updateDoc, doc, collection, query, where, getDocs } = window.FirebaseAPI;
+            const { addDoc, updateDoc, doc, collection, query, where, getDocs } = await nativeImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            
             const scoresPath = typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/scores` : `openacademy/data/scores`;
             const studentsPath = typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/students` : `openacademy/data/students`;
             
-            // 1단계: 학생 명부에 이 학생이 이미 있는지 검사
             let targetStudentId = null;
             const q = query(collection(db, studentsPath), 
                             where("name", "==", manageStudent.name), 
@@ -282,35 +282,24 @@
             const querySnapshot = await getDocs(q);
             
             if (!querySnapshot.empty) {
-                // 이미 등록된 학생이면 기존 ID 사용
                 targetStudentId = querySnapshot.docs[0].id;
-                // 학교나 학년 정보가 바뀌었다면 업데이트 처리
                 await updateDoc(doc(db, studentsPath, targetStudentId), {
-                    school: manageStudent.school,
-                    grade: manageStudent.grade
+                    school: manageStudent.school, grade: manageStudent.grade
                 });
             } else {
-                // 신규 학생이면 학생 명부에 새로 등록하고 새 ID 발급받기
                 const docRef = await addDoc(collection(db, studentsPath), {
-                    name: manageStudent.name,
-                    year: manageStudent.year,
-                    school: manageStudent.school,
-                    grade: manageStudent.grade,
+                    name: manageStudent.name, year: manageStudent.year,
+                    school: manageStudent.school, grade: manageStudent.grade,
                     createdAt: new Date().toISOString()
                 });
                 targetStudentId = docRef.id;
             }
 
-            // 2단계: 부여받은 고유 ID와 함께 '성적'만 성적표에 저장
             const scoreDataToSave = {
                 studentId: targetStudentId,
-                year: manageStudent.year,
-                exam: modalForm.exam,
-                subject: modalForm.subject,
-                detailSubject: modalForm.detailSubject || '',
-                score: modalForm.score,
-                tier: modalForm.tier,
-                className: modalForm.className || ''
+                year: manageStudent.year, exam: modalForm.exam,
+                subject: modalForm.subject, detailSubject: modalForm.detailSubject || '',
+                score: modalForm.score, tier: modalForm.tier, className: modalForm.className || ''
             };
 
             if (modal.mode === 'edit') {
@@ -325,10 +314,9 @@
       };
 
       const handleRecordDelete = async () => {
-        if(!window.FirebaseAPI) return;
         if (window.confirm('정말 이 성적 기록을 삭제하시겠습니까?')) {
             try {
-                const { deleteDoc, doc } = window.FirebaseAPI;
+                const { deleteDoc, doc } = await nativeImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
                 const scoresPath = typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/scores` : `openacademy/data/scores`;
                 await deleteDoc(doc(db, scoresPath, modalForm.docId));
                 setModal({ isOpen: false, mode: 'add' });
@@ -337,7 +325,7 @@
       };
 
       // =================================================================
-      // 🔐 렌더링 1. 공용 잠금 화면 (Lock Screen)
+      // 🔐 렌더링 1. 공용 잠금 화면
       // =================================================================
       if (!isUnlocked) {
          return (
@@ -374,27 +362,31 @@
          );
       }
 
-      // 렌더링 2. 에러 및 로딩 화면
+      // 렌더링 2. 에러 화면
       if (initError) {
           return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
                 <i className="fas fa-exclamation-triangle text-6xl text-red-400 mb-4"></i>
                 <h2 className="text-2xl font-bold text-slate-800">연결 오류 발생</h2>
-                <div className="bg-red-50 text-red-600 p-4 rounded-md mt-4 font-mono text-sm max-w-2xl break-all">{initError}</div>
+                <div className="bg-red-50 text-red-600 p-4 rounded-md mt-4 font-mono text-sm max-w-2xl break-all text-left">
+                  {initError}
+                </div>
             </div>
           );
       }
 
+      // 렌더링 3. 로딩 화면
       if (isLoading) {
           return (
               <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
                   <i className="fas fa-circle-notch fa-spin text-5xl text-indigo-600 mb-4"></i>
                   <h2 className="text-xl font-bold text-slate-800">클라우드 시스템 동기화 중...</h2>
+                  <p className="text-slate-500 mt-2">안전하게 데이터를 불러오고 있습니다.</p>
               </div>
           );
       }
 
-      // 렌더링 3. 메인 대시보드 화면
+      // 렌더링 4. 메인 화면
       return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-800 print:bg-white print:m-0 print:p-0">
           <header className="bg-indigo-700 text-white shadow-md print:hidden">
