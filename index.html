@@ -24,7 +24,7 @@
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
 
-    // --- 브라우저 호환성을 위한 동적 모듈 로더 (에러 해결용) ---
+    // --- 브라우저 호환성을 위한 동적 모듈 로더 ---
     const nativeImport = new Function('modulePath', 'return import(modulePath)');
 
     // --- 설정 데이터 ---
@@ -42,31 +42,36 @@
     };
 
     function OpenAcademyAnalysis() {
-      // --- 클라우드(Firebase) 연결 상태 관리 ---
+      // --- 클라우드(Firebase) 상태 ---
       const [db, setDb] = useState(null);
       const [user, setUser] = useState(null);
-      const [isLoading, setIsLoading] = useState(true); // 데이터 로딩 상태
-      const [initError, setInitError] = useState(''); // 에러 상세 메시지 상태 (새로 추가됨)
-      const [data, setData] = useState([]); // 초기 데이터는 빈 배열 (클라우드에서 불러옴)
+      const [isLoading, setIsLoading] = useState(true);
+      const [initError, setInitError] = useState('');
+      const [data, setData] = useState([]);
 
-      const [view, setView] = useState('dashboard');
+      // --- 화면 뷰 상태 ---
+      const [view, setView] = useState('dashboard'); // 'dashboard' or 'manage'
       const [logoError, setLogoError] = useState(false);
       
+      // --- 대시보드 전용 상태 ---
       const [filters, setFilters] = useState({
         year: 2026, exam: '1학기 중간고사', school: '전체', grade: '전체', className: '전체',
       });
       const [activeSubject, setActiveSubject] = useState('전체');
-
       const [dashboardSort, setDashboardSort] = useState({ key: 'score', direction: 'desc' });
-      const [manageSort, setManageSort] = useState({ key: 'docId', direction: 'desc' });
 
-      // id 대신 클라우드 고유키인 docId 사용
-      const [formData, setFormData] = useState({
-        docId: null, year: 2026, exam: '1학기 중간고사', school: '', grade: 1, className: '', subject: '수학', name: '', score: '', tier: ''
+      // --- 🎯 [신규] 엑셀형 입력(Manage) 전용 상태 ---
+      const [manageStudent, setManageStudent] = useState({
+        year: 2026, name: '', school: '', grade: 1
       });
-      const [isEditing, setIsEditing] = useState(false);
+      
+      // 성적 입력/수정 모달창 상태
+      const [modal, setModal] = useState({ isOpen: false, mode: 'add' }); // mode: 'add' | 'edit'
+      const [modalForm, setModalForm] = useState({
+        docId: null, exam: '', subject: '', detailSubject: '', score: '', tier: '', className: ''
+      });
 
-      // 1. 구글 클라우드(Firebase) 초기 세팅 및 로그인
+      // 1. Firebase 초기 세팅
       useEffect(() => {
         const initFirebase = async () => {
           try {
@@ -78,7 +83,6 @@
             if (typeof __firebase_config !== 'undefined') {
               firebaseConfig = JSON.parse(__firebase_config);
             } else {
-              // ★ 문채 선생님의 실제 키가 적용된 부분 ★
               firebaseConfig = {
                 apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
                 authDomain: "open-school-3f74c.firebaseapp.com",
@@ -86,12 +90,8 @@
               };
             }
 
-            // 키가 비정상일 경우 (초기 세팅 전)
             if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('학원_API_KEY')) {
-                if(typeof __firebase_config === 'undefined') {
-                   setIsLoading(false);
-                   return;
-                }
+                if(typeof __firebase_config === 'undefined') { setIsLoading(false); return; }
             }
 
             const app = initializeApp(firebaseConfig);
@@ -99,75 +99,55 @@
             const database = getFirestore(app);
             setDb(database);
 
-            // 데이터베이스 접근 권한 인증
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
               await signInWithCustomToken(auth, __initial_auth_token);
             } else {
-              await signInAnonymously(auth); // 여기서 Firebase Authentication '익명' 권한이 필요합니다!
+              await signInAnonymously(auth);
             }
 
-            onAuthStateChanged(auth, (u) => {
-              setUser(u);
-            });
+            onAuthStateChanged(auth, (u) => { setUser(u); });
           } catch (error) {
-            console.error("클라우드 연결 오류:", error);
-            setInitError(error.message); // 화면에 에러를 보여주기 위해 상태 업데이트
-            setIsLoading(false);
+            setInitError(error.message); setIsLoading(false);
           }
         };
         initFirebase();
       }, []);
 
-      // 2. 클라우드에서 실시간으로 데이터 불러오기
+      // 2. 데이터 불러오기
       useEffect(() => {
         if (!user || !db) return;
-        
         let unsubscribe;
         const fetchData = async () => {
            try {
              const { collection, onSnapshot } = await nativeImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-             
-             // 저장될 공간 이름 지정
-             const colPath = typeof __app_id !== 'undefined' 
-                ? `artifacts/${__app_id}/public/data/scores` 
-                : `openacademy/data/scores`;
-
+             const colPath = typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/scores` : `openacademy/data/scores`;
              const q = collection(db, colPath);
              
              unsubscribe = onSnapshot(q, (snapshot) => {
                const items = [];
-               snapshot.forEach(doc => {
-                 items.push({ docId: doc.id, ...doc.data() });
-               });
+               snapshot.forEach(doc => { items.push({ docId: doc.id, ...doc.data() }); });
                setData(items);
                setIsLoading(false);
              }, (error) => {
-               console.error("데이터 가져오기 실패 (규칙 문제일 수 있음):", error);
-               setInitError("데이터를 읽을 수 없습니다. Firestore 보안 규칙을 확인하세요: " + error.message);
-               setIsLoading(false);
+               setInitError("데이터를 읽을 수 없습니다: " + error.message); setIsLoading(false);
              });
-           } catch(error) {
-              setInitError(error.message);
-              setIsLoading(false);
-           }
+           } catch(error) { setInitError(error.message); setIsLoading(false); }
         };
         fetchData();
-
-        return () => {
-            if(unsubscribe) unsubscribe();
-        };
+        return () => { if(unsubscribe) unsubscribe(); };
       }, [user, db]);
 
-
+      // --- 데이터 추출 및 필터링 ---
       const schools = ['전체', ...Array.from(new Set(data.map(d => d.school)))];
-      const classNames = ['전체', ...Array.from(new Set(data.map(d => d.className)))];
+      const classNames = ['전체', ...Array.from(new Set(data.map(d => d.className).filter(Boolean)))]; // className이 없는 경우 제외
+      const uniqueStudentNames = Array.from(new Set(data.filter(d => d.year === manageStudent.year).map(d => d.name)));
 
       const resetFilters = () => {
         setFilters({ year: 2026, exam: '1학기 중간고사', school: '전체', grade: '전체', className: '전체' });
         setActiveSubject('전체');
       };
 
-      const filteredData = useMemo(() => {
+      const filteredDashboardData = useMemo(() => {
         return data.filter(item => {
           return (
             item.year === filters.year &&
@@ -180,145 +160,154 @@
         });
       }, [data, filters, activeSubject]);
 
-      const sortData = (dataArray, sortConfig) => {
-        let sortableItems = [...dataArray];
-        if (sortConfig.key !== null) {
+      const sortedDashboardData = useMemo(() => {
+        let sortableItems = [...filteredDashboardData];
+        if (dashboardSort.key !== null) {
           sortableItems.sort((a, b) => {
-            let aValue = a[sortConfig.key];
-            let bValue = b[sortConfig.key];
+            let aValue = a[dashboardSort.key]; let bValue = b[dashboardSort.key];
             if (typeof aValue === 'string') { aValue = aValue.toLowerCase(); bValue = bValue.toLowerCase(); }
-            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+            if (aValue < bValue) return dashboardSort.direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return dashboardSort.direction === 'asc' ? 1 : -1;
             return 0;
           });
         }
         return sortableItems;
-      };
-
-      const sortedDashboardData = useMemo(() => sortData(filteredData, dashboardSort), [filteredData, dashboardSort]);
-      const sortedManageData = useMemo(() => sortData(filteredData, manageSort), [filteredData, manageSort]);
+      }, [filteredDashboardData, dashboardSort]);
 
       const gradeDistribution = useMemo(() => {
         const dist = {};
-        filteredData.forEach(item => {
-          const g = item.tier;
-          if (g) dist[g] = (dist[g] || 0) + 1;
-        });
+        filteredDashboardData.forEach(item => { if (item.tier) dist[item.tier] = (dist[item.tier] || 0) + 1; });
         return dist;
-      }, [filteredData]);
+      }, [filteredDashboardData]);
 
-      const handleSort = (key, type = 'dashboard') => {
-        if (type === 'dashboard') {
-          setDashboardSort({ key, direction: (dashboardSort.key === key && dashboardSort.direction === 'asc') ? 'desc' : 'asc' });
-        } else {
-          setManageSort({ key, direction: (manageSort.key === key && manageSort.direction === 'asc') ? 'desc' : 'asc' });
-        }
-      };
-
-      const handleFilterChange = (e) => {
+      // --- 🎯 관리탭(Manage) 이벤트 로직 ---
+      const handleManageStudentChange = (e) => {
         const { name, value } = e.target;
-        setFilters(prev => ({ ...prev, [name]: name === 'year' || name === 'grade' ? (value === '전체' ? value : Number(value)) : value }));
-      };
-
-      const handleFormChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: (name === 'year' || name === 'grade' || name === 'score' || name === 'tier') ? Number(value) : value }));
-      };
-
-      // 3. 클라우드에 데이터 저장 및 수정 요청
-      const handleSubmit = async (e) => {
-        e.preventDefault();
+        const val = name === 'year' || name === 'grade' ? Number(value) : value;
         
-        if(!db) {
-            alert("클라우드 데이터베이스에 연결되지 않았습니다.");
-            return;
+        setManageStudent(prev => {
+          const next = { ...prev, [name]: val };
+          // 이름을 입력했을 때, 해당 연도의 기존 학생 정보가 있으면 학교/학년 자동 완성
+          if (name === 'name') {
+             const existingInfo = data.find(d => d.year === next.year && d.name === val);
+             if (existingInfo) {
+                next.school = existingInfo.school;
+                next.grade = existingInfo.grade;
+             }
+          }
+          return next;
+        });
+      };
+
+      // 현재 선택된 학생의 특정 연도 데이터 (엑셀 그리드용)
+      const currentStudentData = useMemo(() => {
+        if(!manageStudent.name) return [];
+        return data.filter(d => d.year === manageStudent.year && d.name === manageStudent.name);
+      }, [data, manageStudent]);
+
+      const openScoreModal = (exam, subject, existingRecord = null) => {
+        if (!manageStudent.name.trim() || !manageStudent.school.trim()) {
+          alert('먼저 상단에 학생 이름과 학교를 입력해주세요!');
+          return;
         }
+        
+        if (existingRecord) {
+          setModalForm(existingRecord);
+          setModal({ isOpen: true, mode: 'edit' });
+        } else {
+          // 새로 추가 (기존에 같은 과목으로 넣었던 학원반이 있다면 기본값으로 제안)
+          const lastClass = currentStudentData.find(d => d.subject === subject)?.className || '';
+          setModalForm({
+            docId: null, exam, subject, detailSubject: '', score: '', tier: '', className: lastClass
+          });
+          setModal({ isOpen: true, mode: 'add' });
+        }
+      };
+
+      const handleModalFormChange = (e) => {
+        const { name, value } = e.target;
+        setModalForm(prev => ({
+          ...prev, [name]: (name === 'score' || name === 'tier') ? Number(value) : value
+        }));
+      };
+
+      const handleModalSubmit = async (e) => {
+        e.preventDefault();
+        if(!db) return;
 
         try {
             const { addDoc, updateDoc, doc, collection } = await nativeImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
             const colPath = typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/scores` : `openacademy/data/scores`;
             
-            const { docId, ...saveData } = formData;
+            // 학생 공통 정보와 모달 폼 정보를 합쳐서 저장
+            const saveData = {
+                year: manageStudent.year,
+                school: manageStudent.school,
+                grade: manageStudent.grade,
+                name: manageStudent.name,
+                exam: modalForm.exam,
+                subject: modalForm.subject,
+                detailSubject: modalForm.detailSubject || '', // 세부과목명 (대수, 화학1 등)
+                score: modalForm.score,
+                tier: modalForm.tier,
+                className: modalForm.className || '' // 과목별 학원반
+            };
 
-            if (isEditing) {
-                await updateDoc(doc(db, colPath, docId), saveData);
-                setIsEditing(false);
+            if (modal.mode === 'edit') {
+                await updateDoc(doc(db, colPath, modalForm.docId), saveData);
             } else {
                 await addDoc(collection(db, colPath), saveData);
             }
-            
-            setFormData(prev => ({ ...prev, docId: null, name: '', score: '', tier: '' }));
+            setModal({ isOpen: false, mode: 'add' });
         } catch (error) {
-            console.error("데이터 저장 오류:", error);
-            alert("저장 중 오류가 발생했습니다: " + error.message);
+            console.error("데이터 저장 오류:", error); alert("저장 중 오류가 발생했습니다.");
         }
       };
 
-      const editRecord = (item) => {
-        setFormData(item);
-        setIsEditing(true);
-        setView('manage');
-        window.scrollTo({ top: 0, behavior: 'smooth' }); 
-      };
-
-      // 4. 클라우드에서 데이터 삭제 요청
-      const deleteRecord = async (docId) => {
-        if (window.confirm('정말 이 학생의 성적을 삭제하시겠습니까? (클라우드에서 영구 삭제됩니다)')) {
+      const handleRecordDelete = async () => {
+        if (window.confirm('정말 이 성적 기록을 삭제하시겠습니까?')) {
             try {
                 const { deleteDoc, doc } = await nativeImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
                 const colPath = typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/scores` : `openacademy/data/scores`;
-                await deleteDoc(doc(db, colPath, docId));
+                await deleteDoc(doc(db, colPath, modalForm.docId));
+                setModal({ isOpen: false, mode: 'add' });
             } catch (error) {
-                console.error("삭제 오류:", error);
                 alert("삭제 중 오류가 발생했습니다.");
             }
         }
       };
 
-      const cancelEdit = () => {
-        setIsEditing(false);
-        setFormData({ docId: null, year: filters.year, exam: filters.exam, school: '', grade: 1, className: '', subject: '수학', name: '', score: '', tier: '' });
-      };
 
-      // ★ 에러 발생 시 정확한 원인을 보여주는 화면 ★
+      // --- 에러 및 로딩 렌더링 ---
       if (initError) {
           return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
                 <i className="fas fa-exclamation-triangle text-6xl text-red-400 mb-4"></i>
                 <h2 className="text-2xl font-bold text-slate-800">연결 또는 권한 오류 발생</h2>
-                <div className="bg-red-50 text-red-600 p-4 rounded-md mt-4 font-mono text-sm inline-block text-left max-w-2xl break-all">
-                  {initError}
-                </div>
+                <div className="bg-red-50 text-red-600 p-4 rounded-md mt-4 font-mono text-sm inline-block text-left max-w-2xl break-all">{initError}</div>
                 <p className="text-slate-600 mt-6 max-w-lg">
-                    문채 선생님, 위 오류 메시지가 <b>auth/operation-not-allowed</b> 라면,<br/>
-                    Firebase 콘솔에서 <b>[Authentication] -> [Sign-in method]</b> 탭으로 이동하여<br/>
-                    <b>'익명(Anonymous)' 로그인을 사용 설정</b>해 주세요!<br/><br/>
-                    또는 규칙(Rules) 오류라면, Firestore <b>[규칙(Rules)]</b> 탭에서 <code>allow read, write: if true;</code> 로 설정되었는지 확인해 주세요.
+                    문채 선생님, Firebase 콘솔에서 <b>'익명(Anonymous)' 로그인을 사용 설정</b>하셨는지, <br/>
+                    Firestore <b>[규칙(Rules)]</b>이 올바르게 설정되었는지 확인해 주세요.
                 </p>
             </div>
           );
       }
 
-      // 클라우드 접속을 대기하는 동안 보여줄 로딩 화면
       if (isLoading) {
           return (
               <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
                   <i className="fas fa-circle-notch fa-spin text-5xl text-indigo-600 mb-4"></i>
-                  <h2 className="text-xl font-bold text-slate-800">열린학원 클라우드 시스템 접속 중...</h2>
-                  <p className="text-slate-500 mt-2">데이터베이스를 동기화하고 있습니다.</p>
+                  <h2 className="text-xl font-bold text-slate-800">클라우드 시스템 접속 중...</h2>
               </div>
           );
       }
 
-      // 외부(GitHub) 접속 시, 설정값이 없어서 멈췄을 때 보여주는 안내 화면 (기존)
       if (!user && !db && typeof __firebase_config === 'undefined') {
           return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
                 <i className="fas fa-database text-6xl text-slate-300 mb-4"></i>
                 <h2 className="text-2xl font-bold text-slate-800">클라우드 데이터베이스 설정 필요</h2>
-                <p className="text-slate-600 mt-4 max-w-lg">
-                    문채 선생님! 깃허브에서 시스템을 구동하시려면 학원 전용 클라우드 데이터베이스(Firebase) 주소를 소스코드 안에 입력해주셔야 합니다.
-                </p>
+                <p className="text-slate-600 mt-4 max-w-lg">소스코드 내에 API Key를 입력해 주세요.</p>
             </div>
           );
       }
@@ -337,11 +326,11 @@
                 <h1 className="text-2xl font-bold tracking-tight">문산 열린학원 <span className="text-indigo-200 font-light">성적 분석 시스템</span></h1>
               </div>
               <div className="flex space-x-2">
-                <button onClick={() => setView('dashboard')} className={`px-4 py-2 rounded-md font-medium transition-colors ${view === 'dashboard' ? 'bg-white text-indigo-700' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
+                <button onClick={() => setView('dashboard')} className={`px-4 py-2 rounded-md font-medium transition-colors ${view === 'dashboard' ? 'bg-white text-indigo-700 shadow-inner' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
                   대시보드 분석
                 </button>
-                <button onClick={() => setView('manage')} className={`px-4 py-2 rounded-md font-medium transition-colors ${view === 'manage' ? 'bg-white text-indigo-700' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
-                  성적 입력/수정
+                <button onClick={() => setView('manage')} className={`px-4 py-2 rounded-md font-medium transition-colors ${view === 'manage' ? 'bg-white text-indigo-700 shadow-inner' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
+                  학생별 성적입력(엑셀형)
                 </button>
               </div>
             </div>
@@ -349,63 +338,65 @@
 
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 print:py-0 print:max-w-full">
             
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4 print:hidden">
-              <div className="flex justify-between items-center border-b pb-2">
-                <div className="flex items-center space-x-2 text-indigo-700 font-semibold">
-                  <i className="fas fa-filter text-xl"></i><span>분석 기준 설정</span>
-                </div>
-                <button onClick={resetFilters} className="flex items-center space-x-1 text-sm text-slate-500 hover:text-indigo-600 transition-colors bg-slate-100 hover:bg-indigo-50 px-3 py-1.5 rounded-md">
-                  <i className="fas fa-sync-alt text-base"></i><span>필터 초기화</span>
-                </button>
-              </div>
-              
-              <div className="flex flex-wrap gap-4 items-end">
-                <div className="flex-1 min-w-[120px]">
-                  <label className="block text-xs font-medium text-slate-500 mb-1">연도</label>
-                  <select name="year" value={filters.year} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
-                    {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[140px]">
-                  <label className="block text-xs font-medium text-slate-500 mb-1">시험</label>
-                  <select name="exam" value={filters.exam} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
-                    {EXAMS.map(e => <option key={e} value={e}>{e}</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[140px]">
-                  <label className="block text-xs font-medium text-slate-500 mb-1">학교</label>
-                  <select name="school" value={filters.school} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
-                    {schools.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[100px]">
-                  <label className="block text-xs font-medium text-slate-500 mb-1">학년</label>
-                  <select name="grade" value={filters.grade} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
-                    <option value="전체">전체</option>
-                    {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[140px]">
-                  <label className="block text-xs font-medium text-slate-500 mb-1">학원반</label>
-                  <select name="className" value={filters.className} onChange={handleFilterChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 border">
-                    {classNames.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-2 flex flex-wrap gap-2 items-center">
-                <span className="text-xs font-medium text-slate-500 mr-2">조회 과목:</span>
-                {['전체', ...SUBJECTS].map(sub => (
-                  <button key={sub} onClick={() => setActiveSubject(sub)} className={`px-5 py-2 rounded-full text-sm font-bold transition-all border ${activeSubject === sub ? `ring-2 ring-offset-1 shadow-md ${SUBJECT_COLORS[sub]}` : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
-                    {sub}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {view === 'dashboard' ? (
+              /* ================= 대시보드 뷰 ================= */
               <div className="space-y-6 print:space-y-4">
                 
+                {/* 대시보드 필터 영역 */}
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4 print:hidden">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <div className="flex items-center space-x-2 text-indigo-700 font-semibold">
+                      <i className="fas fa-filter text-xl"></i><span>대시보드 분석 기준</span>
+                    </div>
+                    <button onClick={resetFilters} className="flex items-center space-x-1 text-sm text-slate-500 hover:text-indigo-600 transition-colors bg-slate-100 hover:bg-indigo-50 px-3 py-1.5 rounded-md">
+                      <i className="fas fa-sync-alt text-base"></i><span>필터 초기화</span>
+                    </button>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-4 items-end">
+                    <div className="flex-1 min-w-[120px]">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">연도</label>
+                      <select name="year" value={filters.year} onChange={handleFilterChange} className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500">
+                        {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
+                      </select>
+                    </div>
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">시험</label>
+                      <select name="exam" value={filters.exam} onChange={handleFilterChange} className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500">
+                        {EXAMS.map(e => <option key={e} value={e}>{e}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">학교</label>
+                      <select name="school" value={filters.school} onChange={handleFilterChange} className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500">
+                        {schools.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex-1 min-w-[100px]">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">학년</label>
+                      <select name="grade" value={filters.grade} onChange={handleFilterChange} className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500">
+                        <option value="전체">전체</option>
+                        {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
+                      </select>
+                    </div>
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">학원반(전체)</label>
+                      <select name="className" value={filters.className} onChange={handleFilterChange} className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500">
+                        {classNames.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex flex-wrap gap-2 items-center">
+                    <span className="text-xs font-medium text-slate-500 mr-2">조회 과목:</span>
+                    {['전체', ...SUBJECTS].map(sub => (
+                      <button key={sub} onClick={() => setActiveSubject(sub)} className={`px-5 py-2 rounded-full text-sm font-bold transition-all border ${activeSubject === sub ? `ring-2 ring-offset-1 shadow-md ${SUBJECT_COLORS[sub]}` : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
+                        {sub}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="hidden print:block text-center border-b-2 border-indigo-700 pb-4 mb-6">
                    <h2 className="text-3xl font-bold text-slate-800">{filters.year}년 {filters.exam} 성적 분석 보고서</h2>
                    <p className="text-slate-600 mt-2 font-medium">
@@ -415,19 +406,20 @@
 
                 <div className="flex justify-between items-center print:hidden">
                   <div className="text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
-                    <i className="fas fa-cloud-check mr-2"></i>클라우드 동기화 완료
+                    <i className="fas fa-cloud-check mr-2"></i> 클라우드 동기화 완료
                   </div>
                   <button onClick={() => window.print()} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md font-medium transition-colors shadow-sm">
                     <i className="fas fa-print text-base"></i><span>보고서 출력하기</span>
                   </button>
                 </div>
 
+                {/* 요약 카드 (2개) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center space-x-5">
                     <div className="p-4 bg-blue-100 text-blue-600 rounded-xl"><i className="fas fa-users text-4xl"></i></div>
                     <div>
-                      <p className="text-sm font-medium text-slate-500 mb-1">조회된 학생 수</p>
-                      <p className="text-3xl font-extrabold text-slate-800">{filteredData.length}명</p>
+                      <p className="text-sm font-medium text-slate-500 mb-1">조회된 성적 건수 (학생수)</p>
+                      <p className="text-3xl font-extrabold text-slate-800">{filteredDashboardData.length}건</p>
                     </div>
                   </div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center space-x-5">
@@ -435,7 +427,7 @@
                     <div>
                       <p className="text-sm font-medium text-slate-500 mb-1">평균 점수</p>
                       <p className="text-3xl font-extrabold text-slate-800">
-                        {filteredData.length > 0 ? (filteredData.reduce((acc, curr) => acc + curr.score, 0) / filteredData.length).toFixed(1) : 0}점
+                        {filteredDashboardData.length > 0 ? (filteredDashboardData.reduce((acc, curr) => acc + curr.score, 0) / filteredDashboardData.length).toFixed(1) : 0}점
                       </p>
                     </div>
                   </div>
@@ -468,8 +460,8 @@
                     <table className="w-full text-sm text-left border-collapse">
                       <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-semibold print:bg-slate-100 print:text-black">
                         <tr>
-                          {[{key:'school', label:'학교'}, {key:'grade', label:'학년'}, {key:'className', label:'학원반'}, {key:'name', label:'이름'}, {key:'subject', label:'과목'}, {key:'score', label:'원점수'}, {key:'tier', label:'등급'}].map((col) => (
-                            <th key={col.key} onClick={() => handleSort(col.key, 'dashboard')} className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap border-b print:border-slate-300">
+                          {[{key:'school', label:'학교'}, {key:'grade', label:'학년'}, {key:'className', label:'과목별 학원반'}, {key:'name', label:'이름'}, {key:'subject', label:'과목(세부)'}, {key:'score', label:'원점수'}, {key:'tier', label:'등급'}].map((col) => (
+                            <th key={col.key} onClick={() => setDashboardSort({ key: col.key, direction: dashboardSort.direction === 'asc' ? 'desc' : 'asc' })} className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap border-b print:border-slate-300">
                               <div className="flex items-center justify-center space-x-1">
                                 <span>{col.label}</span><i className="fas fa-sort text-xs text-slate-400 print:hidden"></i>
                               </div>
@@ -482,9 +474,11 @@
                           <tr key={row.docId} className="hover:bg-slate-50 transition-colors">
                             <td className="px-4 py-3 text-center whitespace-nowrap">{row.school}</td>
                             <td className="px-4 py-3 text-center whitespace-nowrap">{row.grade}학년</td>
-                            <td className="px-4 py-3 text-center whitespace-nowrap">{row.className}</td>
+                            <td className="px-4 py-3 text-center whitespace-nowrap text-slate-500">{row.className || '-'}</td>
                             <td className="px-4 py-3 text-center whitespace-nowrap font-medium text-slate-800">{row.name}</td>
-                            <td className="px-4 py-3 text-center whitespace-nowrap">{row.subject}</td>
+                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                               {row.subject} {row.detailSubject && <span className="text-xs font-bold text-indigo-500">({row.detailSubject})</span>}
+                            </td>
                             <td className="px-4 py-3 text-center whitespace-nowrap font-bold text-indigo-600 print:text-black">{row.score}점</td>
                             <td className="px-4 py-3 text-center whitespace-nowrap">
                               <span className={`px-3 py-1 rounded-full text-xs font-bold print:border print:bg-white print:text-black ${row.tier <= 3 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{row.tier}등급</span>
@@ -499,79 +493,160 @@
                 </div>
               </div>
             ) : (
+              /* ================= 엑셀형 성적 입력 뷰 ================= */
               <div className="space-y-6">
-                <div className={`bg-white p-6 rounded-xl shadow-sm border ${isEditing ? 'border-amber-400 ring-2 ring-amber-100' : 'border-indigo-200'}`}>
-                  <div className="flex items-center justify-between mb-4 border-b pb-2">
-                    <h3 className={`text-lg font-bold flex items-center ${isEditing ? 'text-amber-600' : 'text-indigo-700'}`}>
-                      {isEditing ? <><i className="fas fa-pen text-xl mr-2"></i> 클라우드 데이터 수정</> : <><i className="fas fa-plus text-xl mr-2"></i> 클라우드에 새 성적 입력</>}
-                    </h3>
-                    {isEditing && (
-                      <button onClick={cancelEdit} className="text-sm flex items-center text-slate-500 hover:text-slate-700"><i className="fas fa-times mr-1"></i> 취소</button>
-                    )}
+                
+                {/* 1. 학생 선택 영역 (엑셀의 상단부) */}
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-indigo-300 flex flex-col gap-4 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -z-10"></div>
+                  <div className="flex items-center space-x-2 text-indigo-700 font-bold border-b pb-2">
+                    <i className="fas fa-user-graduate text-xl"></i><span>학생 선택 및 기본 정보 (필수입력)</span>
                   </div>
                   
-                  <form onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    <div><label className="block text-xs font-medium text-slate-700 mb-1">연도</label><select name="year" value={formData.year} onChange={handleFormChange} required className="w-full border border-slate-300 rounded-md p-2 text-sm"><option value={2026}>2026년</option><option value={2027}>2027년</option><option value={2028}>2028년</option></select></div>
-                    <div><label className="block text-xs font-medium text-slate-700 mb-1">시험</label><select name="exam" value={formData.exam} onChange={handleFormChange} required className="w-full border border-slate-300 rounded-md p-2 text-sm"><option value="1학기 중간고사">1학기 중간고사</option><option value="1학기 기말고사">1학기 기말고사</option><option value="2학기 중간고사">2학기 중간고사</option><option value="2학기 기말고사">2학기 기말고사</option></select></div>
-                    <div><label className="block text-xs font-medium text-slate-700 mb-1">학교</label><input type="text" name="school" value={formData.school} onChange={handleFormChange} required placeholder="예: 문산고" className="w-full border border-slate-300 rounded-md p-2 text-sm" /></div>
-                    <div><label className="block text-xs font-medium text-slate-700 mb-1">학년</label><select name="grade" value={formData.grade} onChange={handleFormChange} required className="w-full border border-slate-300 rounded-md p-2 text-sm"><option value={1}>1학년</option><option value={2}>2학년</option><option value={3}>3학년</option></select></div>
-                    <div><label className="block text-xs font-medium text-slate-700 mb-1">학원반</label><input type="text" name="className" value={formData.className} onChange={handleFormChange} required placeholder="예: SKY반" className="w-full border border-slate-300 rounded-md p-2 text-sm" /></div>
-                    <div><label className="block text-xs font-medium text-slate-700 mb-1">과목</label><select name="subject" value={formData.subject} onChange={handleFormChange} required className="w-full border border-slate-300 rounded-md p-2 text-sm"><option value="국어">국어</option><option value="영어">영어</option><option value="수학">수학</option><option value="과학">과학</option></select></div>
-                    <div><label className="block text-xs font-medium text-slate-700 mb-1">학생 이름</label><input type="text" name="name" value={formData.name} onChange={handleFormChange} required placeholder="이름" className="w-full border border-slate-300 rounded-md p-2 text-sm" /></div>
-                    <div><label className="block text-xs font-medium text-slate-700 mb-1">원점수</label><input type="number" name="score" value={formData.score} onChange={handleFormChange} required min="0" max="100" placeholder="0~100" className="w-full border border-slate-300 rounded-md p-2 text-sm" /></div>
-                    <div><label className="block text-xs font-bold text-indigo-700 mb-1">산출 등급 (직접입력)</label><input type="number" name="tier" value={formData.tier} onChange={handleFormChange} required min="1" max="9" placeholder="1~9" className="w-full border-2 border-indigo-200 bg-indigo-50 rounded-md p-2 text-sm" /></div>
-                    <div className="col-span-2 md:col-span-5 flex items-end">
-                      <button type="submit" className={`w-full flex items-center justify-center space-x-2 text-white p-3 rounded-md font-bold transition-colors shadow-sm ${isEditing ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-                        {isEditing ? <><i className="fas fa-cloud-upload-alt mr-2"></i><span>수정 정보 동기화</span></> : <><i className="fas fa-cloud-upload-alt mr-2"></i><span>클라우드에 저장</span></>}
-                      </button>
+                  <div className="flex flex-wrap gap-4 items-end">
+                    <div className="flex-1 min-w-[100px]">
+                      <label className="block text-xs font-bold text-slate-600 mb-1">연도</label>
+                      <select name="year" value={manageStudent.year} onChange={handleManageStudentChange} className="w-full border-2 border-indigo-100 rounded-md p-2.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                        {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
+                      </select>
                     </div>
-                  </form>
+                    <div className="flex-[2] min-w-[180px] relative">
+                      <label className="block text-xs font-bold text-indigo-600 mb-1"><i className="fas fa-search mr-1"></i>학생 이름 검색/입력</label>
+                      <input type="text" name="name" list="student-list" value={manageStudent.name} onChange={handleManageStudentChange} placeholder="이름을 입력하세요" autoComplete="off" className="w-full border-2 border-indigo-200 bg-indigo-50/50 rounded-md p-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all" />
+                      <datalist id="student-list">
+                        {uniqueStudentNames.map(name => <option key={name} value={name} />)}
+                      </datalist>
+                    </div>
+                    <div className="flex-1 min-w-[150px]">
+                      <label className="block text-xs font-bold text-slate-600 mb-1">소속 학교</label>
+                      <input type="text" name="school" value={manageStudent.school} onChange={handleManageStudentChange} placeholder="예: 문산고" className="w-full border border-slate-300 rounded-md p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </div>
+                    <div className="flex-1 min-w-[100px]">
+                      <label className="block text-xs font-bold text-slate-600 mb-1">학년</label>
+                      <select name="grade" value={manageStudent.grade} onChange={handleManageStudentChange} className="w-full border border-slate-300 rounded-md p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400"><i className="fas fa-info-circle"></i> 기존 학생 이름을 입력하면 학교와 학년이 자동으로 불러와집니다.</p>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                   <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                      <h3 className="font-bold text-slate-800">전체 데이터 수정 및 목록</h3>
-                      <span className="text-xs text-slate-500">현재 클라우드 조회: {sortedManageData.length}건</span>
-                   </div>
-                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-slate-100 text-slate-600 uppercase text-xs font-semibold">
-                        <tr>
-                          {[{key:'year', label:'연도/시험'}, {key:'school', label:'학교/학년'}, {key:'subject', label:'반/과목'}, {key:'score', label:'이름/점수(등급)'}].map((col) => (
-                            <th key={col.key} onClick={() => handleSort(col.key, 'manage')} className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap">
-                              <div className="flex items-center justify-center space-x-1"><span>{col.label}</span><i className="fas fa-sort text-xs text-slate-400"></i></div>
-                            </th>
-                          ))}
-                          <th className="px-4 py-3 text-center whitespace-nowrap text-indigo-600 font-bold">수정/삭제</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {sortedManageData.length > 0 ? sortedManageData.map((row) => (
-                          <tr key={row.docId} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-4 py-3 text-center whitespace-nowrap">{row.year} {row.exam}</td>
-                            <td className="px-4 py-3 text-center whitespace-nowrap">{row.school} {row.grade}학년</td>
-                            <td className="px-4 py-3 text-center whitespace-nowrap">{row.className} / {row.subject}</td>
-                            <td className="px-4 py-3 text-center whitespace-nowrap">
-                              <span className="font-bold">{row.name}</span> ({row.score}점 / <span className="text-indigo-600 font-bold">{row.tier}등급</span>)
-                            </td>
-                            <td className="px-4 py-3 text-center whitespace-nowrap">
-                              <div className="flex items-center justify-center space-x-2">
-                                <button onClick={() => editRecord(row)} className="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition-colors border border-transparent hover:border-indigo-200" title="수정"><i className="fas fa-pen"></i></button>
-                                <button onClick={() => deleteRecord(row.docId)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors border border-transparent hover:border-red-200" title="삭제"><i className="fas fa-trash"></i></button>
-                              </div>
-                            </td>
+                {/* 2. 엑셀형 성적 입력 그리드 (이름이 있어야 보임) */}
+                <div className={`transition-opacity duration-500 ${manageStudent.name && manageStudent.school ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden">
+                     <div className="p-4 bg-slate-800 text-white flex justify-between items-center">
+                        <h3 className="font-bold"><span className="text-amber-400">{manageStudent.name || '???'}</span> 학생 성적 보드</h3>
+                        <span className="text-xs text-slate-300">칸을 클릭하여 여러 과목을 자유롭게 추가/수정하세요</span>
+                     </div>
+                     <div className="overflow-x-auto p-4">
+                      <table className="w-full text-sm text-left border-collapse border border-slate-300">
+                        <thead className="bg-slate-100">
+                          <tr>
+                            <th className="border border-slate-300 px-4 py-3 text-center font-bold text-slate-700 w-32 bg-slate-200">시험 구분</th>
+                            {SUBJECTS.map((col) => (
+                              <th key={col} className={`border border-slate-300 px-4 py-3 text-center font-bold ${SUBJECT_COLORS[col].replace('bg-', 'bg-').replace('border-', 'border-').split(' ')[0]}`}>{col}</th>
+                            ))}
                           </tr>
-                        )) : (
-                          <tr><td colSpan="5" className="px-4 py-8 text-center text-slate-500">클라우드에 데이터가 없습니다.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {EXAMS.map(exam => (
+                            <tr key={exam}>
+                              <td className="border border-slate-300 px-4 py-3 text-center font-bold bg-slate-50 text-slate-700 whitespace-nowrap">{exam}</td>
+                              {SUBJECTS.map(subject => {
+                                 // 이 셀에 해당하는 성적들 찾기
+                                 const cellScores = currentStudentData.filter(d => d.exam === exam && d.subject === subject);
+                                 return (
+                                    <td key={subject} className="border border-slate-300 p-2 align-top h-28 relative group w-[20%] hover:bg-slate-50 transition-colors">
+                                       
+                                       <div className="space-y-2 mb-8">
+                                          {cellScores.map(record => (
+                                             <div key={record.docId} onClick={() => openScoreModal(exam, subject, record)} 
+                                                  className="bg-white border border-indigo-200 shadow-sm p-2 rounded-md cursor-pointer hover:border-indigo-500 hover:shadow transition-all relative overflow-hidden">
+                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
+                                                <div className="font-bold text-indigo-800 text-xs pl-2">
+                                                   {subject} {record.detailSubject && <span className="text-indigo-500">({record.detailSubject})</span>}
+                                                </div>
+                                                <div className="flex justify-between items-end mt-1 pl-2">
+                                                   <span className="text-lg font-black text-slate-700">{record.score}<span className="text-xs font-normal text-slate-500">점</span></span>
+                                                   <span className="text-sm font-bold text-red-500">{record.tier}<span className="text-xs font-normal">등급</span></span>
+                                                </div>
+                                                {record.className && <div className="text-[10px] text-slate-400 mt-1 pl-2 truncate">{record.className}</div>}
+                                             </div>
+                                          ))}
+                                       </div>
+
+                                       {/* 성적 추가 버튼 (호버 시 표시 또는 비어있을 때 표시) */}
+                                       <button onClick={() => openScoreModal(exam, subject)} 
+                                               className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-[80%] py-1.5 text-xs font-bold rounded flex items-center justify-center space-x-1 transition-all
+                                                          ${cellScores.length > 0 ? 'opacity-0 group-hover:opacity-100 bg-indigo-100 text-indigo-600 hover:bg-indigo-200' : 'bg-slate-100 text-slate-400 hover:bg-indigo-100 hover:text-indigo-600'}`}>
+                                          <i className="fas fa-plus"></i> <span>과목 추가</span>
+                                       </button>
+                                    </td>
+                                 );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
 
               </div>
             )}
           </main>
+
+          {/* 모달 창 (성적 상세 입력/수정) */}
+          {modal.isOpen && (
+             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:hidden">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+                   <div className="bg-indigo-600 p-4 flex justify-between items-center text-white">
+                      <h3 className="font-bold text-lg"><i className="fas fa-edit mr-2"></i>{modalForm.exam} - {modalForm.subject} 성적 {modal.mode === 'edit' ? '수정' : '입력'}</h3>
+                      <button onClick={() => setModal({isOpen:false})} className="text-indigo-200 hover:text-white transition-colors"><i className="fas fa-times text-xl"></i></button>
+                   </div>
+                   
+                   <form onSubmit={handleModalSubmit} className="p-6 space-y-4">
+                      {/* 세부 과목명 (다수 과목 응시 해결 핵심키) */}
+                      <div>
+                         <label className="block text-sm font-bold text-slate-700 mb-1">세부 과목명 <span className="text-xs font-normal text-slate-400">(선택)</span></label>
+                         <input type="text" name="detailSubject" value={modalForm.detailSubject} onChange={handleModalFormChange} placeholder="예: 화학1, 기하, 미적분 등" className="w-full border border-slate-300 rounded-md p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                         <p className="text-[11px] text-indigo-500 mt-1"><i className="fas fa-lightbulb"></i> 과탐 2과목 등 한 과목을 여러 개 칠 때 구분용으로 씁니다.</p>
+                      </div>
+
+                      {/* 학원반 (과목별로 다르게 지정 가능) */}
+                      <div>
+                         <label className="block text-sm font-bold text-slate-700 mb-1">과목별 학원반 <span className="text-xs font-normal text-slate-400">(선택)</span></label>
+                         <input type="text" name="className" list="class-list" value={modalForm.className} onChange={handleModalFormChange} placeholder="예: SKY반 (국어/과학은 비워둬도 됨)" autoComplete="off" className="w-full border border-slate-300 rounded-md p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                         <datalist id="class-list">
+                            {classNames.map(c => <option key={c} value={c} />)}
+                         </datalist>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                         <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-1 text-center">원점수</label>
+                            <input type="number" name="score" value={modalForm.score} onChange={handleModalFormChange} required min="0" max="100" placeholder="0~100" className="w-full border-2 border-slate-200 bg-slate-50 rounded-md p-3 text-center text-lg font-bold focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none" />
+                         </div>
+                         <div>
+                            <label className="block text-sm font-bold text-indigo-600 mb-1 text-center">산출 등급</label>
+                            <input type="number" name="tier" value={modalForm.tier} onChange={handleModalFormChange} required min="1" max="9" placeholder="1~9" className="w-full border-2 border-indigo-200 bg-indigo-50 rounded-md p-3 text-center text-lg font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none" />
+                         </div>
+                      </div>
+
+                      <div className="pt-6 flex gap-2">
+                         {modal.mode === 'edit' && (
+                            <button type="button" onClick={handleRecordDelete} className="px-4 py-3 bg-red-100 hover:bg-red-200 text-red-600 font-bold rounded-lg transition-colors">
+                               <i className="fas fa-trash-alt"></i>
+                            </button>
+                         )}
+                         <button type="submit" className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center space-x-2 shadow-md">
+                            <i className="fas fa-check"></i> <span>{modal.mode === 'edit' ? '수정 완료' : '성적 추가하기'}</span>
+                         </button>
+                      </div>
+                   </form>
+                </div>
+             </div>
+          )}
         </div>
       );
     }
