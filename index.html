@@ -107,11 +107,13 @@
     }
     .teacher-chip:hover { transform: translateY(-1px); }
     .teacher-chip-selected {
-      color: #fff;
-      border-color: rgba(124,58,237,0.4);
-      background: linear-gradient(135deg, #6d28d9, #8b5cf6 62%, #4f46e5);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.24), 0 18px 28px rgba(109,40,217,0.24);
+      color: #fff !important;
+      border-color: rgba(124,58,237,0.4) !important;
+      background: linear-gradient(135deg, #6d28d9, #8b5cf6 62%, #4f46e5) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.24), 0 18px 28px rgba(109,40,217,0.24) !important;
     }
+    .teacher-chip-selected span { color: #fff !important; }
+    .teacher-chip-selected .teacher-chip-dot { background: rgba(255,255,255,0.95) !important; box-shadow: 0 0 0 3px rgba(255,255,255,0.12); }
     .teacher-chip-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.95); }
     .teacher-chip-1 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,243,255,0.94)); }
     .teacher-chip-2 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(239,246,255,0.94)); }
@@ -218,6 +220,20 @@
       return { score, tier };
     }
 
+    function findPreviousComparableRecord(currentRow, allRows) {
+      const base = allRows
+        .filter((r) => r.studentId === currentRow.studentId && r.subject === currentRow.subject)
+        .filter((r) => Number(r.year) < Number(currentRow.year) || (Number(r.year) === Number(currentRow.year) && examOrder(r.exam) < examOrder(currentRow.exam)))
+        .sort((a,b) => Number(a.year) - Number(b.year) || examOrder(a.exam) - examOrder(b.exam));
+      if (!base.length) return null;
+      const currentDetail = String(currentRow.detailSubject || '').trim();
+      const sameDetail = currentDetail ? base.filter((r) => String(r.detailSubject || '').trim() === currentDetail) : [];
+      if (sameDetail.length) return sameDetail[sameDetail.length - 1];
+      const noDetail = base.filter((r) => !String(r.detailSubject || '').trim());
+      if (noDetail.length) return noDetail[noDetail.length - 1];
+      return base[base.length - 1];
+    }
+
     function StatusPill({ value, positiveLabel='상승', negativeLabel='하락', sameLabel='유지' }) {
       const map = {
         up: { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'fa-arrow-trend-up', text: positiveLabel },
@@ -313,7 +329,8 @@
       const [modal, setModal] = useState({ isOpen: false, mode: 'add' });
       const [modalForm, setModalForm] = useState({ docId: null, exam: '', subject: '', detailSubject: '', score: '', tier: '', className: '' });
 
-      const [subjectView, setSubjectView] = useState({ year: 2026, exam: EXAMS[0], subject: '수학' });
+      const [schoolView, setSchoolView] = useState({ year: 2026, exam: EXAMS[0], school: '전체', grade: '전체', subject: '전체' });
+      const [subjectView, setSubjectView] = useState({ year: 2026, exam: EXAMS[0], subject: '수학', detailSubject: '전체' });
       const [studentAnalysisStudentId, setStudentAnalysisStudentId] = useState('');
       const [teamExamForm, setTeamExamForm] = useState({
         year: 2026,
@@ -350,7 +367,7 @@
             if (typeof __firebase_config !== 'undefined') {
               firebaseConfig = JSON.parse(__firebase_config);
             } else {
-                firebaseConfig = {
+               firebaseConfig = {
                 apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
                 authDomain: "open-school-3f74c.firebaseapp.com",
                 projectId: "open-school-3f74c",
@@ -434,6 +451,17 @@
       const classNames = useMemo(() => ['전체', ...Array.from(new Set(scoresData.filter((d) => !d.deleted).map((d) => d.className).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ko'))], [scoresData]);
       const uniqueStudentNames = useMemo(() => Array.from(new Set(studentsData.filter((s) => s.year === manageStudent.year && !s.deleted).map((s) => s.name).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ko')), [studentsData, manageStudent.year]);
       const subjectOptions = SUBJECTS;
+      const schoolAnalysisSchools = schools;
+      const schoolAnalysisSubjects = ['전체', ...SUBJECTS];
+      const detailSubjectOptions = useMemo(() => {
+        const values = Array.from(new Set(
+          joinedData
+            .filter((row) => Number(row.year) === Number(subjectView.year) && row.subject === subjectView.subject)
+            .map((row) => String(row.detailSubject || '').trim())
+            .filter(Boolean)
+        )).sort((a,b)=>a.localeCompare(b,'ko'));
+        return ['전체', ...values];
+      }, [joinedData, subjectView.year, subjectView.subject]);
       const activeStudents = useMemo(() => studentsData.filter((s) => !s.deleted).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''), 'ko')), [studentsData]);
 
       const handleFilterChange = (e) => {
@@ -484,29 +512,40 @@
       }, [filteredDashboardData]);
 
       const schoolRows = useMemo(() => {
-        const rows = [];
-        const filtered = joinedData.filter((row) => Number(row.year) === Number(filters.year) && row.exam === filters.exam);
-        const schoolGradeKeys = Array.from(new Set(filtered.map((r) => `${r.school}__${r.grade}`))).sort();
-        schoolGradeKeys.forEach((key) => {
-          const [school, grade] = key.split('__');
-          SUBJECTS.forEach((subject) => {
-            const items = filtered.filter((r) => r.school === school && String(r.grade) === String(grade) && r.subject === subject);
-            if (!items.length) return;
-            const scoreCounts = Object.fromEntries(SCORE_BUCKETS.map((b) => [b.label, 0]));
-            const tierCounts = {};
-            items.forEach((r) => {
-              scoreCounts[bucketScore(r.score)] += 1;
-              const t = Number(r.tier || 0);
-              if (t) tierCounts[t] = (tierCounts[t] || 0) + 1;
-            });
-            rows.push({ school, grade, subject, count: items.length, scoreCounts, tierCounts, system: getTierSystem(items[0]) });
+        const filtered = joinedData.filter((row) =>
+          Number(row.year) === Number(schoolView.year) &&
+          row.exam === schoolView.exam &&
+          (schoolView.school === '전체' || row.school === schoolView.school) &&
+          (schoolView.grade === '전체' || Number(row.grade) === Number(schoolView.grade)) &&
+          (schoolView.subject === '전체' || row.subject === schoolView.subject)
+        );
+        const keys = Array.from(new Set(filtered.map((r) => `${r.school}__${r.grade}__${r.subject}`))).sort();
+        return keys.map((key) => {
+          const [school, grade, subject] = key.split('__');
+          const items = filtered.filter((r) => r.school === school && String(r.grade) === String(grade) && r.subject === subject).sort((a,b)=>Number(b.score)-Number(a.score));
+          const scoreCounts = Object.fromEntries(SCORE_BUCKETS.map((b) => [b.label, 0]));
+          const tierCounts = {};
+          const tierRoster = {};
+          items.forEach((r) => {
+            scoreCounts[bucketScore(r.score)] += 1;
+            const t = Number(r.tier || 0);
+            if (t) {
+              tierCounts[t] = (tierCounts[t] || 0) + 1;
+              if (!tierRoster[t]) tierRoster[t] = [];
+              tierRoster[t].push({ name: r.name, score: r.score, detailSubject: r.detailSubject || '' });
+            }
           });
+          return { school, grade, subject, count: items.length, scoreCounts, tierCounts, tierRoster, roster: items, system: getTierSystem(items[0]), firstTierRate: items.length ? Math.round(((tierCounts[1] || 0) / items.length) * 100) : 0 };
         });
-        return rows;
-      }, [joinedData, filters.year, filters.exam]);
+      }, [joinedData, schoolView]);
 
       const subjectRows = useMemo(() => {
-        const filtered = joinedData.filter((row) => Number(row.year) === Number(subjectView.year) && row.exam === subjectView.exam && row.subject === subjectView.subject);
+        const filtered = joinedData.filter((row) =>
+          Number(row.year) === Number(subjectView.year) &&
+          row.exam === subjectView.exam &&
+          row.subject === subjectView.subject &&
+          (subjectView.detailSubject === '전체' || String(row.detailSubject || '') === String(subjectView.detailSubject || ''))
+        );
         const keys = Array.from(new Set(filtered.map((r) => `${r.school}__${r.grade}`))).sort();
         return keys.map((key) => {
           const [school, grade] = key.split('__');
@@ -514,20 +553,18 @@
           const scoreCounts = Object.fromEntries(SCORE_BUCKETS.map((b) => [b.label, 0]));
           const tierCounts = {};
           const roster = items.map((item) => {
-            const prev = joinedData
-              .filter((r) => r.studentId === item.studentId && r.subject === item.subject && Number(r.year) === Number(item.year))
-              .sort((a,b) => examOrder(a.exam) - examOrder(b.exam))
-              .filter((r) => examOrder(r.exam) < examOrder(item.exam))
-              .slice(-1)[0];
+            const prev = findPreviousComparableRecord(item, joinedData);
             const status = compareStatus(item, prev);
             return { ...item, prev, status };
-          }).sort((a,b) => Number(b.score)-Number(a.score));
+          }).sort((a,b) => Number(b.score) - Number(a.score));
           items.forEach((r) => {
             scoreCounts[bucketScore(r.score)] += 1;
             const t = Number(r.tier || 0);
             if (t) tierCounts[t] = (tierCounts[t] || 0) + 1;
           });
-          return { school, grade, count: items.length, scoreCounts, tierCounts, roster, system: getTierSystem(items[0]) };
+          const improvedStudents = roster.filter((r) => r.status.score === 'up' || r.status.tier === 'up').map((r) => r.name);
+          const declinedStudents = roster.filter((r) => r.status.score === 'down' || r.status.tier === 'down').map((r) => r.name);
+          return { school, grade, count: items.length, scoreCounts, tierCounts, roster, system: getTierSystem(items[0]), improvedStudents, declinedStudents };
         });
       }, [joinedData, subjectView]);
 
@@ -729,7 +766,7 @@
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_26%)]"></div>
                 <div className="relative z-10 max-w-xl">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs font-bold tracking-[0.18em] text-violet-700 uppercase soft-border mb-5">Munsan Open Academy</div>
-                  <h1 className="text-5xl font-black tracking-tight leading-tight text-slate-900">입력은 빠르게, 분석은 깊게.</h1>
+                  <h1 className="text-4xl xl:text-5xl font-black tracking-tight leading-[1.15] text-slate-900">입력은 쉽고 빠르게,<br/>분석은 깊이 있게!</h1>
                   <p className="mt-5 text-lg text-slate-600 leading-8">성적 입력 참여율을 높이고, 학교별 · 과목별 · 학생별 분석을 한 화면 안에서 연결하는 열린학원 전용 포털입니다.</p>
                 </div>
               </div>
@@ -759,6 +796,7 @@
                         );
                       })}
                     </div>
+                    {selectedTeacherName && <div className="mt-3 rounded-2xl bg-violet-50 border border-violet-200 px-4 py-3 text-sm font-bold text-violet-700">선택한 선생님: {selectedTeacherName}</div>}
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">PIN</label>
@@ -818,6 +856,7 @@
                       <button key={item.key} onClick={() => setView(item.key)} className={`rounded-xl px-3 py-2 text-sm font-bold transition-all ${view === item.key ? 'text-violet-700 bg-violet-50' : 'text-slate-500 hover:bg-slate-50'}`}>{item.label}</button>
                     ))}
                   </div>
+                  <button onClick={() => window.print()} className="hidden md:inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 soft-border shadow-sm text-sm font-bold text-slate-700 hover:bg-violet-50"><i className="fas fa-print"></i>현재 화면 출력</button>
                   <div className="hidden sm:flex items-center gap-3 rounded-2xl bg-white px-4 py-2.5 soft-border shadow-sm">
                     <div className="h-10 w-10 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center font-black">{(currentTeacher?.name || '?').slice(0,1)}</div>
                     <div className="text-sm">
@@ -958,25 +997,64 @@
                 <div className="space-y-6">
                   <div className="hero-panel rounded-[30px] p-5 panel-shadow">
                     <div className="text-sm font-bold text-violet-700">학교별 성적분석</div>
-                    <p className="mt-2 text-slate-600 leading-7">선택한 연도/시험 기준으로 학교 · 학년 · 과목별 원점수 구간 인원 수와 등급 인원 수를 한 번에 확인합니다.</p>
+                    <p className="mt-2 text-slate-600 leading-7">보고 싶은 학교와 학년, 과목을 선택하면 점수대별 인원수, 등급별 인원, 등급별 명단을 바로 확인하고 출력할 수 있어요.</p>
                   </div>
-                  <Card title={`${filters.year}년 ${filters.exam} 학교별 집계`}>
-                    <div className="overflow-x-auto mini-scroll max-h-[620px]">
-                      <table className="w-full text-sm">
-                        <thead className="bg-slate-50 text-xs uppercase text-slate-500 sticky top-0"><tr><th className="px-3 py-3 text-center">학교</th><th className="px-3 py-3 text-center">학년</th><th className="px-3 py-3 text-center">과목</th><th className="px-3 py-3 text-center">인원</th>{SCORE_BUCKETS.map((b)=><th key={b.label} className="px-3 py-3 text-center">{b.label}</th>)}<th className="px-3 py-3 text-center">등급 현황</th></tr></thead>
-                        <tbody className="divide-y divide-slate-200">
-                          {schoolRows.length ? schoolRows.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-violet-50/30">
-                              <td className="px-3 py-3 text-center font-bold">{row.school}</td>
-                              <td className="px-3 py-3 text-center">{row.grade}학년</td>
-                              <td className="px-3 py-3 text-center">{row.subject}</td>
-                              <td className="px-3 py-3 text-center font-bold text-violet-700">{row.count}</td>
-                              {SCORE_BUCKETS.map((b)=><td key={b.label} className="px-3 py-3 text-center">{row.scoreCounts[b.label] || 0}</td>)}
-                              <td className="px-3 py-3 text-center text-xs">{Array.from({ length: row.system }, (_, i) => i+1).map((t) => `${t}:${row.tierCounts[t] || 0}`).join(' / ')}</td>
-                            </tr>
-                          )) : <tr><td colSpan={11} className="px-4 py-10 text-center text-slate-500">데이터가 없습니다.</td></tr>}
-                        </tbody>
-                      </table>
+                  <div className="card-3d rounded-[30px] p-5">
+                    <div className="grid md:grid-cols-5 gap-4">
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">연도</label><select value={schoolView.year} onChange={(e)=>setSchoolView((p)=>({...p, year:Number(e.target.value)}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">시험</label><select value={schoolView.exam} onChange={(e)=>setSchoolView((p)=>({...p, exam:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{EXAMS.map((e)=><option key={e} value={e}>{e}</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">학교</label><select value={schoolView.school} onChange={(e)=>setSchoolView((p)=>({...p, school:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{schoolAnalysisSchools.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">학년</label><select value={schoolView.grade} onChange={(e)=>setSchoolView((p)=>({...p, grade:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5"><option value="전체">전체</option>{GRADES.map((g)=><option key={g} value={g}>{g}학년</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">과목</label><select value={schoolView.subject} onChange={(e)=>setSchoolView((p)=>({...p, subject:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{schoolAnalysisSubjects.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
+                    </div>
+                  </div>
+                  <Card title={`${schoolView.school === '전체' ? '전체 학교' : schoolView.school} ${schoolView.exam} 분석`} right={<button onClick={() => window.print()} className="rounded-2xl bg-violet-50 border border-violet-200 px-4 py-2 text-sm font-bold text-violet-700">리스트 출력</button>}>
+                    <div className="space-y-5 max-h-[720px] overflow-y-auto mini-scroll pr-1">
+                      {schoolRows.length ? schoolRows.map((row, idx) => (
+                        <div key={idx} className="rounded-[26px] bg-white border border-slate-200 p-5 shadow-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div>
+                              <div className="text-lg font-black text-slate-900">{row.school} · {row.grade}학년 · {row.subject}</div>
+                              <div className="text-sm text-slate-500">재원생 {row.count}명 · 1등급 비율 {row.firstTierRate}%</div>
+                            </div>
+                          </div>
+                          <div className="grid xl:grid-cols-[1.15fr_1fr] gap-5">
+                            <div className="space-y-4">
+                              <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
+                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                                  {SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-3 text-center"><div className="text-xs text-slate-500">{b.label}</div><div className="mt-2 text-xl font-black text-slate-900">{row.scoreCounts[b.label] || 0}</div></div>)}
+                                </div>
+                              </div>
+                              <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                  {Array.from({ length: row.system }, (_, i) => i + 1).map((tier) => (
+                                    <div key={tier} className="rounded-2xl bg-white border border-slate-200 p-3">
+                                      <div className="text-xs text-slate-500">{tier}등급</div>
+                                      <div className="mt-1 text-2xl font-black text-violet-700">{row.tierCounts[tier] || 0}</div>
+                                      <div className="mt-2 text-xs text-slate-500 leading-5">{(row.tierRoster[tier] || []).map((r) => r.name).join(', ') || '없음'}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4 overflow-x-auto mini-scroll">
+                              <table className="w-full text-sm">
+                                <thead className="text-slate-500 text-xs uppercase"><tr><th className="py-2 text-left">학생</th><th className="py-2 text-left">세부과목</th><th className="py-2 text-center">점수</th><th className="py-2 text-center">등급</th></tr></thead>
+                                <tbody className="divide-y divide-slate-200">
+                                  {row.roster.map((item) => (
+                                    <tr key={item.docId}>
+                                      <td className="py-3 font-bold text-slate-800">{item.name}</td>
+                                      <td className="py-3 text-slate-500">{item.detailSubject || '-'}</td>
+                                      <td className="py-3 text-center font-black text-violet-700">{item.score}</td>
+                                      <td className="py-3 text-center">{item.tier}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )) : <div className="text-center text-slate-500 py-14">조건에 맞는 데이터가 없습니다.</div>}
                     </div>
                   </Card>
                 </div>
@@ -985,39 +1063,47 @@
               {view === 'subjectAnalysis' && (
                 <div className="space-y-6">
                   <div className="card-3d rounded-[30px] p-5">
-                    <div className="grid md:grid-cols-3 gap-4">
+                    <div className="grid md:grid-cols-4 gap-4">
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">연도</label><select value={subjectView.year} onChange={(e)=>setSubjectView((p)=>({...p, year:Number(e.target.value)}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">시험</label><select value={subjectView.exam} onChange={(e)=>setSubjectView((p)=>({...p, exam:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{EXAMS.map((e)=><option key={e} value={e}>{e}</option>)}</select></div>
-                      <div><label className="block text-xs font-bold text-slate-500 mb-1">과목</label><select value={subjectView.subject} onChange={(e)=>setSubjectView((p)=>({...p, subject:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{subjectOptions.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">과목</label><select value={subjectView.subject} onChange={(e)=>setSubjectView((p)=>({...p, subject:e.target.value, detailSubject:'전체'}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{subjectOptions.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">세부 과목</label><select value={subjectView.detailSubject} onChange={(e)=>setSubjectView((p)=>({...p, detailSubject:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{detailSubjectOptions.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
                     </div>
                   </div>
-                  <Card title={`${subjectView.subject} 과목 학교별/학년별 분석`} right={<div className="text-sm text-slate-500">이전 성적 비교 포함</div>}>
-                    <div className="space-y-5 max-h-[650px] overflow-y-auto mini-scroll pr-1">
+                  <Card title={`${subjectView.subject}${subjectView.detailSubject !== '전체' ? ` · ${subjectView.detailSubject}` : ''} 과목 분석`} right={<button onClick={() => window.print()} className="rounded-2xl bg-violet-50 border border-violet-200 px-4 py-2 text-sm font-bold text-violet-700">리스트 출력</button>}>
+                    <div className="space-y-5 max-h-[720px] overflow-y-auto mini-scroll pr-1">
                       {subjectRows.length ? subjectRows.map((row, idx) => (
                         <div key={idx} className="rounded-[26px] bg-white border border-slate-200 p-5 shadow-sm">
                           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                             <div>
                               <div className="text-lg font-black text-slate-900">{row.school} · {row.grade}학년</div>
-                              <div className="text-sm text-slate-500">원점수 구간 / 등급 인원 / 명단 비교</div>
+                              <div className="text-sm text-slate-500">1등급 {row.tierCounts[1] || 0}명 · 향상 {row.improvedStudents.length}명 · 하락 {row.declinedStudents.length}명</div>
                             </div>
-                            <div className="text-sm font-bold text-violet-700">총 {row.count}명</div>
                           </div>
-                          <div className="grid lg:grid-cols-[1.2fr_1fr] gap-5">
-                            <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
-                              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                                {SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-3 text-center"><div className="text-xs text-slate-500">{b.label}</div><div className="mt-2 text-xl font-black text-slate-900">{row.scoreCounts[b.label] || 0}</div></div>)}
+                          <div className="grid xl:grid-cols-[1.05fr_1.2fr] gap-5">
+                            <div className="space-y-4">
+                              <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
+                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                                  {SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-3 text-center"><div className="text-xs text-slate-500">{b.label}</div><div className="mt-2 text-xl font-black text-slate-900">{row.scoreCounts[b.label] || 0}</div></div>)}
+                                </div>
+                                <div className="mt-4 text-sm text-slate-600">등급 분포: {Array.from({ length: row.system }, (_, i) => i+1).map((t) => `${t}등급 ${row.tierCounts[t] || 0}명`).join(' · ')}</div>
                               </div>
-                              <div className="mt-4 text-sm text-slate-600">등급 분포: {Array.from({ length: row.system }, (_, i) => i+1).map((t) => `${t}등급 ${row.tierCounts[t] || 0}명`).join(' · ')}</div>
+                              <div className="grid md:grid-cols-2 gap-4">
+                                <div className="rounded-3xl bg-emerald-50 border border-emerald-200 p-4"><div className="text-sm font-bold text-emerald-700">향상 학생</div><div className="mt-2 text-sm text-emerald-900 leading-6">{row.improvedStudents.length ? row.improvedStudents.join(', ') : '없음'}</div></div>
+                                <div className="rounded-3xl bg-rose-50 border border-rose-200 p-4"><div className="text-sm font-bold text-rose-700">하락 학생</div><div className="mt-2 text-sm text-rose-900 leading-6">{row.declinedStudents.length ? row.declinedStudents.join(', ') : '없음'}</div></div>
+                              </div>
                             </div>
                             <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4 overflow-x-auto mini-scroll">
                               <table className="w-full text-sm">
-                                <thead className="text-slate-500 text-xs uppercase"><tr><th className="py-2 text-left">학생</th><th className="py-2 text-center">점수</th><th className="py-2 text-center">등급</th><th className="py-2 text-center">원점수</th><th className="py-2 text-center">등급</th></tr></thead>
+                                <thead className="text-slate-500 text-xs uppercase"><tr><th className="py-2 text-left">학생</th><th className="py-2 text-center">현재</th><th className="py-2 text-center">현재 등급</th><th className="py-2 text-center">이전</th><th className="py-2 text-center">이전 등급</th><th className="py-2 text-center">원점수 변화</th><th className="py-2 text-center">등급 변화</th></tr></thead>
                                 <tbody className="divide-y divide-slate-200">
                                   {row.roster.map((item) => (
                                     <tr key={item.docId}>
-                                      <td className="py-3 font-bold text-slate-800">{item.name}</td>
+                                      <td className="py-3 font-bold text-slate-800">{item.name}{item.detailSubject ? <span className="ml-2 text-xs text-slate-400">({item.detailSubject})</span> : null}</td>
                                       <td className="py-3 text-center font-black text-violet-700">{item.score}</td>
                                       <td className="py-3 text-center">{item.tier}</td>
+                                      <td className="py-3 text-center text-slate-500">{item.prev ? item.prev.score : '-'}</td>
+                                      <td className="py-3 text-center text-slate-500">{item.prev ? item.prev.tier : '-'}</td>
                                       <td className="py-3 text-center"><StatusPill value={item.status.score} /></td>
                                       <td className="py-3 text-center"><StatusPill value={item.status.tier} /></td>
                                     </tr>
