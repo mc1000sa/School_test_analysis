@@ -58,10 +58,10 @@
         radial-gradient(circle at 100% 0%, rgba(59,130,246,0.10), transparent 22%),
         linear-gradient(180deg, #f8f9ff 0%, #f4f6fb 42%, #f8f9ff 100%);
     }
-    .sidebar-shadow { box-shadow: 0 30px 60px rgba(15,23,42,0.08); }
-    .panel-shadow { box-shadow: 0 18px 38px rgba(15,23,42,0.08); }
+    .sidebar-shadow { box-shadow: 0 16px 32px rgba(15,23,42,0.06); }
+    .panel-shadow { box-shadow: 0 12px 24px rgba(15,23,42,0.06); }
     .soft-border { border: 1px solid rgba(226,232,240,0.9); }
-    .glass { background: rgba(255,255,255,0.86); backdrop-filter: blur(16px); }
+    .glass { background: rgba(255,255,255,0.94); }
     
     .nav-pill {
       color: #334155;
@@ -112,7 +112,7 @@
       background: linear-gradient(135deg, #6d28d9, #8b5cf6 62%, #4f46e5) !important;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.24), 0 18px 28px rgba(109,40,217,0.24) !important;
     }
-    .teacher-chip-selected span { color: #fff !important; }
+    .teacher-chip-selected span { color: #fff !important; text-shadow: 0 1px 2px rgba(0,0,0,0.12); }
     .teacher-chip-selected .teacher-chip-dot { background: rgba(255,255,255,0.95) !important; box-shadow: 0 0 0 3px rgba(255,255,255,0.12); }
     .teacher-chip-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.95); }
     .teacher-chip-1 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,243,255,0.94)); }
@@ -145,6 +145,25 @@
     }
     .mini-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
     .mini-scroll::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.45); border-radius: 999px; }
+    .print-title { display: none; }
+    @media print {
+      @page { size: A4 portrait; margin: 12mm; }
+      html, body { background: #fff !important; }
+      body * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .app-shell { background: #fff !important; min-height: auto !important; }
+      .content-wrap { padding-left: 0 !important; }
+      main { padding: 0 !important; }
+      .card-3d, .hero-panel, .score-block {
+        background: #fff !important;
+        box-shadow: none !important;
+        border: 1px solid #dbe2ea !important;
+      }
+      .mini-scroll { max-height: none !important; overflow: visible !important; padding-right: 0 !important; }
+      .print-title { display: block !important; margin-bottom: 14px; }
+      .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+      table { width: 100% !important; }
+      tr, td, th { break-inside: avoid; page-break-inside: avoid; }
+    }
     @media (max-width: 1160px) {
       .desktop-sidebar { display:none; }
       .content-wrap { padding-left: 0 !important; }
@@ -766,7 +785,7 @@
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_26%)]"></div>
                 <div className="relative z-10 max-w-xl">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs font-bold tracking-[0.18em] text-violet-700 uppercase soft-border mb-5">Munsan Open Academy</div>
-                  <h1 className="text-4xl xl:text-5xl font-black tracking-tight leading-[1.15] text-slate-900">입력은 쉽고 빠르게,<br/>분석은 깊이 있게!</h1>
+                  <h1 className="text-3xl xl:text-5xl font-black tracking-tight leading-[1.22] text-slate-900">입력은 쉽고 빠르게,<br/>분석은 깊이 있게!</h1>
                   <p className="mt-5 text-lg text-slate-600 leading-8">성적 입력 참여율을 높이고, 학교별 · 과목별 · 학생별 분석을 한 화면 안에서 연결하는 열린학원 전용 포털입니다.</p>
                 </div>
               </div>
@@ -844,7 +863,7 @@
           </aside>
 
           <div className="content-wrap lg:pl-[295px]">
-            <header className="sticky top-0 z-20 bg-[#f7f8fd]/90 backdrop-blur-xl border-b border-slate-200/75 print:hidden">
+            <header className="sticky top-0 z-20 bg-white/95 border-b border-slate-200/75 print:hidden">
               <div className="px-4 sm:px-6 lg:px-10 py-5 flex items-center justify-between gap-4">
                 <div>
                   <div className="text-sm font-bold text-violet-700">열린학원 성적분석 포털</div>
@@ -856,7 +875,7 @@
                       <button key={item.key} onClick={() => setView(item.key)} className={`rounded-xl px-3 py-2 text-sm font-bold transition-all ${view === item.key ? 'text-violet-700 bg-violet-50' : 'text-slate-500 hover:bg-slate-50'}`}>{item.label}</button>
                     ))}
                   </div>
-                  <button onClick={() => window.print()} className="hidden md:inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 soft-border shadow-sm text-sm font-bold text-slate-700 hover:bg-violet-50"><i className="fas fa-print"></i>현재 화면 출력</button>
+                  <button onClick={() => window.print()} className="hidden md:inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 soft-border shadow-sm text-sm font-bold text-slate-700 hover:bg-violet-50"><i className="fas fa-print"></i>현재 화면 인쇄</button>
                   <div className="hidden sm:flex items-center gap-3 rounded-2xl bg-white px-4 py-2.5 soft-border shadow-sm">
                     <div className="h-10 w-10 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center font-black">{(currentTeacher?.name || '?').slice(0,1)}</div>
                     <div className="text-sm">
@@ -869,9 +888,13 @@
             </header>
 
             <main className="px-4 sm:px-6 lg:px-10 py-8 space-y-6">
+              <div className="print-title">
+                <div className="text-[22px] font-black text-slate-900">{titleMap[view]}</div>
+                <div className="mt-1 text-sm text-slate-500">열린학원 성적분석 포털 · 출력일시 {formatDateText(new Date().toISOString())}</div>
+              </div>
               {view === 'dashboard' && (
                 <div className="space-y-6">
-                  <div className="card-3d rounded-[30px] p-5">
+                  <div className="card-3d rounded-[30px] p-5 print-avoid-break">
                     <div className="flex flex-col gap-4">
                       <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                         <div>
@@ -999,7 +1022,7 @@
                     <div className="text-sm font-bold text-violet-700">학교별 성적분석</div>
                     <p className="mt-2 text-slate-600 leading-7">보고 싶은 학교와 학년, 과목을 선택하면 점수대별 인원수, 등급별 인원, 등급별 명단을 바로 확인하고 출력할 수 있어요.</p>
                   </div>
-                  <div className="card-3d rounded-[30px] p-5">
+                  <div className="card-3d rounded-[30px] p-5 print-avoid-break">
                     <div className="grid md:grid-cols-5 gap-4">
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">연도</label><select value={schoolView.year} onChange={(e)=>setSchoolView((p)=>({...p, year:Number(e.target.value)}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">시험</label><select value={schoolView.exam} onChange={(e)=>setSchoolView((p)=>({...p, exam:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{EXAMS.map((e)=><option key={e} value={e}>{e}</option>)}</select></div>
@@ -1008,10 +1031,10 @@
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">과목</label><select value={schoolView.subject} onChange={(e)=>setSchoolView((p)=>({...p, subject:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{schoolAnalysisSubjects.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
                     </div>
                   </div>
-                  <Card title={`${schoolView.school === '전체' ? '전체 학교' : schoolView.school} ${schoolView.exam} 분석`} right={<button onClick={() => window.print()} className="rounded-2xl bg-violet-50 border border-violet-200 px-4 py-2 text-sm font-bold text-violet-700">리스트 출력</button>}>
+                  <Card title={`${schoolView.school === '전체' ? '전체 학교' : schoolView.school} ${schoolView.exam} 분석`} right={<button onClick={() => window.print()} className="rounded-2xl bg-violet-50 border border-violet-200 px-4 py-2 text-sm font-bold text-violet-700">리스트 인쇄</button>}>
                     <div className="space-y-5 max-h-[720px] overflow-y-auto mini-scroll pr-1">
                       {schoolRows.length ? schoolRows.map((row, idx) => (
-                        <div key={idx} className="rounded-[26px] bg-white border border-slate-200 p-5 shadow-sm">
+                        <div key={idx} className="rounded-[26px] bg-white border border-slate-200 p-5 shadow-sm print-avoid-break">
                           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                             <div>
                               <div className="text-lg font-black text-slate-900">{row.school} · {row.grade}학년 · {row.subject}</div>
@@ -1062,7 +1085,7 @@
 
               {view === 'subjectAnalysis' && (
                 <div className="space-y-6">
-                  <div className="card-3d rounded-[30px] p-5">
+                  <div className="card-3d rounded-[30px] p-5 print-avoid-break">
                     <div className="grid md:grid-cols-4 gap-4">
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">연도</label><select value={subjectView.year} onChange={(e)=>setSubjectView((p)=>({...p, year:Number(e.target.value)}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">시험</label><select value={subjectView.exam} onChange={(e)=>setSubjectView((p)=>({...p, exam:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{EXAMS.map((e)=><option key={e} value={e}>{e}</option>)}</select></div>
@@ -1070,10 +1093,10 @@
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">세부 과목</label><select value={subjectView.detailSubject} onChange={(e)=>setSubjectView((p)=>({...p, detailSubject:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{detailSubjectOptions.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
                     </div>
                   </div>
-                  <Card title={`${subjectView.subject}${subjectView.detailSubject !== '전체' ? ` · ${subjectView.detailSubject}` : ''} 과목 분석`} right={<button onClick={() => window.print()} className="rounded-2xl bg-violet-50 border border-violet-200 px-4 py-2 text-sm font-bold text-violet-700">리스트 출력</button>}>
+                  <Card title={`${subjectView.subject}${subjectView.detailSubject !== '전체' ? ` · ${subjectView.detailSubject}` : ''} 과목 분석`} right={<button onClick={() => window.print()} className="rounded-2xl bg-violet-50 border border-violet-200 px-4 py-2 text-sm font-bold text-violet-700">리스트 인쇄</button>}>
                     <div className="space-y-5 max-h-[720px] overflow-y-auto mini-scroll pr-1">
                       {subjectRows.length ? subjectRows.map((row, idx) => (
-                        <div key={idx} className="rounded-[26px] bg-white border border-slate-200 p-5 shadow-sm">
+                        <div key={idx} className="rounded-[26px] bg-white border border-slate-200 p-5 shadow-sm print-avoid-break">
                           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                             <div>
                               <div className="text-lg font-black text-slate-900">{row.school} · {row.grade}학년</div>
@@ -1121,7 +1144,7 @@
 
               {view === 'studentAnalysis' && (
                 <div className="space-y-6">
-                  <div className="card-3d rounded-[30px] p-5">
+                  <div className="card-3d rounded-[30px] p-5 print-avoid-break">
                     <div className="grid lg:grid-cols-[1fr_auto] gap-4 items-end">
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">학생 선택</label>
