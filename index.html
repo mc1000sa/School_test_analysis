@@ -164,9 +164,25 @@
       table { width: 100% !important; }
       tr, td, th { break-inside: avoid; page-break-inside: avoid; }
     }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     @media (max-width: 1160px) {
       .desktop-sidebar { display:none; }
       .content-wrap { padding-left: 0 !important; }
+    }
+    @media (max-width: 767px) {
+      .mobile-safe-bottom { padding-bottom: 84px; }
+      .desktop-manage-grid { display: none !important; }
+      .mobile-manage-list { display: block !important; }
+      .mobile-stack { display: block !important; }
+      .mobile-stack > * + * { margin-top: 12px; }
+      .mobile-analysis-grid { grid-template-columns: 1fr !important; }
+      .mobile-analysis-side { margin-top: 12px; }
+      .top-nav-scroll { overflow-x: auto; white-space: nowrap; }
+      .top-nav-scroll::-webkit-scrollbar { display: none; }
+    }
+    @media (min-width: 768px) {
+      .mobile-manage-list { display: none !important; }
     }
   </style>
 </head>
@@ -185,8 +201,7 @@
       { label: '80-89', min: 80, max: 89 },
       { label: '70-79', min: 70, max: 79 },
       { label: '60-69', min: 60, max: 69 },
-      { label: '50-59', min: 50, max: 59 },
-      { label: '0-49', min: 0, max: 49 },
+      { label: '0-59', min: 0, max: 59 },
     ];
 
     const SUBJECT_COLORS = {
@@ -386,7 +401,7 @@
             if (typeof __firebase_config !== 'undefined') {
               firebaseConfig = JSON.parse(__firebase_config);
             } else {
-               firebaseConfig = {
+                firebaseConfig = {
                 apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
                 authDomain: "open-school-3f74c.firebaseapp.com",
                 projectId: "open-school-3f74c",
@@ -864,30 +879,39 @@
 
           <div className="content-wrap lg:pl-[295px]">
             <header className="sticky top-0 z-20 bg-white/95 border-b border-slate-200/75 print:hidden">
-              <div className="px-4 sm:px-6 lg:px-10 py-5 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-bold text-violet-700">열린학원 성적분석 포털</div>
-                  <h1 className="mt-1 text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{titleMap[view]}</h1>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="hidden md:flex flex-wrap gap-2 items-center rounded-2xl bg-white/80 px-3 py-2 soft-border shadow-sm">
-                    {MENU_ITEMS.map((item) => (
-                      <button key={item.key} onClick={() => setView(item.key)} className={`rounded-xl px-3 py-2 text-sm font-bold transition-all ${view === item.key ? 'text-violet-700 bg-violet-50' : 'text-slate-500 hover:bg-slate-50'}`}>{item.label}</button>
-                    ))}
+              <div className="px-4 sm:px-6 lg:px-10 py-4 sm:py-5 flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-violet-700">열린학원 성적분석 포털</div>
+                    <h1 className="mt-1 text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{titleMap[view]}</h1>
                   </div>
-                  <button onClick={() => window.print()} className="hidden md:inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 soft-border shadow-sm text-sm font-bold text-slate-700 hover:bg-violet-50"><i className="fas fa-print"></i>현재 화면 인쇄</button>
-                  <div className="hidden sm:flex items-center gap-3 rounded-2xl bg-white px-4 py-2.5 soft-border shadow-sm">
-                    <div className="h-10 w-10 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center font-black">{(currentTeacher?.name || '?').slice(0,1)}</div>
-                    <div className="text-sm">
-                      <div className="font-black text-slate-800">{currentTeacher?.name || '-'}</div>
-                      <div className="text-slate-400 text-xs">열린학원 선생님</div>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-2xl bg-white px-3 sm:px-4 py-2.5 soft-border shadow-sm text-xs sm:text-sm font-bold text-slate-700 hover:bg-violet-50"><i className="fas fa-print"></i><span className="hidden sm:inline">현재 화면 인쇄</span><span className="sm:hidden">인쇄</span></button>
+                    <div className="hidden sm:flex items-center gap-3 rounded-2xl bg-white px-4 py-2.5 soft-border shadow-sm">
+                      <div className="h-10 w-10 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center font-black">{(currentTeacher?.name || '?').slice(0,1)}</div>
+                      <div className="text-sm">
+                        <div className="font-black text-slate-800">{currentTeacher?.name || '-'}</div>
+                        <div className="text-slate-400 text-xs">열린학원 선생님</div>
+                      </div>
                     </div>
+                  </div>
+                </div>
+                <div className="hidden md:flex flex-wrap gap-2 items-center rounded-2xl bg-white/80 px-3 py-2 soft-border shadow-sm w-max max-w-full">
+                  {MENU_ITEMS.map((item) => (
+                    <button key={item.key} onClick={() => setView(item.key)} className={`rounded-xl px-3 py-2 text-sm font-bold transition-all ${view === item.key ? 'text-violet-700 bg-violet-50' : 'text-slate-500 hover:bg-slate-50'}`}>{item.label}</button>
+                  ))}
+                </div>
+                <div className="md:hidden -mx-1 px-1 overflow-x-auto no-scrollbar">
+                  <div className="flex gap-2 min-w-max pb-1">
+                    {MENU_ITEMS.map((item) => (
+                      <button key={item.key} onClick={() => setView(item.key)} className={`rounded-2xl px-4 py-2.5 text-sm font-bold border transition-all whitespace-nowrap ${view === item.key ? 'text-white border-transparent bg-gradient-to-r from-violet-700 to-indigo-600 shadow-md shadow-violet-200' : 'text-slate-600 border-slate-200 bg-white hover:bg-slate-50'}`}>{item.label}</button>
+                    ))}
                   </div>
                 </div>
               </div>
             </header>
 
-            <main className="px-4 sm:px-6 lg:px-10 py-8 space-y-6">
+            <main className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 space-y-6 mobile-safe-bottom">
               <div className="print-title">
                 <div className="text-[22px] font-black text-slate-900">{titleMap[view]}</div>
                 <div className="mt-1 text-sm text-slate-500">열린학원 성적분석 포털 · 출력일시 {formatDateText(new Date().toISOString())}</div>
@@ -965,7 +989,7 @@
                     <div className="absolute top-0 right-0 w-36 h-36 bg-violet-50 rounded-bl-full"></div>
                     <div className="relative z-10">
                       <div className="flex items-center space-x-2 text-violet-700 font-black border-b border-slate-100 pb-2 mb-4"><i className="fas fa-user-graduate"></i><span>학생 선택 및 기본 정보</span></div>
-                      <div className="flex flex-wrap gap-4 items-end">
+                      <div className="flex flex-wrap gap-4 items-end mobile-stack">
                         <div className="flex-1 min-w-[100px]"><label className="block text-xs font-bold text-slate-600 mb-1">연도</label><select name="year" value={manageStudent.year} onChange={handleManageStudentChange} className="w-full border-2 border-violet-100 rounded-2xl p-2.5 text-sm font-semibold focus:ring-4 focus:ring-violet-100 outline-none">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
                         <div className="flex-[2] min-w-[180px]"><label className="block text-xs font-bold text-violet-700 mb-1">학생 이름 검색/입력</label><input type="text" name="name" list="student-list" value={manageStudent.name} onChange={handleManageStudentChange} placeholder="이름을 입력하세요" autoComplete="off" className="w-full border-2 border-violet-200 bg-violet-50/50 rounded-2xl p-2.5 text-sm font-bold focus:ring-4 focus:ring-violet-100 focus:bg-white outline-none" /><datalist id="student-list">{uniqueStudentNames.map((name) => <option key={name} value={name} />)}</datalist></div>
                         <div className="flex-1 min-w-[150px]"><label className="block text-xs font-bold text-slate-600 mb-1">소속 학교</label><input type="text" name="school" value={manageStudent.school} onChange={handleManageStudentChange} placeholder="예: 파주고" className="w-full border border-slate-300 rounded-2xl p-2.5 text-sm focus:ring-4 focus:ring-violet-100 outline-none" /></div>
@@ -981,7 +1005,7 @@
                         <h3 className="font-black"><span className="text-amber-300">{manageStudent.name || '???'}</span> 학생 성적 보드</h3>
                         <span className="text-xs text-slate-300">칸을 클릭하여 여러 과목을 자유롭게 추가/수정하세요</span>
                       </div>
-                      <div className="overflow-x-auto p-4 mini-scroll">
+                      <div className="overflow-x-auto p-4 mini-scroll desktop-manage-grid">
                         <table className="w-full text-sm text-left border-collapse border border-slate-300">
                           <thead className="bg-slate-100"><tr><th className="border border-slate-300 px-4 py-3 text-center font-bold text-slate-700 w-32 bg-slate-200">시험 구분</th>{SUBJECTS.map((col)=><th key={col} className="border border-slate-300 px-4 py-3 text-center font-bold">{col}</th>)}</tr></thead>
                           <tbody>
@@ -1010,6 +1034,49 @@
                             ))}
                           </tbody>
                         </table>
+                      </div>
+                      <div className="mobile-manage-list p-4 space-y-4">
+                        {EXAMS.map((exam) => (
+                          <div key={exam} className="score-block rounded-[22px] p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <div className="font-black text-slate-800">{exam}</div>
+                                <div className="text-xs text-slate-400">과목을 눌러 빠르게 입력/수정</div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {SUBJECTS.map((subject) => {
+                                const cellScores = currentStudentData.filter((d) => d.exam === exam && d.subject === subject);
+                                return (
+                                  <button
+                                    key={subject}
+                                    type="button"
+                                    onClick={() => openScoreModal(exam, subject, cellScores[0] || null)}
+                                    className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-left shadow-sm active:scale-[0.99]"
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-black text-slate-800">{subject}</span>
+                                      {cellScores.length > 0 ? <span className="text-[11px] font-bold text-violet-600">{cellScores.length}개</span> : <span className="text-[11px] text-slate-400">입력</span>}
+                                    </div>
+                                    {cellScores.length > 0 ? (
+                                      <div className="mt-2 space-y-1">
+                                        {cellScores.slice(0,2).map((record) => (
+                                          <div key={record.docId} className="rounded-xl bg-violet-50 px-2 py-1.5 text-[11px] text-slate-700">
+                                            <div className="font-bold text-violet-700">{record.detailSubject || '기본'}</div>
+                                            <div>{record.score}점 · {record.tier}등급</div>
+                                          </div>
+                                        ))}
+                                        {cellScores.length > 2 && <div className="text-[11px] text-slate-400">외 {cellScores.length - 2}개</div>}
+                                      </div>
+                                    ) : (
+                                      <div className="mt-2 text-[11px] text-slate-400">터치해서 성적 입력</div>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -1044,16 +1111,16 @@
                           <div className="grid xl:grid-cols-[1.15fr_1fr] gap-5">
                             <div className="space-y-4">
                               <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
-                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                                  {SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-3 text-center"><div className="text-xs text-slate-500">{b.label}</div><div className="mt-2 text-xl font-black text-slate-900">{row.scoreCounts[b.label] || 0}</div></div>)}
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                  {SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-3 min-h-[86px] flex flex-col items-center justify-center text-center"><div className="text-xs text-slate-500 leading-4">{b.label}</div><div className="mt-2 text-xl font-black text-slate-900 leading-none">{row.scoreCounts[b.label] || 0}</div></div>)}
                                 </div>
                               </div>
                               <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
                                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                   {Array.from({ length: row.system }, (_, i) => i + 1).map((tier) => (
-                                    <div key={tier} className="rounded-2xl bg-white border border-slate-200 p-3">
-                                      <div className="text-xs text-slate-500">{tier}등급</div>
-                                      <div className="mt-1 text-2xl font-black text-violet-700">{row.tierCounts[tier] || 0}</div>
+                                    <div key={tier} className="rounded-2xl bg-white border border-slate-200 p-3 min-h-[96px] flex flex-col items-center justify-center text-center">
+                                      <div className="text-xs text-slate-500 leading-4">{tier}등급</div>
+                                      <div className="mt-1 text-2xl font-black text-violet-700 leading-none">{row.tierCounts[tier] || 0}</div>
                                       <div className="mt-2 text-xs text-slate-500 leading-5">{(row.tierRoster[tier] || []).map((r) => r.name).join(', ') || '없음'}</div>
                                     </div>
                                   ))}
@@ -1106,8 +1173,8 @@
                           <div className="grid xl:grid-cols-[1.05fr_1.2fr] gap-5">
                             <div className="space-y-4">
                               <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
-                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                                  {SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-3 text-center"><div className="text-xs text-slate-500">{b.label}</div><div className="mt-2 text-xl font-black text-slate-900">{row.scoreCounts[b.label] || 0}</div></div>)}
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                  {SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-3 min-h-[86px] flex flex-col items-center justify-center text-center"><div className="text-xs text-slate-500 leading-4">{b.label}</div><div className="mt-2 text-xl font-black text-slate-900 leading-none">{row.scoreCounts[b.label] || 0}</div></div>)}
                                 </div>
                                 <div className="mt-4 text-sm text-slate-600">등급 분포: {Array.from({ length: row.system }, (_, i) => i+1).map((t) => `${t}등급 ${row.tierCounts[t] || 0}명`).join(' · ')}</div>
                               </div>
