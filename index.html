@@ -62,15 +62,18 @@
     .panel-shadow { box-shadow: 0 18px 38px rgba(15,23,42,0.08); }
     .soft-border { border: 1px solid rgba(226,232,240,0.9); }
     .glass { background: rgba(255,255,255,0.86); backdrop-filter: blur(16px); }
+    
     .nav-pill {
-      color: #475569;
-      background: transparent;
-      border: 1px solid transparent;
+      color: #334155;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,250,252,0.9));
+      border: 1px solid rgba(226,232,240,0.95);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 8px 18px rgba(15,23,42,0.04);
     }
     .nav-pill:hover {
-      background: rgba(255,255,255,0.7);
-      border-color: rgba(226,232,240,0.9);
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(245,243,255,0.95));
+      border-color: rgba(196,181,253,0.8);
       color: #111827;
+      transform: translateY(-1px);
     }
     .nav-pill-active {
       color: #fff;
@@ -83,6 +86,39 @@
       background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
       box-shadow: 0 12px 22px rgba(124,58,237,0.22);
     }
+    .desktop-sidebar .mt-6.space-y-2 button:nth-child(1):not(.nav-pill-active) { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(239,246,255,0.92)); }
+    .desktop-sidebar .mt-6.space-y-2 button:nth-child(2):not(.nav-pill-active) { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,243,255,0.94)); }
+    .desktop-sidebar .mt-6.space-y-2 button:nth-child(3):not(.nav-pill-active) { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(236,253,245,0.92)); }
+    .desktop-sidebar .mt-6.space-y-2 button:nth-child(4):not(.nav-pill-active) { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,247,237,0.92)); }
+    .desktop-sidebar .mt-6.space-y-2 button:nth-child(5):not(.nav-pill-active) { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,245,255,0.94)); }
+    .desktop-sidebar .mt-6.space-y-2 button:nth-child(6):not(.nav-pill-active) { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(238,242,255,0.94)); }
+    .teacher-chip {
+      height: 54px;
+      border-radius: 18px;
+      border: 1px solid rgba(226,232,240,0.95);
+      font-weight: 800;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 10px 24px rgba(15,23,42,0.05);
+      transition: all .18s ease;
+    }
+    .teacher-chip:hover { transform: translateY(-1px); }
+    .teacher-chip-selected {
+      color: #fff;
+      border-color: rgba(124,58,237,0.4);
+      background: linear-gradient(135deg, #6d28d9, #8b5cf6 62%, #4f46e5);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.24), 0 18px 28px rgba(109,40,217,0.24);
+    }
+    .teacher-chip-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.95); }
+    .teacher-chip-1 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,243,255,0.94)); }
+    .teacher-chip-2 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(239,246,255,0.94)); }
+    .teacher-chip-3 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(236,253,245,0.94)); }
+    .teacher-chip-4 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,247,237,0.94)); }
+    .teacher-chip-5 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,245,255,0.94)); }
+    .teacher-chip-6 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(238,242,255,0.94)); }
     .card-3d {
       background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.90));
       border: 1px solid rgba(255,255,255,0.95);
@@ -146,7 +182,7 @@
       { key: 'schoolAnalysis', label: '학교별 성적분석', icon: 'fa-school' },
       { key: 'subjectAnalysis', label: '과목별 성적분석', icon: 'fa-book-open' },
       { key: 'studentAnalysis', label: '학생별 성적분석', icon: 'fa-user-graduate' },
-      { key: 'teamExam', label: '팀장급 시험분석', icon: 'fa-clipboard-list' },
+      { key: 'teamExam', label: '시험 분석 아카이브', icon: 'fa-clipboard-list' },
     ];
 
     function getTierSystem(row) {
@@ -285,6 +321,7 @@
         school: '',
         grade: 1,
         subject: '국어',
+        detailSubject: '',
         objectiveCount: '',
         objectivePoints: '',
         subjectiveCount: '',
@@ -313,7 +350,7 @@
             if (typeof __firebase_config !== 'undefined') {
               firebaseConfig = JSON.parse(__firebase_config);
             } else {
-               firebaseConfig = {
+                firebaseConfig = {
                 apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
                 authDomain: "open-school-3f74c.firebaseapp.com",
                 projectId: "open-school-3f74c",
@@ -669,7 +706,7 @@
             updatedBy: currentTeacher?.name || '알수없음',
             deleted: false,
           });
-          setTeamExamForm({ ...teamExamForm, objectiveCount:'', objectivePoints:'', subjectiveCount:'', subjectivePoints:'', difficulty:3, review:'', specialNote:'' });
+          setTeamExamForm({ ...teamExamForm, detailSubject:'', objectiveCount:'', objectivePoints:'', subjectiveCount:'', subjectivePoints:'', difficulty:3, review:'', specialNote:'' });
           alert('시험 분석이 저장되었습니다.');
         } catch (error) {
           alert('teamExams 규칙을 먼저 추가해야 저장됩니다.');
@@ -691,7 +728,7 @@
               <div className="hidden lg:flex rounded-[36px] hero-panel panel-shadow p-10 items-end relative overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_26%)]"></div>
                 <div className="relative z-10 max-w-xl">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs font-bold tracking-[0.18em] text-violet-700 uppercase soft-border mb-5">Open Academy Data Portal</div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs font-bold tracking-[0.18em] text-violet-700 uppercase soft-border mb-5">Munsan Open Academy</div>
                   <h1 className="text-5xl font-black tracking-tight leading-tight text-slate-900">입력은 빠르게, 분석은 깊게.</h1>
                   <p className="mt-5 text-lg text-slate-600 leading-8">성적 입력 참여율을 높이고, 학교별 · 과목별 · 학생별 분석을 한 화면 안에서 연결하는 열린학원 전용 포털입니다.</p>
                 </div>
@@ -700,22 +737,35 @@
                 <div className="flex items-center gap-3 mb-6">
                   {!logoError ? <img src="logo.png" alt="열린학원 로고" className="h-12 w-auto object-contain" onError={() => setLogoError(true)} /> : <div className="h-12 w-12 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center"><i className="fas fa-school"></i></div>}
                 </div>
-                <h2 className="text-3xl font-black text-slate-900">선생님 로그인</h2>
-                <p className="mt-2 text-slate-500">등록된 선생님 목록에서 선택 후 PIN만 입력하면 바로 접속할 수 있어요.</p>
+                <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black tracking-[0.18em] text-violet-700 uppercase soft-border">문산 열린학원 교직원</div>
+                <h2 className="mt-4 text-3xl font-black text-slate-900">빠른 PIN 로그인</h2>
+                <p className="mt-2 text-slate-500">선생님 버튼을 먼저 누른 뒤, PIN 번호만 입력하면 바로 접속할 수 있어요.</p>
                 <form onSubmit={handleTeacherLogin} className="mt-8 space-y-4">
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">선생님 선택</label>
-                    <select value={selectedTeacherName} onChange={(e) => setSelectedTeacherName(e.target.value)} className="w-full h-14 px-4 border border-slate-200 rounded-2xl outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 bg-white transition-all">
-                      <option value="">선생님을 선택하세요</option>
-                      {teachersData.map((teacher) => <option key={teacher.teacherId} value={teacher.name}>{teacher.name}</option>)}
-                    </select>
+                    <label className="block text-sm font-bold text-slate-700 mb-3">선생님 선택</label>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {teachersData.map((teacher, idx) => {
+                        const selected = selectedTeacherName === teacher.name;
+                        return (
+                          <button
+                            type="button"
+                            key={teacher.teacherId}
+                            onClick={() => setSelectedTeacherName(teacher.name)}
+                            className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selected ? 'teacher-chip-selected' : ''}`}
+                          >
+                            <span className="teacher-chip-dot"></span>
+                            <span>{teacher.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">PIN</label>
-                    <input type="password" value={loginPin} onChange={(e) => setLoginPin(e.target.value)} className="w-full h-14 px-4 border border-slate-200 rounded-2xl outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 bg-white transition-all" placeholder="PIN 입력" />
+                    <input type="password" value={loginPin} onChange={(e) => setLoginPin(e.target.value)} className="w-full h-14 px-4 border border-slate-200 rounded-2xl outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 bg-white transition-all" placeholder={selectedTeacherName ? `${selectedTeacherName} 선생님 PIN 입력` : 'PIN 입력'} />
                   </div>
                   {loginError && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-2xl px-4 py-3">{loginError}</div>}
-                  <button type="submit" className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 hover:from-violet-800 hover:to-indigo-700 text-white font-bold shadow-lg shadow-violet-200">로그인</button>
+                  <button type="submit" className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-700 via-purple-600 to-indigo-600 hover:from-violet-800 hover:via-purple-700 hover:to-indigo-700 text-white font-bold shadow-lg shadow-violet-200">로그인</button>
                 </form>
               </div>
             </div>
@@ -729,7 +779,7 @@
         schoolAnalysis: '학교별 성적분석',
         subjectAnalysis: '과목별 성적분석',
         studentAnalysis: '학생별 성적분석',
-        teamExam: '팀장급 시험분석',
+        teamExam: '시험 분석 아카이브',
       };
 
       return (
@@ -1037,14 +1087,15 @@
               {view === 'teamExam' && (
                 <div className="space-y-6">
                   <div className="grid xl:grid-cols-[0.95fr_1.05fr] gap-5">
-                    <Card title="팀장 시험 분석 입력">
+                    <Card title="과목별 시험 분석 입력">
                       <form onSubmit={saveTeamExam} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">연도</label><select name="year" value={teamExamForm.year} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">시험</label><select name="exam" value={teamExamForm.exam} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{EXAMS.map((e)=><option key={e} value={e}>{e}</option>)}</select></div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">학교</label><input name="school" value={teamExamForm.school} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5" /></div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">학년</label><select name="grade" value={teamExamForm.grade} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{GRADES.map((g)=><option key={g} value={g}>{g}학년</option>)}</select></div>
-                          <div className="col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">과목명</label><select name="subject" value={teamExamForm.subject} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{SUBJECTS.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
+                          <div><label className="block text-xs font-bold text-slate-500 mb-1">과목명</label><select name="subject" value={teamExamForm.subject} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{SUBJECTS.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
+                          <div><label className="block text-xs font-bold text-slate-500 mb-1">세부 과목명</label><input name="detailSubject" value={teamExamForm.detailSubject} onChange={handleTeamFormChange} placeholder="예: 공통수학1, 대수, 기하" className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5" /></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">객 문항수</label><input name="objectiveCount" value={teamExamForm.objectiveCount} onChange={handleTeamFormChange} type="number" className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5" /></div>
@@ -1076,6 +1127,7 @@
                               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 leading-7">
                                 <div><b>객 문항수/배점:</b> {row.objectiveCount || 0} / {row.objectivePoints || 0}</div>
                                 <div><b>주 문항수/배점:</b> {row.subjectiveCount || 0} / {row.subjectivePoints || 0}</div>
+                                <div className="mt-3"><b>세부 과목명</b><div className="mt-1 text-slate-600 whitespace-pre-wrap">{row.detailSubject || '-'}</div></div>
                                 <div className="mt-3"><b>시험특이사항</b><div className="mt-1 text-slate-600 whitespace-pre-wrap">{row.specialNote || '-'}</div></div>
                               </div>
                               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
