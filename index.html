@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>열린학원 성적분석 시스템 v2</title>
+  <title>열린학원 성적분석 시스템</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -774,9 +774,9 @@
       const sortedDashboardData = [...filteredDashboardData].sort((a,b) => dashboardSort.direction === 'asc' ? String(a[dashboardSort.key]).localeCompare(String(b[dashboardSort.key])) : String(b[dashboardSort.key]).localeCompare(String(a[dashboardSort.key])));
 
       // Teacher Analysis Logic
-      const teacherAnalysisRows = useMemo(() => {
-        const target = teacherAnalysisTeacher || currentTeacherName;
-        const rows = activeJoinedData.filter(r => (r.createdBy===target || r.updatedBy===target) && r.year===teacherAnalysisView.year && r.exam===teacherAnalysisView.exam);
+      const teacherAnalysisTarget = teacherAnalysisTeacher || currentTeacherName;
+      const teacherAnalysisRows = (() => {
+        const rows = activeJoinedData.filter(r => (r.createdBy===teacherAnalysisTarget || r.updatedBy===teacherAnalysisTarget) && r.year===teacherAnalysisView.year && r.exam===teacherAnalysisView.exam);
         const map = new Map();
         rows.forEach(r => {
           if(!map.has(r.studentId)) map.set(r.studentId, { ...r, scores: [] });
@@ -790,8 +790,8 @@
           scoreImproved: s.scores.some(x=>x.scoreDelta > 0),
           tierImproved: s.scores.some(x=>x.tierDelta > 0)
         }));
-      }, [activeJoinedData, teacherAnalysisTeacher, teacherAnalysisView, currentTeacher]);
-      const sortedTeacherAnalysisRows = useMemo(() => {
+      })();
+      const sortedTeacherAnalysisRows = (() => {
         const getValue = (row, key) => {
           if (key === 'name') return safeLower(row.name);
           if (key === 'school') return safeLower(row.school);
@@ -812,10 +812,9 @@
           return 0;
         });
         return items;
-      }, [teacherAnalysisRows, teacherAnalysisSort]);
+      })();
 
-      
-      const teacherManagedStudents = useMemo(() => {
+      const teacherManagedStudents = (() => {
         const target = manageTeacherFilter;
         const rows = target === '전체' ? activeJoinedData : activeJoinedData.filter(r => r.createdBy===target || r.updatedBy===target);
         const map = new Map();
@@ -823,7 +822,7 @@
           if(!map.has(r.studentId)) map.set(r.studentId, { id: r.studentId, name: r.name, school: r.school, grade: r.grade, year: r.year });
         });
         return Array.from(map.values());
-      }, [activeJoinedData, manageTeacherFilter]);
+      })();
 
       const titleMap = Object.fromEntries(MENU_ITEMS.map((item) => [item.key, item.label]));
       const adminPill = isAdminUser ? <span className="admin-badge px-3 py-1.5 text-xs">관리자</span> : null;
