@@ -117,7 +117,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 0;
+      text-align: center;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 10px 24px rgba(15,23,42,0.05);
       transition: all .18s ease;
     }
@@ -130,7 +131,43 @@
     }
     .teacher-chip-selected span { color: #fff !important; text-shadow: 0 1px 2px rgba(0,0,0,0.12); }
     .teacher-chip-selected .teacher-chip-dot { background: rgba(255,255,255,0.95) !important; box-shadow: 0 0 0 3px rgba(255,255,255,0.12); }
-    .teacher-chip-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.95); }
+    .teacher-chip-dot { display:none; }
+    .login-main-title {
+      font-family: 'Gowun Dodum', 'Noto Sans KR', sans-serif;
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      line-height: 1.26;
+    }
+    .login-copy-title {
+      font-family: 'Noto Sans KR', sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.34;
+    }
+    .top-context-wrap {
+      border-radius: 24px;
+      background: rgba(255,255,255,0.88);
+      border: 1px solid rgba(226,232,240,0.95);
+      box-shadow: 0 10px 22px rgba(15,23,42,0.05);
+    }
+    .top-context-chip {
+      border-radius: 999px;
+      border: 1px solid rgba(226,232,240,0.95);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+      color: #475569;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 10px 15px;
+      transition: all .18s ease;
+      white-space: nowrap;
+    }
+    .top-context-chip:hover { transform: translateY(-1px); border-color: rgba(196,181,253,0.9); }
+    .top-context-chip-active {
+      color: #fff;
+      border-color: rgba(124,58,237,0.38);
+      background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 58%, #4f46e5 100%);
+      box-shadow: 0 14px 24px rgba(109,40,217,0.18);
+    }
     .teacher-chip-1 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,243,255,0.94)); }
     .teacher-chip-2 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(239,246,255,0.94)); }
     .teacher-chip-3 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(236,253,245,0.94)); }
@@ -182,8 +219,8 @@
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    @media (max-width: 1160px) {
-      .desktop-sidebar { display:none; }
+    @media (max-width: 1279px) {
+      .desktop-sidebar { display:none !important; }
       .content-wrap { padding-left: 0 !important; }
     }
     @media (max-width: 767px) {
@@ -278,6 +315,10 @@
 
     function formatDateText(v) {
       if (!v) return '-';
+      if (v && typeof v === 'object' && typeof v.seconds === 'number') {
+        const d = new Date((v.seconds * 1000) + Math.floor((v.nanoseconds || 0) / 1000000));
+        return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      }
       const d = new Date(v);
       if (Number.isNaN(d.getTime())) return String(v);
       return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
@@ -399,6 +440,7 @@
       const [initError, setInitError] = useState('');
       const [logoError, setLogoError] = useState(false);
       const [manageTeacherFilter, setManageTeacherFilter] = useState('전체');
+      const [selectedQuickStudentId, setSelectedQuickStudentId] = useState('');
       const [teacherAnalysisTeacher, setTeacherAnalysisTeacher] = useState('');
       const [subjectSort, setSubjectSort] = useState({ key: 'score', direction: 'desc' });
 
@@ -829,9 +871,21 @@
         setView('dashboard');
       };
 
+      useEffect(() => {
+        if (currentTeacher?.name && manageTeacherFilter === '전체') {
+          setManageTeacherFilter(currentTeacher.name);
+        }
+      }, [currentTeacher]);
+
+      useEffect(() => {
+        setSelectedQuickStudentId('');
+      }, [manageTeacherFilter]);
+
+
       const handleManageStudentChange = (e) => {
         const { name, value } = e.target;
         const val = name === 'year' || name === 'grade' ? Number(value) : value;
+        setSelectedQuickStudentId('');
         setManageStudent((prev) => {
           const next = { ...prev, [name]: val };
           if (name === 'name') {
@@ -986,12 +1040,12 @@
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_26%)]"></div>
                 <div className="relative z-10 max-w-xl">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs font-bold tracking-[0.18em] text-violet-700 uppercase soft-border mb-5">OPEN ACADEMY</div>
-                  <h1 className="hero-korean-title text-[38px] xl:text-[54px] text-slate-900">
+                  <h1 className="login-main-title text-[34px] xl:text-[42px] text-slate-900">
                     <span className="block">열린학원</span>
-                    <span className="mt-5 block">성적분석 웹앱</span>
+                    <span className="mt-3 block">성적분석 포털사이트</span>
                   </h1>
-                  <p className="mt-8 text-[19px] leading-[2.1] text-slate-600 font-medium">입력은 쉽고 빠르게,<br/>분석은 깊이 있게</p>
-                  <div className="creator-signature mt-10 text-[28px] xl:text-[34px]">Created by mOOn_Mathematics</div>
+                  <p className="login-copy-title mt-10 text-[28px] xl:text-[36px] leading-[1.7] text-slate-800">입력은 쉽고 빠르게,<br/>분석은 깊이 있게!!!</p>
+                  <div className="creator-signature mt-10 text-[12px] tracking-[0.18em] uppercase">Created by mOOn_Mathematics</div>
                 </div>
               </div>
               <div className="glass rounded-[36px] panel-shadow soft-border p-7 sm:p-9">
@@ -999,7 +1053,7 @@
                   {!logoError ? <img src="./logo.png" alt="열린학원 로고" className="h-12 w-auto object-contain" onError={() => setLogoError(true)} /> : <div className="h-12 w-12 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center"><i className="fas fa-school"></i></div>}
                 </div>
                 <h2 className="text-3xl font-black text-slate-900">빠른 PIN 로그인</h2>
-                <p className="mt-2 whitespace-pre-line text-slate-500">선생님 선택 버튼을 먼저 누른 뒤,\n고유 PIN 번호를 입력하면 바로 로그인 가능!</p>
+                <p className="mt-2 text-slate-500 leading-7">선생님 선택 버튼을 먼저 누른 뒤,<br/>고유 PIN 번호 입력하고 바로 로그인!!!</p>
                 <form onSubmit={handleTeacherLogin} className="mt-8 space-y-4">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-3">선생님 선택</label>
@@ -1023,7 +1077,8 @@
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">PIN</label>
-                    <input type="password" value={loginPin} onChange={(e) => setLoginPin(e.target.value)} className="w-full h-14 px-4 border border-slate-200 rounded-2xl outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 bg-white transition-all" placeholder={selectedTeacherName ? `${selectedTeacherName} 선생님 PIN 입력` : '선생님 선택 후 PIN 입력'} />
+                    <input type="password" inputMode="numeric" maxLength="4" value={loginPin} onChange={(e) => setLoginPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))} className="w-full h-14 px-4 border border-slate-200 rounded-2xl outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 bg-white transition-all text-center tracking-[0.35em] font-black" placeholder="4자리 PIN 입력" />
+                    <div className="mt-2 text-xs text-slate-400">PIN은 4자리 숫자로 입력해주세요.</div>
                   </div>
                   {loginError && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-2xl px-4 py-3">{loginError}</div>}
                   <button type="submit" className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-700 via-purple-600 to-indigo-600 hover:from-violet-800 hover:via-purple-700 hover:to-indigo-700 text-white font-bold shadow-lg shadow-violet-200">로그인</button>
@@ -1044,9 +1099,36 @@
         teamExam: '시험 분석 아카이브',
       };
 
+      const desktopContextBar = (() => {
+        if (view === 'manage' || view === 'teacherAnalysis') {
+          const activeTeacher = view === 'manage' ? manageTeacherFilter : (teacherAnalysisTeacher || currentTeacher?.name || '');
+          return (
+            <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar">
+              <span className="px-2 text-xs font-bold text-slate-400 whitespace-nowrap">선생님 빠른 선택</span>
+              {teachersData.map((teacher, idx) => {
+                const selected = activeTeacher === teacher.name;
+                const click = () => view === 'manage' ? setManageTeacherFilter(teacher.name) : setTeacherAnalysisTeacher(teacher.name);
+                return <button key={teacher.teacherId} type="button" onClick={click} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${selected ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>;
+              })}
+            </div>
+          );
+        }
+        if (view === 'subjectAnalysis') {
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar">{SUBJECTS.map((subject) => <button key={subject} type="button" onClick={() => setSubjectView((p) => ({ ...p, subject, detailSubject: '전체' }))} className={`top-context-chip ${subjectView.subject === subject ? 'top-context-chip-active' : ''}`}>{subject}</button>)}</div>;
+        }
+        if (view === 'schoolAnalysis') {
+          const quickSchools = schools.filter((s) => s !== '전체').slice(0, 8);
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setSchoolView((p) => ({ ...p, school: '전체' }))} className={`top-context-chip ${schoolView.school === '전체' ? 'top-context-chip-active' : ''}`}>전체 학교</button>{quickSchools.map((school) => <button key={school} type="button" onClick={() => setSchoolView((p) => ({ ...p, school }))} className={`top-context-chip ${schoolView.school === school ? 'top-context-chip-active' : ''}`}>{school}</button>)}</div>;
+        }
+        if (view === 'dashboard') {
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setActiveSubject('전체')} className={`top-context-chip ${activeSubject === '전체' ? 'top-context-chip-active' : ''}`}>전체 과목</button>{SUBJECTS.map((subject) => <button key={subject} type="button" onClick={() => setActiveSubject(subject)} className={`top-context-chip ${activeSubject === subject ? 'top-context-chip-active' : ''}`}>{subject}</button>)}</div>;
+        }
+        return null;
+      })();
+
       return (
         <div className="app-shell font-sans text-slate-800">
-          <aside className="desktop-sidebar fixed left-5 top-5 bottom-5 w-[262px] rounded-[34px] glass soft-border sidebar-shadow p-5 print:hidden flex flex-col">
+          <aside className="desktop-sidebar hidden xl:flex fixed left-5 top-5 bottom-5 w-[262px] rounded-[34px] glass soft-border sidebar-shadow p-5 print:hidden flex-col">
             <div className="pb-5 border-b border-slate-100 flex items-center justify-center min-h-[72px]">
               {!logoError ? <img src="./logo.png" alt="열린학원 로고" className="max-h-12 w-auto object-contain" onError={() => setLogoError(true)} /> : <div className="h-12 w-12 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center"><i className="fas fa-school"></i></div>}
             </div>
@@ -1067,7 +1149,7 @@
             </div>
           </aside>
 
-          <div className="content-wrap lg:pl-[295px]">
+          <div className="content-wrap xl:pl-[295px]">
             <header className="sticky top-0 z-20 bg-white/95 border-b border-slate-200/75 print:hidden">
               <div className="px-4 sm:px-6 lg:px-10 py-4 sm:py-5 flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-3">
@@ -1086,11 +1168,7 @@
                     </div>
                   </div>
                 </div>
-                <div className="hidden md:flex flex-wrap gap-2 items-center rounded-2xl bg-white/80 px-3 py-2 soft-border shadow-sm w-max max-w-full">
-                  {MENU_ITEMS.map((item) => (
-                    <button key={item.key} onClick={() => setView(item.key)} className={`rounded-xl px-3 py-2 text-sm font-bold transition-all ${view === item.key ? 'text-violet-700 bg-violet-50' : 'text-slate-500 hover:bg-slate-50'}`}>{item.label}</button>
-                  ))}
-                </div>
+                {desktopContextBar}
                 <div className="md:hidden -mx-1 px-1 overflow-x-auto no-scrollbar">
                   <div className="flex gap-2 min-w-max pb-1">
                     {MENU_ITEMS.map((item) => (
@@ -1205,7 +1283,7 @@
                         </div>
                         <div className="max-h-[300px] overflow-y-auto mini-scroll pr-1 space-y-3">
                           {teacherManagedStudents.length ? teacherManagedStudents.map((student) => (
-                            <button key={student.studentId} type="button" onClick={() => setManageStudent({ year: Number(student.year) || manageStudent.year, name: student.name, school: student.school, grade: Number(student.grade) || 1 })} className="w-full text-left rounded-[22px] border border-slate-200 bg-white px-4 py-4 shadow-sm hover:border-violet-300 hover:bg-violet-50/50 transition-all">
+                            <button key={student.studentId} type="button" onClick={() => { setSelectedQuickStudentId(student.studentId); setManageStudent({ year: Number(student.year) || manageStudent.year, name: student.name, school: student.school, grade: Number(student.grade) || 1 }); }} className={`w-full text-left rounded-[22px] border px-4 py-4 shadow-sm transition-all ${selectedQuickStudentId === student.studentId ? 'border-violet-400 bg-violet-50' : 'border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/50'}`}>
                               <div className="flex items-start justify-between gap-3">
                                 <div>
                                   <div className="text-base font-black text-slate-900">{student.name}</div>
@@ -1226,10 +1304,12 @@
                         </div>
                         <div className="rounded-2xl bg-white border border-slate-200 p-4">
                           <div className="text-xs font-bold text-slate-500">현재 선택 학생</div>
-                          <div className="mt-2 text-lg font-black text-slate-900">{manageStudent.name || '학생을 먼저 선택하세요'}</div>
-                          {selectedManageStudentInfo ? (
-                            <>
-                              <div className="mt-2 text-sm text-slate-500">{selectedManageStudentInfo.school} · {selectedManageStudentInfo.grade}학년 · {selectedManageStudentInfo.isWithdrawn ? '퇴원생' : '재원생'}</div>
+                          <div className="mt-3 flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-lg font-black text-slate-900">{manageStudent.name || '학생을 먼저 선택하세요'}</div>
+                              {selectedManageStudentInfo ? <div className="mt-2 text-sm text-slate-500">{selectedManageStudentInfo.school} · {selectedManageStudentInfo.grade}학년 · {selectedManageStudentInfo.isWithdrawn ? '퇴원생' : '재원생'}</div> : <div className="mt-3 text-sm text-slate-400">기존 등록 학생을 불러오면 상태를 변경할 수 있어요.</div>}
+                            </div>
+                            {selectedManageStudentInfo ? (
                               <button type="button" onClick={async () => {
                                 try {
                                   const { updateDoc, doc } = window.FirebaseAPI;
@@ -1241,13 +1321,11 @@
                                 } catch (error) {
                                   alert('학생 상태 변경 중 오류가 발생했습니다.');
                                 }
-                              }} className={`mt-4 w-full rounded-2xl px-4 py-3 font-black ${selectedManageStudentInfo.isWithdrawn ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
-                                {selectedManageStudentInfo.isWithdrawn ? '복귀 처리하기' : '퇴원 처리하기'}
+                              }} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-black ${selectedManageStudentInfo.isWithdrawn ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
+                                {selectedManageStudentInfo.isWithdrawn ? '복귀' : '퇴원'}
                               </button>
-                            </>
-                          ) : (
-                            <div className="mt-3 text-sm text-slate-400">기존 등록 학생을 불러오면 상태를 변경할 수 있어요.</div>
-                          )}
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     </Card>
