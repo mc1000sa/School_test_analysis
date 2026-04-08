@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>열린 학교시험 성적분석</title>
+  <title>열린 학교시험 성적분석 포털</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -101,11 +101,23 @@
     }
     .creator-signature {
       font-family: 'SUIT','Pretendard','Noto Sans KR',sans-serif;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.03em;
       font-size: 12px;
-      font-weight: 700;
-      color: rgba(15,23,42,0.42);
-      text-shadow: none;
+      font-weight: 800;
+      color: transparent;
+      background: linear-gradient(180deg, #f8fafc 0%, #d8dee9 38%, #aeb8c9 62%, #ffffff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.92), 0 10px 22px rgba(148,163,184,0.18);
+      filter: drop-shadow(0 1px 0 rgba(255,255,255,0.75));
+    }
+    .login-title-metal {
+      color: transparent;
+      background: linear-gradient(180deg, #111827 0%, #334155 34%, #0f172a 62%, #6b7280 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.35), 0 10px 18px rgba(15,23,42,0.16);
+      filter: drop-shadow(0 3px 3px rgba(15,23,42,0.08));
     }
 
     .card-3d {
@@ -798,6 +810,66 @@
       };
 
 
+      const handleExportAllData = () => {
+        if (!isAdminUser || typeof XLSX === 'undefined') return;
+        try {
+          const rows = [];
+          const activeStudentRows = studentsData.filter((student) => !student.deleted);
+          const activeScoreRows = scoresData.filter((score) => !score.deleted);
+          const scoreMap = new Map();
+          activeScoreRows.forEach((score) => {
+            if (!scoreMap.has(score.studentId)) scoreMap.set(score.studentId, []);
+            scoreMap.get(score.studentId).push(score);
+          });
+
+          activeStudentRows.forEach((student) => {
+            const linkedScores = scoreMap.get(student.studentId) || [];
+            if (!linkedScores.length) {
+              rows.push({
+                학생명: student.name || '',
+                학교: student.school || '',
+                학년: student.grade || '',
+                연도: student.year || '',
+                시험명: '',
+                과목: '',
+                세부과목: '',
+                점수: '',
+                등급: '',
+                담당자: '',
+                학원반: '',
+                재원상태: student.isWithdrawn ? '퇴원' : '재원',
+              });
+              return;
+            }
+            linkedScores.slice().sort((a,b) => Number(a.year||student.year||0) - Number(b.year||student.year||0) || examOrder(a.exam) - examOrder(b.exam) || safeLower(a.subject||'').localeCompare(safeLower(b.subject||''), 'ko')).forEach((score) => {
+              rows.push({
+                학생명: student.name || '',
+                학교: student.school || '',
+                학년: student.grade || '',
+                연도: student.year || score.year || '',
+                시험명: score.exam || '',
+                과목: score.subject || '',
+                세부과목: score.detailSubject || '',
+                점수: score.score ?? '',
+                등급: score.tier ?? '',
+                담당자: score.updatedBy || score.createdBy || '',
+                학원반: score.className || '',
+                재원상태: student.isWithdrawn ? '퇴원' : '재원',
+              });
+            });
+          });
+
+          const worksheet = XLSX.utils.json_to_sheet(rows);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, '전체성적');
+          const today = new Date();
+          const stamp = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}_${String(today.getHours()).padStart(2,'0')}${String(today.getMinutes()).padStart(2,'0')}`;
+          XLSX.writeFile(workbook, `열린학원_전체성적_${stamp}.xlsx`);
+        } catch (error) {
+          alert('엑셀 내보내기 중 오류가 발생했습니다: ' + error.message);
+        }
+      };
+
       const handleScoreOwnerChange = async (docId, teacherName) => {
         if (!db || !window.FirebaseAPI || !docId || !teacherName) return;
         try {
@@ -916,7 +988,7 @@
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.18),transparent_28%)]"></div>
                 <div className="relative z-10">
                   <div className="max-w-[260px]"><img src="./logo.png" alt="열린학원 로고" className="w-full h-auto object-contain" onError={(e)=>{e.currentTarget.style.display='none';}} /></div>
-                  <h1 className="login-main-title mt-8 text-[34px] md:text-[42px]"><span className="block text-transparent bg-clip-text bg-gradient-to-b from-[#fff4c7] via-[#f4d97e] to-[#b8860b] drop-shadow-[0_2px_3px_rgba(255,255,255,0.35)]">성적분석 포털사이트</span></h1>
+                  <h1 className="login-main-title mt-8 text-[39px] md:text-[47px]"><span className="block login-title-metal">성적분석 포털사이트</span></h1>
                   <p className="login-copy-title mt-8 text-[24px] md:text-[32px] leading-[1.8] text-slate-500 italic">입력은 쉽고 빠르게,<br/>분석은 깊이 있게!!!</p>
                   <div className="creator-signature mt-12 text-[14px]">Created by mOOn_Mathematics</div>
                 </div>
@@ -1061,6 +1133,7 @@
                 </div>
                 <div className="flex items-center gap-2">
                   {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : null}
+                  {isAdminUser ? <button onClick={handleExportAllData} className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full font-bold text-sm text-emerald-700 hover:bg-emerald-100"><i className="fas fa-file-export mr-2"></i>전체 엑셀</button> : null}
                   <button onClick={() => window.print()} className="px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200"><i className="fas fa-print mr-2"></i>인쇄</button>
                 </div>
               </div>
