@@ -264,6 +264,8 @@
     const { useEffect, useMemo, useState } = React;
 
     const EXAMS = ['1학기 중간고사', '1학기 기말고사', '2학기 중간고사', '2학기 기말고사'];
+    const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
+    const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고', '직접입력'];
     const SUBJECTS = ['국어', '영어', '수학', '과학'];
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -442,6 +444,8 @@
       const [manageTeacherFilter, setManageTeacherFilter] = useState('전체');
       const [selectedQuickStudentId, setSelectedQuickStudentId] = useState('');
       const [teacherAnalysisTeacher, setTeacherAnalysisTeacher] = useState('');
+      const [quickEntryExamMap, setQuickEntryExamMap] = useState({});
+      const [teacherAnalysisSort, setTeacherAnalysisSort] = useState({ key: 'name', direction: 'asc' });
       const [subjectSort, setSubjectSort] = useState({ key: 'score', direction: 'desc' });
 
       const [teachersData, setTeachersData] = useState([]);
@@ -603,7 +607,10 @@
 
       const activeJoinedData = useMemo(() => joinedData.filter((row) => !row.isWithdrawn), [joinedData]);
 
-      const schools = useMemo(() => ['전체', ...Array.from(new Set(studentsData.filter((s) => !s.deleted && s.isWithdrawn !== true).map((s) => s.school).filter(Boolean))).sort((a,b) => a.localeCompare(b, 'ko'))], [studentsData]);
+      const schools = useMemo(() => {
+        const extras = Array.from(new Set(studentsData.filter((s) => !s.deleted && s.isWithdrawn !== true).map((s) => s.school).filter(Boolean).filter((s) => !SCHOOL_OPTIONS.includes(s)))).sort((a,b) => a.localeCompare(b, 'ko'));
+        return ['전체', ...SCHOOL_OPTIONS.filter((s) => s !== '직접입력'), ...extras, '직접입력'];
+      }, [studentsData]);
       const classNames = useMemo(() => ['전체', ...Array.from(new Set(scoresData.filter((d) => !d.deleted).map((d) => d.className).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ko'))], [scoresData]);
       const uniqueStudentNames = useMemo(() => Array.from(new Set(studentsData.filter((s) => s.year === manageStudent.year && !s.deleted).map((s) => s.name).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ko')), [studentsData, manageStudent.year]);
       const subjectOptions = SUBJECTS;
@@ -790,20 +797,14 @@
               school: row.school,
               grade: row.grade,
               year: row.year,
-              subjects: new Set([row.subject]),
-              exams: new Set([row.exam]),
               updatedAt: row.updatedAt || '',
             });
           } else {
             const current = map.get(key);
-            current.subjects.add(row.subject);
-            current.exams.add(row.exam);
             if (String(row.updatedAt || '') > String(current.updatedAt || '')) current.updatedAt = row.updatedAt || '';
           }
         });
-        return Array.from(map.values())
-          .map((item) => ({ ...item, subjectsText: Array.from(item.subjects).sort((a,b)=>a.localeCompare(b,'ko')).join(', '), examCount: item.exams.size }))
-          .sort((a,b) => safeLower(a.name).localeCompare(safeLower(b.name), 'ko'));
+        return Array.from(map.values()).sort((a,b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')) || safeLower(a.name).localeCompare(safeLower(b.name), 'ko'));
       }, [joinedData, manageTeacherFilter]);
 
       const teacherAnalysisRows = useMemo(() => {
@@ -819,28 +820,41 @@
         });
         return Array.from(byStudent.values()).map((student) => {
           const latestBySubject = {};
+          let scoreImprovedCount = 0;
+          let tierImprovedCount = 0;
           student.scores.forEach((row) => {
+            const prev = findPreviousComparableRecord(row, activeJoinedData);
+            const status = compareStatus(row, prev);
+            if (status.score === 'up') scoreImprovedCount += 1;
+            if (status.tier === 'up') tierImprovedCount += 1;
             const key = `${row.subject}__${row.detailSubject || ''}`;
-            const prev = latestBySubject[key];
-            if (!prev || Number(row.year) > Number(prev.year) || (Number(row.year) === Number(prev.year) && examOrder(row.exam) > examOrder(prev.exam))) {
+            const prevLatest = latestBySubject[key];
+            if (!prevLatest || Number(row.year) > Number(prevLatest.year) || (Number(row.year) === Number(prevLatest.year) && examOrder(row.exam) > examOrder(prevLatest.exam))) {
               latestBySubject[key] = row;
             }
           });
           const latestScores = Object.values(latestBySubject);
           const average = latestScores.length ? Math.round(latestScores.reduce((sum, row) => sum + Number(row.score || 0), 0) / latestScores.length) : 0;
+          const latestTierAverage = latestScores.length ? (latestScores.reduce((sum,row)=>sum + Number(row.tier || 0),0) / latestScores.length).toFixed(1) : '-';
           return {
             ...student,
             latestScores,
             average,
+            latestTierAverage,
             subjectCount: latestScores.length,
+            scoreImprovedCount,
+            tierImprovedCount,
+            latestExam: latestScores[0]?.exam || '-',
           };
-        }).sort((a,b) => safeLower(a.name).localeCompare(safeLower(b.name), 'ko'));
+        });
       }, [activeJoinedData, teacherAnalysisTeacher, currentTeacher]);
 
       const teacherAnalysisSummary = useMemo(() => {
         const rows = teacherAnalysisRows;
         const schoolCount = new Set(rows.map((r) => r.school)).size;
         const avg = rows.length ? Math.round(rows.reduce((sum, row) => sum + Number(row.average || 0), 0) / rows.length) : 0;
+        const improvedScoreStudents = rows.filter((row) => row.scoreImprovedCount > 0).length;
+        const improvedTierStudents = rows.filter((row) => row.tierImprovedCount > 0).length;
         const scoreBucketCounts = Object.fromEntries(SCORE_BUCKETS.map((b) => [b.label, 0]));
         const tierCounts = {};
         teacherAnalysisRows.forEach((student) => {
@@ -850,8 +864,22 @@
             if (t) tierCounts[t] = (tierCounts[t] || 0) + 1;
           });
         });
-        return { studentCount: rows.length, schoolCount, avg, scoreBucketCounts, tierCounts };
+        return { studentCount: rows.length, schoolCount, avg, improvedScoreStudents, improvedTierStudents, scoreBucketCounts, tierCounts };
       }, [teacherAnalysisRows]);
+
+      const sortedTeacherAnalysisRows = useMemo(() => {
+        const items = [...teacherAnalysisRows];
+        items.sort((a,b) => {
+          let av = a[teacherAnalysisSort.key];
+          let bv = b[teacherAnalysisSort.key];
+          if (teacherAnalysisSort.key === 'name' || teacherAnalysisSort.key === 'school') { av = safeLower(av); bv = safeLower(bv); }
+          else { av = Number(av || 0); bv = Number(bv || 0); }
+          if (av < bv) return teacherAnalysisSort.direction === 'asc' ? -1 : 1;
+          if (av > bv) return teacherAnalysisSort.direction === 'asc' ? 1 : -1;
+          return 0;
+        });
+        return items;
+      }, [teacherAnalysisRows, teacherAnalysisSort]);
 
       const handleTeacherLogin = (e) => {
         e.preventDefault();
@@ -1121,7 +1149,7 @@
           return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setSchoolView((p) => ({ ...p, school: '전체' }))} className={`top-context-chip ${schoolView.school === '전체' ? 'top-context-chip-active' : ''}`}>전체 학교</button>{quickSchools.map((school) => <button key={school} type="button" onClick={() => setSchoolView((p) => ({ ...p, school }))} className={`top-context-chip ${schoolView.school === school ? 'top-context-chip-active' : ''}`}>{school}</button>)}</div>;
         }
         if (view === 'dashboard') {
-          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setActiveSubject('전체')} className={`top-context-chip ${activeSubject === '전체' ? 'top-context-chip-active' : ''}`}>전체 과목</button>{SUBJECTS.map((subject) => <button key={subject} type="button" onClick={() => setActiveSubject(subject)} className={`top-context-chip ${activeSubject === subject ? 'top-context-chip-active' : ''}`}>{subject}</button>)}</div>;
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar">{EXAMS.map((exam) => <button key={exam} type="button" onClick={() => setFilters((p) => ({ ...p, exam }))} className={`top-context-chip ${filters.exam === exam ? 'top-context-chip-active' : ''}`}>{EXAM_SHORT_LABELS[exam] || exam}</button>)}</div>;
         }
         return null;
       })();
@@ -1195,9 +1223,9 @@
                         </div>
                         <button onClick={resetFilters} className="rounded-2xl bg-slate-100 hover:bg-violet-50 border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">필터 초기화</button>
                       </div>
-                      <div className="grid md:grid-cols-5 gap-4">
+                      <div className="grid md:grid-cols-4 xl:grid-cols-5 gap-4">
                         <div><label className="block text-xs font-bold text-slate-500 mb-1">연도</label><select name="year" value={filters.year} onChange={handleFilterChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5 outline-none focus:ring-4 focus:ring-violet-100">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
-                        <div><label className="block text-xs font-bold text-slate-500 mb-1">시험</label><select name="exam" value={filters.exam} onChange={handleFilterChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5 outline-none focus:ring-4 focus:ring-violet-100">{EXAMS.map((e)=><option key={e} value={e}>{e}</option>)}</select></div>
+                        
                         <div><label className="block text-xs font-bold text-slate-500 mb-1">학교</label><select name="school" value={filters.school} onChange={handleFilterChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5 outline-none focus:ring-4 focus:ring-violet-100">{schools.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
                         <div><label className="block text-xs font-bold text-slate-500 mb-1">학년</label><select name="grade" value={filters.grade} onChange={handleFilterChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5 outline-none focus:ring-4 focus:ring-violet-100"><option value="전체">전체</option>{GRADES.map((g)=><option key={g} value={g}>{g}학년</option>)}</select></div>
                         <div><label className="block text-xs font-bold text-slate-500 mb-1">학원반</label><select name="className" value={filters.className} onChange={handleFilterChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5 outline-none focus:ring-4 focus:ring-violet-100">{classNames.map((c)=><option key={c} value={c}>{c}</option>)}</select></div>
@@ -1260,7 +1288,7 @@
                       <div className="flex flex-wrap gap-4 items-end mobile-stack">
                         <div className="flex-1 min-w-[100px]"><label className="block text-xs font-bold text-slate-600 mb-1">연도</label><select name="year" value={manageStudent.year} onChange={handleManageStudentChange} className="w-full border-2 border-violet-100 rounded-2xl p-2.5 text-sm font-semibold focus:ring-4 focus:ring-violet-100 outline-none">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
                         <div className="flex-[2] min-w-[180px]"><label className="block text-xs font-bold text-violet-700 mb-1">학생 이름 검색/입력</label><input type="text" name="name" list="student-list" value={manageStudent.name} onChange={handleManageStudentChange} placeholder="이름을 입력하세요" autoComplete="off" className="w-full border-2 border-violet-200 bg-violet-50/50 rounded-2xl p-2.5 text-sm font-bold focus:ring-4 focus:ring-violet-100 focus:bg-white outline-none" /><datalist id="student-list">{uniqueStudentNames.map((name) => <option key={name} value={name} />)}</datalist></div>
-                        <div className="flex-1 min-w-[150px]"><label className="block text-xs font-bold text-slate-600 mb-1">소속 학교</label><input type="text" name="school" value={manageStudent.school} onChange={handleManageStudentChange} placeholder="예: 파주고" className="w-full border border-slate-300 rounded-2xl p-2.5 text-sm focus:ring-4 focus:ring-violet-100 outline-none" /></div>
+                        <div className="flex-1 min-w-[150px]"><label className="block text-xs font-bold text-slate-600 mb-1">소속 학교</label><input type="text" name="school" list="school-option-list" value={manageStudent.school} onChange={handleManageStudentChange} placeholder="학교 선택 또는 직접입력" className="w-full border border-slate-300 rounded-2xl p-2.5 text-sm focus:ring-4 focus:ring-violet-100 outline-none" /><datalist id="school-option-list">{SCHOOL_OPTIONS.map((school)=><option key={school} value={school} />)}</datalist></div>
                         <div className="flex-1 min-w-[100px]"><label className="block text-xs font-bold text-slate-600 mb-1">학년</label><select name="grade" value={manageStudent.grade} onChange={handleManageStudentChange} className="w-full border border-slate-300 rounded-2xl p-2.5 text-sm focus:ring-4 focus:ring-violet-100 outline-none">{GRADES.map((g)=><option key={g} value={g}>{g}학년</option>)}</select></div>
                       </div>
                       <p className="text-xs text-slate-400 mt-3">입력/수정/삭제 이력이 선생님 이름으로 기록됩니다.</p>
@@ -1281,19 +1309,13 @@
                           </div>
                           <div className="text-sm text-slate-500">선생님을 선택하면 해당 선생님이 한번이라도 기록한 학생들이 아래에 표시됩니다.</div>
                         </div>
-                        <div className="max-h-[300px] overflow-y-auto mini-scroll pr-1 space-y-3">
-                          {teacherManagedStudents.length ? teacherManagedStudents.map((student) => (
-                            <button key={student.studentId} type="button" onClick={() => { setSelectedQuickStudentId(student.studentId); setManageStudent({ year: Number(student.year) || manageStudent.year, name: student.name, school: student.school, grade: Number(student.grade) || 1 }); }} className={`w-full text-left rounded-[22px] border px-4 py-4 shadow-sm transition-all ${selectedQuickStudentId === student.studentId ? 'border-violet-400 bg-violet-50' : 'border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/50'}`}>
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <div className="text-base font-black text-slate-900">{student.name}</div>
-                                  <div className="mt-1 text-sm text-slate-500">{student.school} · {student.grade}학년 · {student.year}년</div>
-                                  <div className="mt-2 text-xs text-slate-400">과목: {student.subjectsText || '-'} · 입력 시험 수: {student.examCount}</div>
-                                </div>
-                                <div className="text-xs text-slate-400 whitespace-nowrap">{formatDateText(student.updatedAt)}</div>
-                              </div>
+                        <div className="max-h-[300px] overflow-y-auto mini-scroll pr-1">
+                          {teacherManagedStudents.length ? <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">{teacherManagedStudents.map((student) => (
+                            <button key={student.studentId} type="button" onClick={() => { setSelectedQuickStudentId(student.studentId); setManageStudent({ year: Number(student.year) || manageStudent.year, name: student.name, school: student.school, grade: Number(student.grade) || 1 }); }} className={`w-full text-left rounded-[18px] border px-4 py-3 shadow-sm transition-all ${selectedQuickStudentId === student.studentId ? 'border-violet-400 bg-violet-50' : 'border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/50'}`}>
+                              <div className="text-base font-black text-slate-900 truncate">{student.name}</div>
+                              <div className="mt-1 text-sm text-slate-500 truncate">{student.school} · {student.grade}학년 · {student.year}년</div>
                             </button>
-                          )) : <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-8 text-center text-slate-500">해당 선생님이 입력한 학생 기록이 아직 없습니다.</div>}
+                          ))}</div> : <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-8 text-center text-slate-500">해당 선생님이 입력한 학생 기록이 아직 없습니다.</div>}
                         </div>
                       </div>
                     </Card>
@@ -1322,13 +1344,49 @@
                                   alert('학생 상태 변경 중 오류가 발생했습니다.');
                                 }
                               }} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-black ${selectedManageStudentInfo.isWithdrawn ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
-                                {selectedManageStudentInfo.isWithdrawn ? '복귀' : '퇴원'}
+                                {selectedManageStudentInfo.isWithdrawn ? '복귀 처리' : '퇴원 처리'}
                               </button>
                             ) : null}
                           </div>
                         </div>
                       </div>
                     </Card>
+                  </div>
+
+                  <div className="card-3d rounded-[30px] p-5">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                      <div>
+                        <div className="text-lg font-black text-slate-900">선생님별 빠른 세로 입력</div>
+                        <div className="text-sm text-slate-500">담당 학생을 세로로 보며 시험을 선택하고 과목별로 바로 추가/수정할 수 있어요.</div>
+                      </div>
+                    </div>
+                    <div className="space-y-3 max-h-[420px] overflow-y-auto mini-scroll pr-1">
+                      {teacherManagedStudents.length ? teacherManagedStudents.map((student) => {
+                        const activeExam = quickEntryExamMap[student.studentId] || EXAMS[0];
+                        const studentRows = joinedData.filter((row) => row.studentId === student.studentId);
+                        return (
+                          <div key={`quick-${student.studentId}`} className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                              <div className="min-w-[180px]">
+                                <div className="font-black text-slate-900">{student.name}</div>
+                                <div className="text-sm text-slate-500">{student.school} · {student.grade}학년 · {student.year}년</div>
+                              </div>
+                              <div className="w-full lg:w-[180px]">
+                                <select value={activeExam} onChange={(e)=>setQuickEntryExamMap((prev)=>({ ...prev, [student.studentId]: e.target.value }))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5 text-sm">
+                                  {EXAMS.map((exam)=><option key={exam} value={exam}>{EXAM_SHORT_LABELS[exam]}</option>)}
+                                </select>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 flex-1">
+                                {SUBJECTS.map((subject) => {
+                                  const existing = studentRows.find((row) => row.exam === activeExam && row.subject === subject);
+                                  return <button key={`${student.studentId}-${subject}`} type="button" onClick={() => { setSelectedQuickStudentId(student.studentId); setManageStudent({ year: Number(student.year) || 2026, name: student.name, school: student.school, grade: Number(student.grade) || 1 }); openScoreModal(activeExam, subject, existing || null); }} className={`rounded-2xl border px-3 py-2.5 text-sm font-bold transition-all ${existing ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-violet-300 hover:bg-violet-50'}`}>{subject} {existing ? '수정' : '추가'}</button>;
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }) : <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-8 text-center text-slate-500">먼저 선생님을 선택하면 빠른 세로 입력 목록이 표시됩니다.</div>}
+                    </div>
                   </div>
 
                   <div className={`${manageStudent.name && manageStudent.school ? 'opacity-100' : 'opacity-40 pointer-events-none'} transition-opacity`}>
@@ -1373,37 +1431,31 @@
                             <div className="flex items-center justify-between mb-3">
                               <div>
                                 <div className="font-black text-slate-800">{exam}</div>
-                                <div className="text-xs text-slate-400">과목을 눌러 빠르게 입력/수정</div>
+                                <div className="text-xs text-slate-400">추가 버튼으로 여러 과목을 계속 입력할 수 있어요</div>
                               </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               {SUBJECTS.map((subject) => {
                                 const cellScores = currentStudentData.filter((d) => d.exam === exam && d.subject === subject);
                                 return (
-                                  <button
-                                    key={subject}
-                                    type="button"
-                                    onClick={() => openScoreModal(exam, subject, cellScores[0] || null)}
-                                    className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-left shadow-sm active:scale-[0.99]"
-                                  >
+                                  <div key={subject} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
                                     <div className="flex items-center justify-between gap-2">
                                       <span className="font-black text-slate-800">{subject}</span>
-                                      {cellScores.length > 0 ? <span className="text-[11px] font-bold text-violet-600">{cellScores.length}개</span> : <span className="text-[11px] text-slate-400">입력</span>}
+                                      <button type="button" onClick={() => openScoreModal(exam, subject)} className="rounded-xl bg-violet-50 border border-violet-200 px-2.5 py-1 text-[11px] font-bold text-violet-700">+ 추가</button>
                                     </div>
                                     {cellScores.length > 0 ? (
                                       <div className="mt-2 space-y-1">
-                                        {cellScores.slice(0,2).map((record) => (
-                                          <div key={record.docId} className="rounded-xl bg-violet-50 px-2 py-1.5 text-[11px] text-slate-700">
+                                        {cellScores.map((record) => (
+                                          <button key={record.docId} type="button" onClick={() => openScoreModal(exam, subject, record)} className="w-full rounded-xl bg-violet-50 px-2 py-1.5 text-left text-[11px] text-slate-700 border border-transparent active:scale-[0.99]">
                                             <div className="font-bold text-violet-700">{record.detailSubject || '기본'}</div>
                                             <div>{record.score}점 · {record.tier}등급</div>
-                                          </div>
+                                          </button>
                                         ))}
-                                        {cellScores.length > 2 && <div className="text-[11px] text-slate-400">외 {cellScores.length - 2}개</div>}
                                       </div>
                                     ) : (
-                                      <div className="mt-2 text-[11px] text-slate-400">터치해서 성적 입력</div>
+                                      <div className="mt-2 text-[11px] text-slate-400">아직 입력 없음</div>
                                     )}
-                                  </button>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -1417,58 +1469,35 @@
 
 
               {view === 'teacherAnalysis' && (
-                <div className="space-y-6">
-                  <div className="hero-panel rounded-[30px] p-5 panel-shadow">
-                    <div className="text-sm font-bold text-violet-700">선생님별 성적분석</div>
-                    <p className="mt-2 text-slate-600 leading-7">로그인 화면처럼 선생님 버튼을 눌러 담당 학생들의 점수 분포와 최근 과목별 현황을 한눈에 확인할 수 있습니다.</p>
-                    <div className="mt-5 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
-                      {teachersData.map((teacher, idx) => {
-                        const selected = (teacherAnalysisTeacher || currentTeacher?.name || '') === teacher.name;
-                        return (
-                          <button key={teacher.teacherId} type="button" onClick={() => setTeacherAnalysisTeacher(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selected ? 'teacher-chip-selected' : ''}`}>
-                            <span className="teacher-chip-dot"></span><span>{teacher.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-4 gap-4">
+                <div className="space-y-6"> 
+                  <div className="grid md:grid-cols-4 gap-4"> 
                     <div className="card-3d rounded-[28px] p-5"><div className="text-sm font-bold text-slate-500">담당 학생 수</div><div className="mt-3 text-3xl font-black text-slate-900">{teacherAnalysisSummary.studentCount}명</div></div>
-                    <div className="card-3d rounded-[28px] p-5"><div className="text-sm font-bold text-slate-500">담당 학교 수</div><div className="mt-3 text-3xl font-black text-slate-900">{teacherAnalysisSummary.schoolCount}개</div></div>
-                    <div className="card-3d rounded-[28px] p-5"><div className="text-sm font-bold text-slate-500">최근 평균 점수</div><div className="mt-3 text-3xl font-black text-slate-900">{teacherAnalysisSummary.avg}점</div></div>
-                    <div className="card-3d rounded-[28px] p-5"><div className="text-sm font-bold text-slate-500">선택 선생님</div><div className="mt-3 text-2xl font-black text-slate-900">{teacherAnalysisTeacher || currentTeacher?.name || '-'}</div></div>
+                    <div className="card-3d rounded-[28px] p-5"><div className="text-sm font-bold text-slate-500">원점수 향상</div><div className="mt-3 text-3xl font-black text-slate-900">{teacherAnalysisSummary.improvedScoreStudents}명</div></div>
+                    <div className="card-3d rounded-[28px] p-5"><div className="text-sm font-bold text-slate-500">등급 향상</div><div className="mt-3 text-3xl font-black text-slate-900">{teacherAnalysisSummary.improvedTierStudents}명</div></div>
+                    <div className="card-3d rounded-[28px] p-5"><div className="text-sm font-bold text-slate-500">전체 평균</div><div className="mt-3 text-3xl font-black text-slate-900">{teacherAnalysisSummary.avg}점</div></div>
                   </div>
-                  <div className="grid xl:grid-cols-[1.02fr_1.18fr] gap-5">
-                    <Card title="원점수 분포">
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        {SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-4 min-h-[96px] flex flex-col items-center justify-center text-center"><div className="text-xs text-slate-500">{b.label}</div><div className="mt-2 text-2xl font-black text-slate-900">{teacherAnalysisSummary.scoreBucketCounts[b.label] || 0}</div></div>)}
-                      </div>
+                  <div className="grid xl:grid-cols-[0.9fr_1.1fr] gap-5"> 
+                    <Card title="원점수 분포"> 
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">{SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-4 min-h-[96px] flex flex-col items-center justify-center text-center"><div className="text-xs text-slate-500">{b.label}</div><div className="mt-2 text-2xl font-black text-slate-900">{teacherAnalysisSummary.scoreBucketCounts[b.label] || 0}</div></div>)}</div>
                     </Card>
-                    <Card title="담당 학생 최근 과목 현황" right={<button onClick={() => window.print()} className="rounded-2xl bg-violet-50 border border-violet-200 px-4 py-2 text-sm font-bold text-violet-700">리스트 인쇄</button>}>
-                      <div className="max-h-[540px] overflow-y-auto mini-scroll pr-1 space-y-3">
-                        {teacherAnalysisRows.length ? teacherAnalysisRows.map((student) => (
-                          <div key={student.studentId} className="rounded-[24px] bg-white border border-slate-200 p-4 shadow-sm">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div>
-                                <div className="text-base font-black text-slate-900">{student.name}</div>
-                                <div className="text-sm text-slate-500">{student.school} · {student.grade}학년 · 평균 {student.average}점</div>
-                              </div>
-                              <button type="button" onClick={() => { setManageStudent({ year: Number(student.latestScores[0]?.year || 2026), name: student.name, school: student.school, grade: Number(student.grade) || 1 }); setView('manage'); }} className="rounded-xl bg-violet-50 border border-violet-200 px-3 py-2 text-xs font-bold text-violet-700">성적입력으로 이동</button>
-                            </div>
-                            <div className="mt-3 grid md:grid-cols-2 gap-2">
-                              {student.latestScores.map((row) => (
-                                <div key={row.docId} className="rounded-2xl bg-slate-50 border border-slate-200 px-3 py-3 text-sm">
-                                  <div className="font-bold text-slate-800">{row.subject}{row.detailSubject ? ` (${row.detailSubject})` : ''}</div>
-                                  <div className="mt-1 text-slate-500">{row.exam}</div>
-                                  <div className="mt-2 font-black text-violet-700">{row.score}점 · {row.tier}등급</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )) : <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-10 text-center text-slate-500">선택 선생님의 기록이 없습니다.</div>}
-                      </div>
+                    <Card title="등급 분포"> 
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">{Array.from({ length: 9 }, (_, i) => i + 1).map((tier) => <div key={tier} className="rounded-2xl bg-white border border-slate-200 p-4 min-h-[96px] flex flex-col items-center justify-center text-center"><div className="text-xs text-slate-500">{tier}등급</div><div className="mt-2 text-2xl font-black text-violet-700">{teacherAnalysisSummary.tierCounts[tier] || 0}</div></div>)}</div>
                     </Card>
                   </div>
+                  <Card title="담당 학생 목록" right={<span className="text-xs text-slate-400">헤더 클릭 정렬</span>}> 
+                    <div className="overflow-x-auto mini-scroll max-h-[560px]"> 
+                      <table className="w-full text-sm"> 
+                        <thead className="bg-slate-50 text-xs uppercase text-slate-500 sticky top-0"> 
+                          <tr>
+                            {[{key:'name',label:'학생명'},{key:'school',label:'학교'},{key:'grade',label:'학년'},{key:'average',label:'평균 점수'},{key:'subjectCount',label:'최근 과목 수'},{key:'scoreImprovedCount',label:'원점수 향상'},{key:'tierImprovedCount',label:'등급 향상'}].map((col) => <th key={col.key} onClick={() => setTeacherAnalysisSort((prev) => ({ key: col.key, direction: prev.key === col.key && prev.direction === 'asc' ? 'desc' : 'asc' }))} className="px-3 py-3 text-center cursor-pointer hover:bg-slate-100 whitespace-nowrap">{col.label}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200"> 
+                          {sortedTeacherAnalysisRows.length ? sortedTeacherAnalysisRows.map((student) => <tr key={student.studentId} className="hover:bg-violet-50/40"><td className="px-3 py-3 text-center font-black text-slate-900">{student.name}</td><td className="px-3 py-3 text-center">{student.school}</td><td className="px-3 py-3 text-center">{student.grade}학년</td><td className="px-3 py-3 text-center font-black text-violet-700">{student.average}점</td><td className="px-3 py-3 text-center">{student.subjectCount}</td><td className="px-3 py-3 text-center">{student.scoreImprovedCount}</td><td className="px-3 py-3 text-center">{student.tierImprovedCount}</td></tr>) : <tr><td colSpan="7" className="px-4 py-10 text-center text-slate-500">데이터가 없습니다.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
                 </div>
               )}
 
@@ -1665,7 +1694,7 @@
                         <div className="grid grid-cols-2 gap-4">
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">연도</label><select name="year" value={teamExamForm.year} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">시험</label><select name="exam" value={teamExamForm.exam} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{EXAMS.map((e)=><option key={e} value={e}>{e}</option>)}</select></div>
-                          <div><label className="block text-xs font-bold text-slate-500 mb-1">학교</label><input name="school" value={teamExamForm.school} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5" /></div>
+                          <div><label className="block text-xs font-bold text-slate-500 mb-1">학교</label><input name="school" list="team-school-option-list" value={teamExamForm.school} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5" /><datalist id="team-school-option-list">{SCHOOL_OPTIONS.map((school)=><option key={school} value={school} />)}</datalist></div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">학년</label><select name="grade" value={teamExamForm.grade} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{GRADES.map((g)=><option key={g} value={g}>{g}학년</option>)}</select></div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">과목명</label><select name="subject" value={teamExamForm.subject} onChange={handleTeamFormChange} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{SUBJECTS.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">세부 과목명</label><input name="detailSubject" value={teamExamForm.detailSubject} onChange={handleTeamFormChange} placeholder="예: 공통수학1, 대수, 기하" className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5" /></div>
