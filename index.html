@@ -538,22 +538,8 @@
       const [teamSchoolCustom, setTeamSchoolCustom] = useState('');
       const [tierCapNotice, setTierCapNotice] = useState(false);
       const [excelUploading, setExcelUploading] = useState(false);
-      const [bootstrapReady, setBootstrapReady] = useState(false);
-      const [teacherLoadError, setTeacherLoadError] = useState('');
 
-      const TEACHER_CACHE_KEY = 'openacademy_teacher_cache_v1';
       const getPath = (name) => typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/${name}` : `openacademy/data/${name}`;
-
-      useEffect(() => {
-        try {
-          const cached = window.localStorage.getItem(TEACHER_CACHE_KEY);
-          if (!cached) return;
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length) {
-            setTeachersData(parsed.filter((t) => t && t.isActive !== false).sort((a,b) => String(a.name||'').localeCompare(String(b.name||''), 'ko')));
-          }
-        } catch (e) {}
-      }, []);
 
       useEffect(() => {
         const initFirebase = async () => {
@@ -606,7 +592,6 @@
             const auth = getAuth(app);
             const database = getFirestore(app);
             setDb(database);
-            setBootstrapReady(true);
 
             try {
               if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -614,17 +599,16 @@
               } else {
                 await signInAnonymously(auth);
               }
+              onAuthStateChanged(auth, (u) => {
+                setUser(u || { uid: 'openacademy-guest' });
+              });
             } catch (authError) {
               setInitError('Firebase 인증 실패: ' + authError.message);
+              setUser({ uid: 'openacademy-guest' });
+              setIsLoading(false);
             }
-
-            setUser(auth.currentUser || { uid: 'openacademy-guest' });
-            onAuthStateChanged(auth, (u) => {
-              setUser(u || { uid: 'openacademy-guest' });
-            });
           } catch (error) {
             setInitError('Firebase 초기화 실패: ' + error.message);
-            setBootstrapReady(true);
             setIsLoading(false);
           }
         };
@@ -632,7 +616,7 @@
       }, []);
 
       useEffect(() => {
-        if (!db || !window.FirebaseAPI || !bootstrapReady) return;
+        if (!user || !db || !window.FirebaseAPI) return;
         const { collection, onSnapshot } = window.FirebaseAPI;
         let unsubTeachers, unsubStudents, unsubScores, unsubTeam;
         try {
@@ -644,23 +628,9 @@
           unsubTeachers = onSnapshot(collection(db, getPath('teachers')), (snapshot) => {
             const items = [];
             snapshot.forEach((d) => items.push({ teacherId: d.id, ...d.data() }));
-            const normalized = items.filter((t) => t.isActive !== false).sort((a,b) => String(a.name||'').localeCompare(String(b.name||''), 'ko'));
-            setTeachersData(normalized);
-            setTeacherLoadError('');
-            try { if (normalized.length) window.localStorage.setItem(TEACHER_CACHE_KEY, JSON.stringify(normalized)); } catch (e) {}
+            setTeachersData(items.filter((t) => t.isActive !== false).sort((a,b) => String(a.name||'').localeCompare(String(b.name||''), 'ko')));
             ready.teachers = true; finish();
-          }, (error) => {
-            setTeacherLoadError('선생님 목록을 실시간으로 읽지 못했습니다.');
-            try {
-              const cached = window.localStorage.getItem(TEACHER_CACHE_KEY);
-              if (cached) {
-                const parsed = JSON.parse(cached);
-                if (Array.isArray(parsed) && parsed.length) setTeachersData(parsed);
-              }
-            } catch (e) {}
-            setInitError('teachers 데이터를 읽을 수 없습니다: ' + error.message);
-            ready.teachers = true; finish();
-          });
+          }, (error) => { setInitError('teachers 데이터를 읽을 수 없습니다: ' + error.message); ready.teachers = true; finish(); });
 
           unsubStudents = onSnapshot(collection(db, getPath('students')), (snapshot) => {
             const items = [];
@@ -986,7 +956,7 @@
 
       const handleTeacherLogin = (e) => {
         e.preventDefault();
-        if (!teachersData.length) return setLoginError(initError ? '선생님 목록을 불러오지 못했습니다. Firebase 연결 또는 teachers 데이터 경로를 확인해주세요.' : '선생님 목록을 아직 불러오는 중입니다.');
+        if (!teachersData.length) return setLoginError(initError ? '선생님 목록을 불러오지 못했습니다.' : '선생님 목록을 아직 불러오는 중입니다.');
         if (!selectedTeacherName.trim()) return setLoginError('선생님을 먼저 선택해주세요.');
         const foundTeacher = teachersData.find((t) => String(t.name || '').trim() === selectedTeacherName.trim() && String(t.pin || '').trim() === loginPin.trim() && t.isActive !== false);
         if (!foundTeacher) return setLoginError('PIN이 올바르지 않습니다.');
@@ -1294,11 +1264,10 @@
                 <p className="mt-2 text-slate-500 leading-7">선생님 선택 버튼을 먼저 누른 뒤,<br/>고유 PIN 번호 입력하고 바로 로그인!!!</p>
                 <form onSubmit={handleTeacherLogin} className="mt-8 space-y-4">
                   {initError && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">{initError}</div>}
-                  {teacherLoadError && <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">{teacherLoadError}</div>}
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-3">선생님 선택</label>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {teachersData.length === 0 && <div className="col-span-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm font-bold text-slate-500">{!bootstrapReady || isLoading ? '선생님 목록을 불러오는 중...' : '선생님 목록이 없습니다.'}</div>}
+                      {teachersData.length === 0 && <div className="col-span-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm font-bold text-slate-500">{isLoading ? '선생님 목록을 불러오는 중...' : '선생님 목록이 없습니다.'}</div>}
                       {teachersData.map((teacher, idx) => {
                         const selected = selectedTeacherName === teacher.name;
                         return (
@@ -1314,10 +1283,7 @@
                         );
                       })}
                     </div>
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="flex-1 rounded-2xl bg-violet-50 border border-violet-200 px-4 py-3 text-sm font-bold text-violet-700">선택된 선생님: {selectedTeacherName || '없음'}</div>
-                      <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 hover:bg-slate-50">새로고침</button>
-                    </div>
+                    <div className="mt-3 rounded-2xl bg-violet-50 border border-violet-200 px-4 py-3 text-sm font-bold text-violet-700">선택된 선생님: {selectedTeacherName || '없음'}</div>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2 text-center">PIN</label>
@@ -1330,7 +1296,7 @@
                     <div className="mt-2 text-xs text-slate-400 text-center">PIN은 4자리 숫자로 입력해주세요.</div>
                   </div>
                   {loginError && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-2xl px-4 py-3">{loginError}</div>}
-                  <button type="submit" disabled={!selectedTeacherName || loginPin.length !== 4 || !teachersData.length} className={`w-full h-14 rounded-2xl text-white font-bold shadow-lg shadow-violet-200 ${selectedTeacherName && loginPin.length === 4 && teachersData.length ? 'bg-gradient-to-r from-violet-700 via-purple-600 to-indigo-600 hover:from-violet-800 hover:via-purple-700 hover:to-indigo-700' : 'bg-slate-300 cursor-not-allowed'}`}>로그인</button>
+                  <button type="submit" disabled={!teachersData.length} className={`w-full h-14 rounded-2xl text-white font-bold shadow-lg shadow-violet-200 ${teachersData.length ? 'bg-gradient-to-r from-violet-700 via-purple-600 to-indigo-600 hover:from-violet-800 hover:via-purple-700 hover:to-indigo-700' : 'bg-slate-300 cursor-not-allowed'}`}>로그인</button>
                 </form>
               </div>
             </div>
