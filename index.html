@@ -353,6 +353,28 @@
       return { score, tier };
     }
 
+    function formatScoreDelta(curr, prev) {
+      if (!prev) return '신규';
+      const diff = Number(curr.score || 0) - Number(prev.score || 0);
+      if (diff > 0) return `+${diff}점 ▲`;
+      if (diff < 0) return `${diff}점 ▼`;
+      return '유지';
+    }
+
+    function formatTierDelta(curr, prev) {
+      if (!prev) return '신규';
+      const diff = Number(prev.tier || 0) - Number(curr.tier || 0);
+      if (diff > 0) return `${diff}등급 ▲`;
+      if (diff < 0) return `${Math.abs(diff)}등급 ▼`;
+      return '유지';
+    }
+
+    function normalizeTeacherAnalysisTier(tier) {
+      const n = Number(tier || 0);
+      if (!n) return 0;
+      return Math.min(n, 5);
+    }
+
     function findPreviousComparableRecord(currentRow, allRows) {
       const base = allRows
         .filter((r) => r.studentId === currentRow.studentId && r.subject === currentRow.subject)
@@ -444,6 +466,7 @@
       const [manageTeacherFilter, setManageTeacherFilter] = useState('전체');
       const [selectedQuickStudentId, setSelectedQuickStudentId] = useState('');
       const [teacherAnalysisTeacher, setTeacherAnalysisTeacher] = useState('');
+      const [teacherAnalysisView, setTeacherAnalysisView] = useState({ year: 2026, exam: EXAMS[0], school: '전체', grade: '전체' });
       const [quickEntryExamMap, setQuickEntryExamMap] = useState({});
       const [teacherAnalysisSort, setTeacherAnalysisSort] = useState({ key: 'name', direction: 'asc' });
       const [subjectSort, setSubjectSort] = useState({ key: 'score', direction: 'desc' });
@@ -810,61 +833,64 @@
       const teacherAnalysisRows = useMemo(() => {
         const targetTeacher = teacherAnalysisTeacher || currentTeacher?.name || '';
         if (!targetTeacher) return [];
-        const rows = activeJoinedData.filter((row) => row.createdBy === targetTeacher || row.updatedBy === targetTeacher);
+        const rows = activeJoinedData.filter((row) => (
+          (row.createdBy === targetTeacher || row.updatedBy === targetTeacher) &&
+          Number(row.year) === Number(teacherAnalysisView.year) &&
+          row.exam === teacherAnalysisView.exam &&
+          (teacherAnalysisView.school === '전체' || row.school === teacherAnalysisView.school) &&
+          (teacherAnalysisView.grade === '전체' || Number(row.grade) === Number(teacherAnalysisView.grade))
+        ));
         const byStudent = new Map();
         rows.forEach((row) => {
           if (!byStudent.has(row.studentId)) {
-            byStudent.set(row.studentId, { studentId: row.studentId, name: row.name, school: row.school, grade: row.grade, scores: [] });
+            byStudent.set(row.studentId, { studentId: row.studentId, name: row.name, school: row.school, grade: row.grade, year: row.year, scores: [] });
           }
-          byStudent.get(row.studentId).scores.push(row);
+          const prev = findPreviousComparableRecord(row, activeJoinedData);
+          byStudent.get(row.studentId).scores.push({
+            ...row,
+            prev,
+            scoreDeltaText: formatScoreDelta(row, prev),
+            tierDeltaText: formatTierDelta(row, prev),
+            normalizedTier: normalizeTeacherAnalysisTier(row.tier),
+            numericScoreDelta: prev ? Number(row.score || 0) - Number(prev.score || 0) : 0,
+            numericTierDelta: prev ? Number(prev.tier || 0) - Number(row.tier || 0) : 0,
+          });
         });
         return Array.from(byStudent.values()).map((student) => {
-          const latestBySubject = {};
-          let scoreImprovedCount = 0;
-          let tierImprovedCount = 0;
-          student.scores.forEach((row) => {
-            const prev = findPreviousComparableRecord(row, activeJoinedData);
-            const status = compareStatus(row, prev);
-            if (status.score === 'up') scoreImprovedCount += 1;
-            if (status.tier === 'up') tierImprovedCount += 1;
-            const key = `${row.subject}__${row.detailSubject || ''}`;
-            const prevLatest = latestBySubject[key];
-            if (!prevLatest || Number(row.year) > Number(prevLatest.year) || (Number(row.year) === Number(prevLatest.year) && examOrder(row.exam) > examOrder(prevLatest.exam))) {
-              latestBySubject[key] = row;
-            }
-          });
-          const latestScores = Object.values(latestBySubject);
-          const average = latestScores.length ? Math.round(latestScores.reduce((sum, row) => sum + Number(row.score || 0), 0) / latestScores.length) : 0;
-          const latestTierAverage = latestScores.length ? (latestScores.reduce((sum,row)=>sum + Number(row.tier || 0),0) / latestScores.length).toFixed(1) : '-';
+          const sortedScores = [...student.scores].sort((a,b) => safeLower(a.subject).localeCompare(safeLower(b.subject), 'ko') || safeLower(a.detailSubject || '').localeCompare(safeLower(b.detailSubject || ''), 'ko'));
+          const average = sortedScores.length ? Math.round(sortedScores.reduce((sum, row) => sum + Number(row.score || 0), 0) / sortedScores.length) : 0;
+          const scoreImproved = sortedScores.some((row) => row.numericScoreDelta > 0);
+          const tierImproved = sortedScores.some((row) => row.numericTierDelta > 0);
+          const bestScoreDelta = sortedScores.reduce((max, row) => Math.max(max, row.numericScoreDelta || 0), 0);
+          const bestTierDelta = sortedScores.reduce((max, row) => Math.max(max, row.numericTierDelta || 0), 0);
           return {
             ...student,
-            latestScores,
+            scores: sortedScores,
             average,
-            latestTierAverage,
-            subjectCount: latestScores.length,
-            scoreImprovedCount,
-            tierImprovedCount,
-            latestExam: latestScores[0]?.exam || '-',
+            subjectNames: sortedScores.map((row) => `${row.subject}${row.detailSubject ? `(${row.detailSubject})` : ''}`).join(' · '),
+            scoreImproved,
+            tierImproved,
+            bestScoreDelta,
+            bestTierDelta,
           };
         });
-      }, [activeJoinedData, teacherAnalysisTeacher, currentTeacher]);
+      }, [activeJoinedData, teacherAnalysisTeacher, currentTeacher, teacherAnalysisView]);
 
       const teacherAnalysisSummary = useMemo(() => {
         const rows = teacherAnalysisRows;
-        const schoolCount = new Set(rows.map((r) => r.school)).size;
         const avg = rows.length ? Math.round(rows.reduce((sum, row) => sum + Number(row.average || 0), 0) / rows.length) : 0;
-        const improvedScoreStudents = rows.filter((row) => row.scoreImprovedCount > 0).length;
-        const improvedTierStudents = rows.filter((row) => row.tierImprovedCount > 0).length;
+        const improvedScoreStudents = rows.filter((row) => row.scoreImproved).length;
+        const improvedTierStudents = rows.filter((row) => row.tierImproved).length;
         const scoreBucketCounts = Object.fromEntries(SCORE_BUCKETS.map((b) => [b.label, 0]));
-        const tierCounts = {};
-        teacherAnalysisRows.forEach((student) => {
-          student.latestScores.forEach((row) => {
+        const tierCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        rows.forEach((student) => {
+          student.scores.forEach((row) => {
             scoreBucketCounts[bucketScore(row.score)] += 1;
-            const t = Number(row.tier || 0);
+            const t = normalizeTeacherAnalysisTier(row.tier);
             if (t) tierCounts[t] = (tierCounts[t] || 0) + 1;
           });
         });
-        return { studentCount: rows.length, schoolCount, avg, improvedScoreStudents, improvedTierStudents, scoreBucketCounts, tierCounts };
+        return { studentCount: rows.length, avg, improvedScoreStudents, improvedTierStudents, scoreBucketCounts, tierCounts };
       }, [teacherAnalysisRows]);
 
       const sortedTeacherAnalysisRows = useMemo(() => {
@@ -872,7 +898,7 @@
         items.sort((a,b) => {
           let av = a[teacherAnalysisSort.key];
           let bv = b[teacherAnalysisSort.key];
-          if (teacherAnalysisSort.key === 'name' || teacherAnalysisSort.key === 'school') { av = safeLower(av); bv = safeLower(bv); }
+          if (teacherAnalysisSort.key === 'name' || teacherAnalysisSort.key === 'school' || teacherAnalysisSort.key === 'subjectNames') { av = safeLower(av); bv = safeLower(bv); }
           else { av = Number(av || 0); bv = Number(bv || 0); }
           if (av < bv) return teacherAnalysisSort.direction === 'asc' ? -1 : 1;
           if (av > bv) return teacherAnalysisSort.direction === 'asc' ? 1 : -1;
@@ -1470,6 +1496,14 @@
 
               {view === 'teacherAnalysis' && (
                 <div className="space-y-6"> 
+                  <div className="card-3d rounded-[30px] p-5 print-avoid-break">
+                    <div className="grid md:grid-cols-4 gap-4">
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">연도</label><select value={teacherAnalysisView.year} onChange={(e)=>setTeacherAnalysisView((p)=>({...p, year:Number(e.target.value)}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">시험</label><select value={teacherAnalysisView.exam} onChange={(e)=>setTeacherAnalysisView((p)=>({...p, exam:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{EXAMS.map((exam)=><option key={exam} value={exam}>{exam}</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">학교</label><select value={teacherAnalysisView.school} onChange={(e)=>setTeacherAnalysisView((p)=>({...p, school:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">{schools.filter((s)=>s !== '직접입력').map((school)=><option key={school} value={school}>{school}</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-slate-500 mb-1">학년</label><select value={teacherAnalysisView.grade} onChange={(e)=>setTeacherAnalysisView((p)=>({...p, grade:e.target.value}))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5"><option value="전체">전체</option>{GRADES.map((g)=><option key={g} value={g}>{g}학년</option>)}</select></div>
+                    </div>
+                  </div>
                   <div className="grid md:grid-cols-4 gap-4"> 
                     <div className="card-3d rounded-[28px] p-5"><div className="text-sm font-bold text-slate-500">담당 학생 수</div><div className="mt-3 text-3xl font-black text-slate-900">{teacherAnalysisSummary.studentCount}명</div></div>
                     <div className="card-3d rounded-[28px] p-5"><div className="text-sm font-bold text-slate-500">원점수 향상</div><div className="mt-3 text-3xl font-black text-slate-900">{teacherAnalysisSummary.improvedScoreStudents}명</div></div>
@@ -1480,8 +1514,8 @@
                     <Card title="원점수 분포"> 
                       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">{SCORE_BUCKETS.map((b) => <div key={b.label} className="rounded-2xl bg-white border border-slate-200 p-4 min-h-[96px] flex flex-col items-center justify-center text-center"><div className="text-xs text-slate-500">{b.label}</div><div className="mt-2 text-2xl font-black text-slate-900">{teacherAnalysisSummary.scoreBucketCounts[b.label] || 0}</div></div>)}</div>
                     </Card>
-                    <Card title="등급 분포"> 
-                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">{Array.from({ length: 9 }, (_, i) => i + 1).map((tier) => <div key={tier} className="rounded-2xl bg-white border border-slate-200 p-4 min-h-[96px] flex flex-col items-center justify-center text-center"><div className="text-xs text-slate-500">{tier}등급</div><div className="mt-2 text-2xl font-black text-violet-700">{teacherAnalysisSummary.tierCounts[tier] || 0}</div></div>)}</div>
+                    <Card title="등급 분포" right={<span className="text-[11px] text-slate-400">6~9등급 입력 시 5등급으로 합산됩니다.</span>}> 
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">{Array.from({ length: 5 }, (_, i) => i + 1).map((tier) => <div key={tier} className="rounded-2xl bg-white border border-slate-200 p-4 min-h-[96px] flex flex-col items-center justify-center text-center"><div className="text-xs text-slate-500">{tier}등급</div><div className="mt-2 text-2xl font-black text-violet-700">{teacherAnalysisSummary.tierCounts[tier] || 0}</div></div>)}</div>
                     </Card>
                   </div>
                   <Card title="담당 학생 목록" right={<span className="text-xs text-slate-400">헤더 클릭 정렬</span>}> 
@@ -1489,11 +1523,11 @@
                       <table className="w-full text-sm"> 
                         <thead className="bg-slate-50 text-xs uppercase text-slate-500 sticky top-0"> 
                           <tr>
-                            {[{key:'name',label:'학생명'},{key:'school',label:'학교'},{key:'grade',label:'학년'},{key:'average',label:'평균 점수'},{key:'subjectCount',label:'최근 과목 수'},{key:'scoreImprovedCount',label:'원점수 향상'},{key:'tierImprovedCount',label:'등급 향상'}].map((col) => <th key={col.key} onClick={() => setTeacherAnalysisSort((prev) => ({ key: col.key, direction: prev.key === col.key && prev.direction === 'asc' ? 'desc' : 'asc' }))} className="px-3 py-3 text-center cursor-pointer hover:bg-slate-100 whitespace-nowrap">{col.label}</th>)}
+                            {[{key:'name',label:'학생명'},{key:'school',label:'학교'},{key:'grade',label:'학년'},{key:'subjectNames',label:'과목명'},{key:'average',label:'입력 점수'},{key:'bestScoreDelta',label:'원점수 변화'},{key:'bestTierDelta',label:'등급 변화'}].map((col) => <th key={col.key} onClick={() => setTeacherAnalysisSort((prev) => ({ key: col.key, direction: prev.key === col.key && prev.direction === 'asc' ? 'desc' : 'asc' }))} className="px-3 py-3 text-center cursor-pointer hover:bg-slate-100 whitespace-nowrap">{col.label}</th>)}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200"> 
-                          {sortedTeacherAnalysisRows.length ? sortedTeacherAnalysisRows.map((student) => <tr key={student.studentId} className="hover:bg-violet-50/40"><td className="px-3 py-3 text-center font-black text-slate-900">{student.name}</td><td className="px-3 py-3 text-center">{student.school}</td><td className="px-3 py-3 text-center">{student.grade}학년</td><td className="px-3 py-3 text-center font-black text-violet-700">{student.average}점</td><td className="px-3 py-3 text-center">{student.subjectCount}</td><td className="px-3 py-3 text-center">{student.scoreImprovedCount}</td><td className="px-3 py-3 text-center">{student.tierImprovedCount}</td></tr>) : <tr><td colSpan="7" className="px-4 py-10 text-center text-slate-500">데이터가 없습니다.</td></tr>}
+                          {sortedTeacherAnalysisRows.length ? sortedTeacherAnalysisRows.map((student) => <tr key={student.studentId} className="hover:bg-violet-50/40 align-top"><td className="px-3 py-3 text-center font-black text-slate-900">{student.name}</td><td className="px-3 py-3 text-center">{student.school}</td><td className="px-3 py-3 text-center">{student.grade}학년</td><td className="px-3 py-3 text-left leading-6">{student.scores.map((row) => <div key={row.docId} className="whitespace-nowrap">{row.subject}{row.detailSubject ? ` (${row.detailSubject})` : ''}</div>)}</td><td className="px-3 py-3 text-left leading-6">{student.scores.map((row) => <div key={row.docId} className="whitespace-nowrap"><span className="font-black text-violet-700">{row.score}점</span> · {EXAM_SHORT_LABELS[row.exam] || row.exam}</div>)}</td><td className="px-3 py-3 text-left leading-6">{student.scores.map((row) => <div key={row.docId} className="whitespace-nowrap">{formatScoreDelta(row, row.prev)}</div>)}</td><td className="px-3 py-3 text-left leading-6">{student.scores.map((row) => <div key={row.docId} className="whitespace-nowrap">{formatTierDelta(row, row.prev)}</div>)}</td></tr>) : <tr><td colSpan="7" className="px-4 py-10 text-center text-slate-500">데이터가 없습니다.</td></tr>}
                         </tbody>
                       </table>
                     </div>
