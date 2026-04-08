@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>열린 학교시험 성적분석 ver 2.07</title>
+  <title>열린 학교시험 성적분석 v3.0</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -683,14 +683,14 @@
         const { name, value } = e.target;
         if (name === 'school') {
           if (value !== '직접입력') {
-            setManageStudent(p => ({ ...p, school: value, customSchool: '', name: '' }));
+            setManageStudent(p => ({ ...p, school: value, customSchool: '' }));
           } else {
-            setManageStudent(p => ({ ...p, school: value, name: '' }));
+            setManageStudent(p => ({ ...p, school: value }));
           }
           return;
         }
         if (name === 'grade' || name === 'year') {
-          setManageStudent(p => ({ ...p, [name]: Number(value), name: '' }));
+          setManageStudent(p => ({ ...p, [name]: Number(value) }));
           return;
         }
         setManageStudent(p => ({ ...p, [name]: value }));
@@ -1280,29 +1280,27 @@
             {view === 'manage' && (
               <div className="space-y-6">
                 <div className="grid xl:grid-cols-3 gap-6">
-                  <Card title="학생 신입생 입력" right={<span className="inline-flex items-center gap-2 text-xs font-black text-violet-700"><i className="fas fa-user-plus"></i>신규 입력 전용</span>}>
+                  <Card title="신입생 입력" right={<span className="inline-flex items-center gap-2 text-xs font-black text-violet-700"><i className="fas fa-user-plus"></i>신규 입력 전용</span>}>
                     <div className="space-y-4">
-                      <div className="text-sm text-slate-500 leading-6">새 학생을 등록하거나 기존 학생 성적을 바로 입력하는 카드입니다.</div>
-                      <div className="flex gap-3">
-                        <select name="year" value={manageStudent.year} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} className="w-28 border border-slate-300 rounded-xl p-2.5 outline-none">
-                          {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
-                        </select>
-                        <select name="grade" value={manageStudent.grade} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} className="w-28 border border-slate-300 rounded-xl p-2.5 outline-none">
-                          {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
-                        </select>
-                      </div>
+                      <div className="text-sm text-slate-500 leading-6">새 학생 이름을 먼저 입력한 뒤, 연도·학교·학년을 선택해 바로 아래 성적 보드로 연결하는 카드입니다.</div>
                       <input type="text" name="name" list="manage-student-options" value={manageStudent.name} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} placeholder="신입생 이름 입력" className="w-full border-2 border-violet-300 rounded-xl p-3 font-bold outline-none" />
                       <datalist id="manage-student-options">
                         {activeStudents.filter((student) => Number(student.year) === Number(manageStudent.year) && Number(student.grade) === Number(manageStudent.grade) && (finalSchoolValue ? student.school === finalSchoolValue : true)).map((student) => <option key={student.studentId} value={student.name} />)}
                       </datalist>
-                      <div className="flex gap-3">
-                        <select name="school" value={manageStudent.school} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none">
+                      <div className="grid grid-cols-3 gap-3">
+                        <select name="year" value={manageStudent.year} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} className="border border-slate-300 rounded-xl p-2.5 outline-none">
+                          {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
+                        </select>
+                        <select name="school" value={manageStudent.school} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} className="border border-slate-300 rounded-xl p-2.5 outline-none">
                           <option value="">학교 선택</option>
                           {SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                           <option value="직접입력">직접입력</option>
                         </select>
-                        {manageStudent.school === '직접입력' && <input type="text" name="customSchool" value={manageStudent.customSchool} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} placeholder="학교명 입력" className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none" />}
+                        <select name="grade" value={manageStudent.grade} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} className="border border-slate-300 rounded-xl p-2.5 outline-none">
+                          {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
+                        </select>
                       </div>
+                      {manageStudent.school === '직접입력' && <input type="text" name="customSchool" value={manageStudent.customSchool} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} placeholder="학교명 입력" className="w-full border border-slate-300 rounded-xl p-2.5 outline-none" />}
                       <div className="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-6 text-violet-800">
                         이름 · 학교 · 학년을 입력하면 아래 성적 보드에서 바로 점수/등급 입력이 가능합니다.
                       </div>
