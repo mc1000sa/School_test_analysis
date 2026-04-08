@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>열린학원 성적분석 시스템</title>
+  <title>열린학원 성적분석 포털</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -16,7 +16,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Dokdo&family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=SUIT:wght@400;500;600;700;800;900&family=Pretendard:wght@400;500;600;700;800;900&family=Dokdo&display=swap" rel="stylesheet">
 
   <script type="module">
     import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -88,22 +88,24 @@
     }
     
     .login-main-title {
-      font-family: 'Black Han Sans', 'Noto Sans KR', sans-serif;
+      font-family: 'SUIT','Pretendard','Noto Sans KR',sans-serif;
       font-weight: 900;
       letter-spacing: -0.02em;
       line-height: 1.34;
     }
     .login-copy-title {
-      font-family: 'Noto Sans KR', sans-serif;
+      font-family: 'SUIT','Pretendard','Noto Sans KR',sans-serif;
       font-weight: 800;
       letter-spacing: -0.03em;
       line-height: 1.34;
     }
     .creator-signature {
-      font-family: 'Dokdo', cursive;
-      letter-spacing: 0.04em;
-      color: rgba(15,23,42,0.38);
-      text-shadow: 0 8px 24px rgba(15,23,42,0.10);
+      font-family: 'SUIT','Pretendard','Noto Sans KR',sans-serif;
+      letter-spacing: 0.02em;
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(15,23,42,0.42);
+      text-shadow: none;
     }
 
     .card-3d {
@@ -147,7 +149,7 @@
 
     .top-context-wrap {
       border-radius: 24px;
-      background: rgba(255,255,255,0.92);
+      background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(247,244,255,0.96) 60%, rgba(239,246,255,0.96) 100%);
       border: 1px solid rgba(226,232,240,0.95);
       box-shadow: 0 10px 22px rgba(15,23,42,0.05);
     }
@@ -175,6 +177,13 @@
     .teacher-chip-4 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,247,237,0.94)); }
     .teacher-chip-5 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,245,255,0.94)); }
     .teacher-chip-6 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(238,242,255,0.94)); }
+
+    .logo-shell {display:flex;align-items:center;justify-content:center;min-height:72px;}
+    .logo-shell img {max-height:52px; width:auto; object-fit:contain;}
+    .section-hero {background: linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(245,243,255,0.94) 55%, rgba(239,246,255,0.94) 100%); border:1px solid rgba(226,232,240,0.92); box-shadow:0 14px 28px rgba(15,23,42,0.06);} 
+    .table-sort {cursor:pointer; user-select:none;}
+    .table-sort:hover {background:rgba(245,243,255,0.7);} 
+
     .admin-badge {
       border-radius: 999px;
       background: linear-gradient(135deg, #f59e0b, #f97316);
@@ -234,7 +243,6 @@
       { key: 'manage', label: '성적입력', icon: 'fa-pen-to-square' },
       { key: 'teacherAnalysis', label: '선생님별 성적분석', icon: 'fa-chalkboard-user' },
       { key: 'schoolAnalysis', label: '학교별 성적분석', icon: 'fa-school' },
-      { key: 'subjectAnalysis', label: '과목별 성적분석', icon: 'fa-book-open' },
       { key: 'studentAnalysis', label: '학생별 성적분석', icon: 'fa-user-graduate' },
       { key: 'teamExam', label: '시험 분석 아카이브', icon: 'fa-clipboard-list' },
     ];
@@ -556,14 +564,26 @@
       const activeJoinedData = useMemo(() => joinedData.filter(row => !row.isWithdrawn), [joinedData]);
       const schools = useMemo(() => ['전체', ...SCHOOL_OPTIONS, '직접입력'], []);
       const classNames = useMemo(() => ['전체', ...Array.from(new Set(scoresData.filter(d => !d.deleted).map(d => d.className).filter(Boolean))).sort()], [scoresData]);
-      const activeStudents = useMemo(() => studentsData.filter(s => !s.deleted && !s.isWithdrawn).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''))), [studentsData]);
+      const activeStudents = useMemo(() => studentsData.filter(s => !s.deleted && !s.isWithdrawn).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''), 'ko')), [studentsData]);
+      const orderedTeachers = useMemo(() => {
+        const items = [...teachersData].sort((a,b) => {
+          if ((a.name||'') === '원장쌤' && (b.name||'') !== '원장쌤') return -1;
+          if ((b.name||'') === '원장쌤' && (a.name||'') !== '원장쌤') return 1;
+          return String(a.name||'').localeCompare(String(b.name||''), 'ko');
+        });
+        return items;
+      }, [teachersData]);
+      const [schoolSort, setSchoolSort] = useState({ key: 'avg', direction: 'desc' });
+      const [studentSort, setStudentSort] = useState({ key: 'year', direction: 'asc' });
+      const [teamExamSort, setTeamExamSort] = useState({ key: 'year', direction: 'desc' });
+      const [studentSubjectFilter, setStudentSubjectFilter] = useState('전체');
       const isLoggedIn = !!currentTeacher;
       const currentTeacherName = currentTeacher?.name || '';
       const isAdminUser = currentTeacherName === ADMIN_TEACHER_NAME;
 
       const detectedTestStudents = useMemo(() => {
-        return studentsData.filter((student) => !student.deleted && isLikelyTestStudent(student));
-      }, [studentsData]);
+        return studentsData.filter((student) => !student.deleted && (isLikelyTestStudent(student) || !scoresData.some((score) => score.studentId === student.studentId && !score.deleted)));
+      }, [studentsData, scoresData]);
 
       const detectedTestStudentIds = useMemo(() => new Set(detectedTestStudents.map((student) => student.studentId)), [detectedTestStudents]);
 
@@ -613,16 +633,34 @@
         if (!t) return setLoginError('PIN이 올바르지 않습니다.');
         setCurrentTeacher(t);
         setLoginError('');
+        setTeacherAnalysisTeacher(t.name);
+        setManageTeacherFilter(t.name);
       };
+      const handleLogout = () => {
+        setCurrentTeacher(null);
+        setSelectedTeacherName('');
+        setLoginPin('');
+        setView('dashboard');
+      };
+
+      const resetManageStudentName = () => setManageStudent((p) => ({ ...p, name: '' }));
 
       // Handle Manage Form
       const handleManageStudentChange = (e) => {
         const { name, value } = e.target;
-        if(name === 'school' && value !== '직접입력') {
-           setManageStudent(p => ({ ...p, school: value, customSchool: '' }));
-        } else {
-           setManageStudent(p => ({ ...p, [name]: (name==='year'||name==='grade')?Number(value):value }));
+        if (name === 'school') {
+          if (value !== '직접입력') {
+            setManageStudent(p => ({ ...p, school: value, customSchool: '', name: '' }));
+          } else {
+            setManageStudent(p => ({ ...p, school: value, name: '' }));
+          }
+          return;
         }
+        if (name === 'grade' || name === 'year') {
+          setManageStudent(p => ({ ...p, [name]: Number(value), name: '' }));
+          return;
+        }
+        setManageStudent(p => ({ ...p, [name]: value }));
       };
 
       const finalSchoolValue = manageStudent.school === '직접입력' ? manageStudent.customSchool : manageStudent.school;
@@ -727,6 +765,79 @@
       };
 
 
+      const handleScoreOwnerChange = async (docId, teacherName) => {
+        if (!db || !window.FirebaseAPI || !docId || !teacherName) return;
+        try {
+          const { updateDoc, doc } = window.FirebaseAPI;
+          await updateDoc(doc(db, getPath('scores'), docId), {
+            updatedBy: teacherName,
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          alert('입력자 변경 중 오류가 발생했습니다: ' + error.message);
+        }
+      };
+
+      const saveTeamExam = async (e) => {
+        e.preventDefault();
+        if (!db || !window.FirebaseAPI) return;
+        try {
+          const { addDoc, collection } = window.FirebaseAPI;
+          await addDoc(collection(db, getPath('teamExams')), {
+            ...teamExamForm,
+            createdAt: new Date().toISOString(),
+            createdBy: currentTeacher?.name || '',
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentTeacher?.name || '',
+            deleted: false,
+          });
+          setTeamExamForm({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', difficulty: 3, review: '', specialNote: '' });
+          alert('시험 분석이 저장되었습니다.');
+        } catch (error) {
+          alert('시험 분석 저장 중 오류가 발생했습니다: ' + error.message);
+        }
+      };
+
+      const sortRows = (rows, sortState, mapper = {}) => {
+        const getVal = (row) => mapper[sortState.key] ? mapper[sortState.key](row) : row[sortState.key];
+        return [...rows].sort((a,b) => {
+          const av = getVal(a); const bv = getVal(b);
+          if (av < bv) return sortState.direction === 'asc' ? -1 : 1;
+          if (av > bv) return sortState.direction === 'asc' ? 1 : -1;
+          return 0;
+        });
+      };
+
+      const schoolAnalysisRows = (() => {
+        const rows = activeJoinedData.filter(r => Number(r.year) === Number(schoolView.year) && r.exam === schoolView.exam && (schoolView.school === '전체' || r.school === schoolView.school) && (schoolView.subject === '전체' || r.subject === schoolView.subject) && (schoolView.grade === '전체' || Number(r.grade) === Number(schoolView.grade)));
+        const grouped = {};
+        rows.forEach(r => {
+          const key = [r.school, r.grade, r.subject].join('__');
+          grouped[key] = grouped[key] || [];
+          grouped[key].push(r);
+        });
+        const items = Object.entries(grouped).map(([key, arr]) => {
+          const [school, grade, subject] = key.split('__');
+          const avg = Math.round(arr.reduce((sum, item) => sum + Number(item.score || 0), 0) / arr.length);
+          const rates = [1,2,3,4,5].reduce((acc, tier) => {
+            acc[`rate${tier}`] = Math.round((arr.filter(item => normalizeTeacherAnalysisTier(item.tier) === tier).length / arr.length) * 100);
+            return acc;
+          }, {});
+          return { school, grade:Number(grade), subject, count: arr.length, avg, ...rates };
+        });
+        return sortRows(items, schoolSort, { school:r=>safeLower(r.school), grade:r=>Number(r.grade), subject:r=>safeLower(r.subject), count:r=>Number(r.count), avg:r=>Number(r.avg), rate1:r=>Number(r.rate1), rate2:r=>Number(r.rate2), rate3:r=>Number(r.rate3), rate4:r=>Number(r.rate4), rate5:r=>Number(r.rate5) });
+      })();
+
+      const dashboardSummaryCards = (() => {
+        const rows = filteredDashboardData;
+        return {
+          top90: rows.filter(r => Number(r.score) >= 90).length,
+          score80: rows.filter(r => Number(r.score) >= 80 && Number(r.score) < 90).length,
+          tier1: rows.filter(r => normalizeTeacherAnalysisTier(r.tier) === 1).length,
+          tier2: rows.filter(r => normalizeTeacherAnalysisTier(r.tier) === 2).length,
+        };
+      })();
+
       if (isLoading) return <div className="min-h-screen flex items-center justify-center text-violet-700 font-bold text-xl">연결 준비 중...</div>;
       if (initError) return <div className="min-h-screen flex items-center justify-center p-6"><div className="bg-white border border-rose-200 rounded-[28px] p-6 max-w-2xl w-full"><div className="text-2xl font-black text-rose-600 mb-3">연결 오류</div><div className="text-sm text-rose-600 whitespace-pre-wrap leading-7">{initError}</div></div></div>;
       
@@ -749,7 +860,7 @@
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-3">선생님 선택</label>
                     <div className="grid grid-cols-3 gap-3">
-                      {teachersData.map((t, idx) => (
+                      {orderedTeachers.map((t, idx) => (
                         <button type="button" key={t.teacherId} onClick={() => setSelectedTeacherName(t.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selectedTeacherName === t.name ? 'teacher-chip-selected' : ''}`}>
                           {t.name}
                         </button>
@@ -771,7 +882,7 @@
 
       // Views Data Prep
       const filteredDashboardData = activeJoinedData.filter(d => d.year === filters.year && d.exam === filters.exam && (filters.school==='전체'||d.school===filters.school) && (filters.grade==='전체'||d.grade===filters.grade) && (filters.className==='전체'||d.className===filters.className) && (activeSubject==='전체'||d.subject===activeSubject));
-      const sortedDashboardData = [...filteredDashboardData].sort((a,b) => dashboardSort.direction === 'asc' ? String(a[dashboardSort.key]).localeCompare(String(b[dashboardSort.key])) : String(b[dashboardSort.key]).localeCompare(String(a[dashboardSort.key])));
+      const sortedDashboardData = [...filteredDashboardData].sort((a,b) => { const key = dashboardSort.key; const av = ['grade','score','tier'].includes(key) ? Number(a[key] || 0) : safeLower(a[key] || ''); const bv = ['grade','score','tier'].includes(key) ? Number(b[key] || 0) : safeLower(b[key] || ''); if (av < bv) return dashboardSort.direction === 'asc' ? -1 : 1; if (av > bv) return dashboardSort.direction === 'asc' ? 1 : -1; return 0; });
 
       // Teacher Analysis Logic
       const teacherAnalysisTarget = teacherAnalysisTeacher || currentTeacherName;
@@ -828,20 +939,17 @@
       const adminPill = isAdminUser ? <span className="admin-badge px-3 py-1.5 text-xs">관리자</span> : null;
       const topContextBar = (() => {
         if (view === 'dashboard') {
-          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar">{EXAMS.map((exam) => <button key={exam} type="button" onClick={() => setFilters((p) => ({ ...p, exam }))} className={`top-context-chip ${filters.exam === exam ? 'top-context-chip-active' : ''}`}>{EXAM_SHORT_LABELS[exam]}</button>)}</div>;
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar">{EXAMS.map((exam) => <button key={exam} type="button" onClick={() => setFilters((p) => ({ ...p, exam }))} className={`top-context-chip ${filters.exam === exam ? 'top-context-chip-active' : ''}`}>{EXAM_SHORT_LABELS[exam]}</button>)}</div>;
         }
         if (view === 'manage') {
-          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar"><span className="px-2 text-xs font-bold text-slate-400 whitespace-nowrap">선생님 빠른 선택</span><button type="button" onClick={() => setManageTeacherFilter('전체')} className={`top-context-chip ${manageTeacherFilter === '전체' ? 'top-context-chip-active' : ''}`}>전체</button>{teachersData.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setManageTeacherFilter(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${manageTeacherFilter === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar"><span className="px-2 text-xs font-bold text-slate-500 whitespace-nowrap">선생님 빠른 선택</span><button type="button" onClick={() => setManageTeacherFilter('전체')} className={`top-context-chip ${manageTeacherFilter === '전체' ? 'top-context-chip-active' : ''}`}>전체</button>{orderedTeachers.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setManageTeacherFilter(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${manageTeacherFilter === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
         }
         if (view === 'teacherAnalysis') {
           const activeTeacher = teacherAnalysisTeacher || currentTeacher?.name || '';
-          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar">{teachersData.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setTeacherAnalysisTeacher(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${activeTeacher === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar">{orderedTeachers.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setTeacherAnalysisTeacher(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${activeTeacher === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
         }
         if (view === 'schoolAnalysis') {
-          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setSchoolView((p) => ({ ...p, school: '전체' }))} className={`top-context-chip ${schoolView.school === '전체' ? 'top-context-chip-active' : ''}`}>전체 학교</button>{SCHOOL_OPTIONS.map((school) => <button key={school} type="button" onClick={() => setSchoolView((p) => ({ ...p, school }))} className={`top-context-chip ${schoolView.school === school ? 'top-context-chip-active' : ''}`}>{school}</button>)}</div>;
-        }
-        if (view === 'subjectAnalysis') {
-          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar">{SUBJECTS.map((subject) => <button key={subject} type="button" onClick={() => setSubjectView((p) => ({ ...p, subject }))} className={`top-context-chip ${subjectView.subject === subject ? 'top-context-chip-active' : ''}`}>{subject}</button>)}</div>;
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setSchoolView((p) => ({ ...p, school: '전체' }))} className={`top-context-chip ${schoolView.school === '전체' ? 'top-context-chip-active' : ''}`}>전체 학교</button>{SCHOOL_OPTIONS.map((school) => <button key={school} type="button" onClick={() => setSchoolView((p) => ({ ...p, school }))} className={`top-context-chip ${schoolView.school === school ? 'top-context-chip-active' : ''}`}>{school}</button>)}</div>;
         }
         return null;
       })();
@@ -849,7 +957,7 @@
       return (
         <div className="app-shell font-sans text-slate-800">
           <aside className="desktop-sidebar hidden xl:flex fixed left-5 top-5 bottom-5 w-[260px] rounded-[30px] glass soft-border sidebar-shadow p-5 flex-col">
-            <div className="flex items-center justify-center font-black text-2xl text-violet-800 tracking-tight pb-6 border-b border-slate-100">열린학원</div>
+            <div className="logo-shell pb-6 border-b border-slate-100"><img src="./logo.png" alt="열린학원 로고" onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentNode.innerHTML='<div class=\"font-black text-2xl text-violet-800 tracking-tight\">열린학원</div>';}} /></div>
             <div className="mt-6 space-y-2 flex-1">
               {MENU_ITEMS.map(i => (
                 <button key={i.key} onClick={() => setView(i.key)} className={`w-full flex items-center gap-3 px-4 py-3 font-bold text-sm ${view === i.key ? 'nav-pill-active' : 'nav-pill'}`}>
@@ -857,14 +965,11 @@
                 </button>
               ))}
             </div>
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-              <div className="text-xs text-slate-500 font-bold mb-1">로그인</div>
-              <div className="flex items-center justify-between gap-2"><div className="font-black text-slate-900">{currentTeacherName} 선생님</div>{adminPill}</div>
-            </div>
+            <div className="mt-auto space-y-3"><div className="bg-slate-50 p-4 rounded-2xl border border-slate-200"><div className="text-xs text-slate-500 font-bold mb-1">로그인</div><div className="flex items-center justify-between gap-2"><div className="font-black text-slate-900">{currentTeacherName} 선생님</div>{adminPill}</div></div><button onClick={handleLogout} className="w-full rounded-2xl bg-gradient-to-r from-slate-700 to-slate-900 text-white font-bold py-3 shadow-sm">로그아웃</button></div>
           </aside>
 
           <main className="content-wrap xl:pl-[290px] p-4 sm:p-6 space-y-6 mobile-safe-bottom">
-            <header className="sticky top-0 z-20 bg-white/95 border-b border-slate-200/75 rounded-[28px] p-4 sm:p-5 shadow-sm">
+            <header className="sticky top-0 z-20 section-hero rounded-[28px] p-4 sm:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-violet-700">열린학원 성적분석 포털</div>
@@ -889,31 +994,33 @@
 
             {view === 'dashboard' && (
               <div className="space-y-6">
+                <div className="grid md:grid-cols-4 gap-4">
+                  <div className="card-3d rounded-[24px] p-5 text-center"><div className="text-sm font-bold text-slate-500">90점 이상</div><div className="mt-2 text-3xl font-black text-violet-700">{dashboardSummaryCards.top90}명</div></div>
+                  <div className="card-3d rounded-[24px] p-5 text-center"><div className="text-sm font-bold text-slate-500">80~89점</div><div className="mt-2 text-3xl font-black text-sky-700">{dashboardSummaryCards.score80}명</div></div>
+                  <div className="card-3d rounded-[24px] p-5 text-center"><div className="text-sm font-bold text-slate-500">1등급</div><div className="mt-2 text-3xl font-black text-emerald-700">{dashboardSummaryCards.tier1}명</div></div>
+                  <div className="card-3d rounded-[24px] p-5 text-center"><div className="text-sm font-bold text-slate-500">2등급</div><div className="mt-2 text-3xl font-black text-amber-600">{dashboardSummaryCards.tier2}명</div></div>
+                </div>
                 <Card title="대시보드 필터">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-wrap gap-2">
-                      {EXAMS.map(ex => (
-                        <button key={ex} onClick={()=>setFilters({...filters, exam: ex})} className={`px-5 py-2 btn-pill text-sm ${filters.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>
-                      ))}
-                    </div>
-                    <div className="grid md:grid-cols-4 gap-4">
-                       <select value={filters.school} onChange={e=>setFilters({...filters, school: e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none">{schools.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                       <select value={filters.grade} onChange={e=>setFilters({...filters, grade: e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전학년</option>{GRADES.map(g=><option key={g} value={g}>{g}학년</option>)}</select>
-                    </div>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <select value={filters.school} onChange={e=>setFilters({...filters, school: e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none">{schools.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                    <select value={filters.grade} onChange={e=>setFilters({...filters, grade: e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전학년</option>{GRADES.map(g=><option key={g} value={g}>{g}학년</option>)}</select>
+                    <select value={activeSubject} onChange={e=>setActiveSubject(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 과목</option>{SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}</select>
                   </div>
                 </Card>
-                <Card title="성적 리스트">
+                <Card title="성적 리스트" right={<span className="text-xs text-slate-400">헤더 클릭 정렬</span>}>
                   <div className="overflow-x-auto mini-scroll">
                     <table className="w-full text-sm text-center border-collapse">
                       <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b">
-                        <tr><th>학교</th><th>학년</th><th>이름</th><th>과목</th><th>점수</th><th>등급</th></tr>
+                        <tr>{[
+                          ['school','학교'],['grade','학년'],['name','이름'],['subject','과목'],['score','점수'],['tier','등급']
+                        ].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => setDashboardSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr>
                       </thead>
                       <tbody>
-                        {sortedDashboardData.map(r => (
+                        {sortedDashboardData.length ? sortedDashboardData.map(r => (
                           <tr key={r.docId} className="border-b border-slate-100 hover:bg-slate-50">
-                            <td className="py-3">{r.school}</td><td>{r.grade}</td><td className="font-bold">{r.name}</td><td>{r.subject}</td><td className="font-black text-violet-700">{r.score}점</td><td>{r.tier}등급</td>
+                            <td className="py-3">{r.school}</td><td>{r.grade}</td><td className="font-bold">{r.name}</td><td>{r.subject}{r.detailSubject ? ` (${r.detailSubject})` : ''}</td><td className="font-black text-violet-700">{r.score}점</td><td>{normalizeTeacherAnalysisTier(r.tier)}등급</td>
                           </tr>
-                        ))}
+                        )) : <tr><td colSpan="6" className="py-10 text-slate-400">데이터가 없습니다.</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -930,7 +1037,7 @@
                         <select name="year" value={manageStudent.year} onChange={handleManageStudentChange} className="w-24 border border-slate-300 rounded-xl p-2.5 outline-none">
                           {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
                         </select>
-                        <input type="text" name="name" value={manageStudent.name} onChange={handleManageStudentChange} placeholder="학생 이름" className="flex-1 border-2 border-violet-300 rounded-xl p-2.5 font-bold outline-none" />
+                        <input type="text" name="name" list="manage-student-options" value={manageStudent.name} onChange={handleManageStudentChange} placeholder="학생 이름" className="flex-1 border-2 border-violet-300 rounded-xl p-2.5 font-bold outline-none" /><datalist id="manage-student-options">{activeStudents.filter((student) => Number(student.year) === Number(manageStudent.year) && Number(student.grade) === Number(manageStudent.grade) && ((manageStudent.school === '직접입력' ? manageStudent.customSchool : manageStudent.school) ? student.school === (manageStudent.school === '직접입력' ? manageStudent.customSchool : manageStudent.school) : true)).map((student) => <option key={student.studentId} value={student.name} />)}</datalist>
                       </div>
                       <div className="flex gap-4">
                         <select name="school" value={manageStudent.school} onChange={handleManageStudentChange} className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none">
@@ -1002,7 +1109,7 @@
                   <Card title="담당 학생 리스트" className="max-h-[600px] overflow-y-auto mini-scroll">
                     <select value={manageTeacherFilter} onChange={e=>setManageTeacherFilter(e.target.value)} className="w-full mb-4 border border-slate-200 p-2 rounded-lg">
                       <option value="전체">전체 선생님</option>
-                      {teachersData.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}
+                      {orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}
                     </select>
                     <div className="space-y-2">
                       {teacherManagedStudents.map(st => (
@@ -1014,8 +1121,7 @@
                     </div>
                   </Card>
 
-                  <div className={`transition-opacity ${manageStudent.name ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-                    <Card title={`${manageStudent.name||'선택안됨'} 학생 성적 보드`}>
+                  <div className={`transition-opacity ${manageStudent.name ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}><Card title={`${manageStudent.name||'선택안됨'} 학생 성적 보드`} right={<span className="text-sm text-slate-500">{manageStudent.year}년 · {finalSchoolValue || '학교 미선택'} · {manageStudent.grade}학년</span>}>
                       <div className="flex flex-wrap gap-2 mb-4">
                         {EXAMS.map(ex => (
                           <button key={ex} onClick={()=>setFilters({...filters, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${filters.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>
@@ -1047,130 +1153,50 @@
             {view === 'teacherAnalysis' && (
               <div className="space-y-6">
                 <Card>
-                  <div className="flex gap-4 items-center flex-wrap">
-                    <select value={teacherAnalysisTeacher || currentTeacherName} onChange={e=>setTeacherAnalysisTeacher(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 font-bold text-violet-800 outline-none">
-                      {teachersData.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}
-                    </select>
-                    <div className="flex gap-2">
-                      {EXAMS.map(ex => (
-                         <button key={ex} onClick={()=>setTeacherAnalysisView({...teacherAnalysisView, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${teacherAnalysisView.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>
-                      ))}
-                    </div>
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <select value={teacherAnalysisTeacher || currentTeacherName} onChange={e=>setTeacherAnalysisTeacher(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 font-bold text-violet-800 outline-none">{orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}</select>
+                    <div className="flex gap-2 flex-wrap">{EXAMS.map(ex => <button key={ex} onClick={()=>setTeacherAnalysisView({...teacherAnalysisView, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${teacherAnalysisView.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>)}</div>
                   </div>
+                  <div className="mt-3 text-xs text-slate-500">첫 시험처럼 이전 비교 대상이 없는 입력은 <span className="font-bold text-slate-700">신규</span>로 처리됩니다.</div>
                 </Card>
-
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center"><div className="text-sm text-slate-500 font-bold">담당 학생 수</div><div className="text-3xl font-black mt-2">{teacherAnalysisRows.length}명</div></div>
+                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center"><div className="text-sm text-slate-500 font-bold">담당 학생 수</div><div className="text-3xl font-black mt-2">{new Set(teacherAnalysisRows.map(r=>r.studentId)).size}명</div></div>
                   <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center"><div className="text-sm text-slate-500 font-bold">원점수 향상</div><div className="text-3xl font-black mt-2 text-emerald-600">{teacherAnalysisRows.filter(r=>r.scoreImproved).length}명</div></div>
                   <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center"><div className="text-sm text-slate-500 font-bold">등급 향상</div><div className="text-3xl font-black mt-2 text-emerald-600">{teacherAnalysisRows.filter(r=>r.tierImproved).length}명</div></div>
                   <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center"><div className="text-sm text-slate-500 font-bold">전체 평균</div><div className="text-3xl font-black mt-2 text-violet-700">{Math.round(teacherAnalysisRows.reduce((a,b)=>a+(b.average||0),0)/(teacherAnalysisRows.length||1))}점</div></div>
                 </div>
-
-                <Card title="상세 성적 변화 리스트" right={<div className="text-xs text-slate-500">헤더 클릭 정렬</div>}>
-                  <div className="mb-3 text-xs font-bold text-amber-700">※ 선생님별 등급 분포와 표에서는 6~9등급 입력값을 모두 5등급으로 통일해서 표시합니다.</div>
+                <Card title="상세 성적 변화 리스트" right={<span className="text-xs text-slate-400">헤더 클릭 정렬</span>}>
+                  <div className="mb-3 text-xs font-bold text-amber-700">※ 6~9등급 입력값은 모두 5등급으로 통일해서 표시합니다. 필요한 경우 입력자도 여기서 바로 변경할 수 있습니다.</div>
                   <div className="overflow-x-auto mini-scroll">
                     <table className="w-full text-sm text-center">
                       <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
-                        <tr>
-                          {[
-                            { key:'name', label:'학생명' },
-                            { key:'school', label:'학교' },
-                            { key:'grade', label:'학년' },
-                            { key:'subjectNames', label:'과목명' },
-                            { key:'exam', label:'시험명' },
-                            { key:'score', label:'점수' },
-                            { key:'tier', label:'등급' },
-                            { key:'bestDelta', label:'변화' },
-                          ].map((col) => (
-                            <th key={col.key} onClick={() => setTeacherAnalysisSort((prev) => ({ key: col.key, direction: prev.key === col.key && prev.direction === 'asc' ? 'desc' : 'asc' }))} className="py-3 px-3 cursor-pointer hover:bg-slate-100 whitespace-nowrap">
-                              {col.label}
-                            </th>
-                          ))}
-                        </tr>
+                        <tr>{[['name','학생명'],['school','학교'],['grade','학년'],['subjectNames','과목명'],['exam','시험명'],['score','점수'],['tier','등급'],['bestDelta','변화'],['owner','입력자']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => key !== 'owner' && setTeacherAnalysisSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {sortedTeacherAnalysisRows.map(row => (
-                          <React.Fragment key={row.studentId}>
-                            {row.scores.map((score, i) => (
-                              <tr key={score.docId} className="hover:bg-slate-50">
-                                {i===0 && <td rowSpan={row.scores.length} className="font-black border-r border-slate-100">{row.name}</td>}
-                                {i===0 && <td rowSpan={row.scores.length} className="border-r border-slate-100">{row.school}</td>}
-                                {i===0 && <td rowSpan={row.scores.length} className="border-r border-slate-100">{row.grade}</td>}
-                                <td className="py-3">{score.subject} {score.detailSubject&&`(${score.detailSubject})`}</td>
-                                <td>{EXAM_SHORT_LABELS[score.exam] || score.exam}</td>
-                                <td className="font-bold text-slate-800">{score.score}점</td>
-                                <td>{normalizeTeacherAnalysisTier(score.tier)}등급</td>
-                                <td>{formatScoreDelta(score, score.prev)}</td>
-                              </tr>
-                            ))}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
+                      <tbody className="divide-y divide-slate-100">{(() => { const flatRows = sortedTeacherAnalysisRows.flatMap(row => row.scores.map(score => ({ studentId: row.studentId, name: row.name, school: row.school, grade: row.grade, subjectNames: `${score.subject}${score.detailSubject ? ` (${score.detailSubject})` : ''}`, exam: score.exam, score: score.score, tier: normalizeTeacherAnalysisTier(score.tier), bestDelta: Number(score.score || 0) - Number(score.prev?.score || 0), prev: score.prev, docId: score.docId, owner: score.updatedBy || score.createdBy || '' }))); const sortedFlat = sortRows(flatRows, teacherAnalysisSort, { name:r=>safeLower(r.name), school:r=>safeLower(r.school), grade:r=>Number(r.grade), subjectNames:r=>safeLower(r.subjectNames), exam:r=>examOrder(r.exam), score:r=>Number(r.score), tier:r=>Number(r.tier), bestDelta:r=>Number(r.bestDelta) }); return sortedFlat.length ? sortedFlat.map((row) => <tr key={row.docId} className="hover:bg-slate-50"><td className="py-3 font-bold">{row.name}</td><td>{row.school}</td><td>{row.grade}</td><td>{row.subjectNames}</td><td>{EXAM_SHORT_LABELS[row.exam] || row.exam}</td><td className="font-black text-violet-700">{row.score}점</td><td>{row.tier}등급</td><td>{formatScoreDelta({score:row.score}, row.prev)}</td><td><select value={row.owner} onChange={(e)=>handleScoreOwnerChange(row.docId, e.target.value)} className="border border-slate-200 rounded-lg px-2 py-1 text-xs">{orderedTeachers.map(t => <option key={t.teacherId} value={t.name}>{t.name}</option>)}</select></td></tr>) : <tr><td colSpan="9" className="py-10 text-slate-400">데이터가 없습니다.</td></tr>; })()}</tbody>
                     </table>
                   </div>
                 </Card>
               </div>
             )}
+
 
 
             {view === 'schoolAnalysis' && (
               <div className="space-y-6">
                 <Card title="학교별 성적 현황">
-                  <div className="grid md:grid-cols-4 gap-4">
+                  <div className="grid md:grid-cols-5 gap-4">
                     <select value={schoolView.year} onChange={e => setSchoolView((p) => ({ ...p, year: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{YEARS.map(y => <option key={y} value={y}>{y}년</option>)}</select>
                     <select value={schoolView.exam} onChange={e => setSchoolView((p) => ({ ...p, exam: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{EXAMS.map(ex => <option key={ex} value={ex}>{EXAM_SHORT_LABELS[ex]}</option>)}</select>
+                    <select value={schoolView.grade} onChange={e => setSchoolView((p) => ({ ...p, grade: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학년</option>{GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}</select>
                     <select value={schoolView.school} onChange={e => setSchoolView((p) => ({ ...p, school: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학교</option>{SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <select value={schoolView.subject} onChange={e => setSchoolView((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 과목</option>{SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                   </div>
                 </Card>
-                <Card title="학교별 평균 점수">
+                <Card title="학교별 평균 점수" right={<span className="text-xs text-slate-400">헤더 클릭 정렬</span>}>
                   <div className="overflow-x-auto mini-scroll">
                     <table className="w-full text-sm text-center">
-                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
-                        <tr><th className="py-3">학교</th><th>학년</th><th>과목</th><th>학생수</th><th>평균</th><th>1등급 비율</th></tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {(() => {
-                          const rows = activeJoinedData.filter(r => Number(r.year) === Number(schoolView.year) && r.exam === schoolView.exam && (schoolView.school === '전체' || r.school === schoolView.school) && (schoolView.subject === '전체' || r.subject === schoolView.subject));
-                          const grouped = {};
-                          rows.forEach(r => {
-                            const key = [r.school, r.grade, r.subject].join('__');
-                            grouped[key] = grouped[key] || [];
-                            grouped[key].push(r);
-                          });
-                          const items = Object.entries(grouped).map(([key, arr]) => {
-                            const [school, grade, subject] = key.split('__');
-                            const avg = Math.round(arr.reduce((sum, item) => sum + Number(item.score || 0), 0) / arr.length);
-                            const topRate = Math.round((arr.filter(item => normalizeTeacherAnalysisTier(item.tier) === 1).length / arr.length) * 100);
-                            return { school, grade, subject, count: arr.length, avg, topRate };
-                          }).sort((a, b) => b.avg - a.avg);
-                          return items.length ? items.map((row) => <tr key={`${row.school}-${row.grade}-${row.subject}`}><td className="py-3 font-bold">{row.school}</td><td>{row.grade}학년</td><td>{row.subject}</td><td>{row.count}명</td><td className="font-black text-violet-700">{row.avg}점</td><td>{row.topRate}%</td></tr>) : <tr><td colSpan="6" className="py-10 text-slate-400">데이터가 없습니다.</td></tr>;
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-              </div>
-            )}
-
-            {view === 'subjectAnalysis' && (
-              <div className="space-y-6">
-                <Card title="과목별 성적 현황">
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <select value={subjectView.year} onChange={e => setSubjectView((p) => ({ ...p, year: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{YEARS.map(y => <option key={y} value={y}>{y}년</option>)}</select>
-                    <select value={subjectView.exam} onChange={e => setSubjectView((p) => ({ ...p, exam: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{EXAMS.map(ex => <option key={ex} value={ex}>{EXAM_SHORT_LABELS[ex]}</option>)}</select>
-                    <select value={subjectView.subject} onChange={e => setSubjectView((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                  </div>
-                </Card>
-                <Card title="과목별 상세 명단">
-                  <div className="overflow-x-auto mini-scroll">
-                    <table className="w-full text-sm text-center">
-                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
-                        <tr><th className="py-3">학교</th><th>학년</th><th>학생명</th><th>세부과목</th><th>점수</th><th>등급</th></tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {activeJoinedData.filter(r => Number(r.year) === Number(subjectView.year) && r.exam === subjectView.exam && r.subject === subjectView.subject).sort((a, b) => Number(b.score || 0) - Number(a.score || 0)).map((r) => <tr key={r.docId}><td className="py-3">{r.school}</td><td>{r.grade}학년</td><td className="font-bold">{r.name}</td><td>{r.detailSubject || '-'}</td><td className="font-black text-violet-700">{r.score}점</td><td>{normalizeTeacherAnalysisTier(r.tier)}등급</td></tr>)}
-                      </tbody>
+                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b"><tr>{[['school','학교'],['grade','학년'],['subject','과목'],['count','학생수'],['avg','평균'],['rate1','1등급'],['rate2','2등급'],['rate3','3등급'],['rate4','4등급'],['rate5','5등급']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => setSchoolSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr></thead>
+                      <tbody className="divide-y divide-slate-100">{schoolAnalysisRows.length ? schoolAnalysisRows.map((row) => <tr key={`${row.school}-${row.grade}-${row.subject}`}><td className="py-3 font-bold">{row.school}</td><td>{row.grade}학년</td><td>{row.subject}</td><td>{row.count}명</td><td className="font-black text-violet-700">{row.avg}점</td><td>{row.rate1}%</td><td>{row.rate2}%</td><td>{row.rate3}%</td><td>{row.rate4}%</td><td>{row.rate5}%</td></tr>) : <tr><td colSpan="10" className="py-10 text-slate-400">데이터가 없습니다.</td></tr>}</tbody>
                     </table>
                   </div>
                 </Card>
@@ -1179,34 +1205,29 @@
 
             {view === 'studentAnalysis' && (
               <div className="space-y-6">
-                <Card title="학생별 성적 추이">
-                  <div className="grid md:grid-cols-[320px_1fr] gap-4">
-                    <select value={studentAnalysisStudentId} onChange={e => setStudentAnalysisStudentId(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 outline-none">
-                      <option value="">학생 선택</option>
-                      {activeStudents.map((student) => <option key={student.studentId} value={student.studentId}>{student.name} · {student.school}</option>)}
-                    </select>
-                    <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">학생을 선택하면 시험 순서대로 점수 기록을 볼 수 있습니다.</div>
+                <Card title="학생별 성적 분석">
+                  <div className="grid md:grid-cols-[320px_1fr_220px] gap-4">
+                    <select value={studentAnalysisStudentId} onChange={e => { setStudentAnalysisStudentId(e.target.value); setStudentSubjectFilter('전체'); }} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="">학생 선택</option>{activeStudents.map((student) => <option key={student.studentId} value={student.studentId}>{student.name} · {student.school}</option>)}</select>
+                    <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">과목별 평균, 강점/약점, 시험 순 점수 추이를 함께 봅니다.</div>
+                    <select value={studentSubjectFilter} onChange={e => setStudentSubjectFilter(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 과목</option>{SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                   </div>
                 </Card>
                 <Card title="학생별 기록">
                   {(() => {
                     const target = activeStudents.find((student) => student.studentId === studentAnalysisStudentId);
                     if (!target) return <div className="py-10 text-center text-slate-400">학생을 먼저 선택해주세요.</div>;
-                    const records = activeJoinedData.filter((row) => row.studentId === target.studentId).sort((a, b) => Number(a.year) - Number(b.year) || examOrder(a.exam) - examOrder(b.exam));
-                    return (
-                      <div className="space-y-5">
-                        <div className="text-lg font-black text-slate-900">{target.name} · {target.school} · {target.grade}학년</div>
-                        <SimpleLineChart series={records} />
-                        <div className="overflow-x-auto mini-scroll">
-                          <table className="w-full text-sm text-center">
-                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b"><tr><th className="py-3">연도</th><th>시험</th><th>과목</th><th>점수</th><th>등급</th><th>입력자</th></tr></thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {records.map((r) => <tr key={r.docId}><td className="py-3">{r.year}</td><td>{EXAM_SHORT_LABELS[r.exam] || r.exam}</td><td>{r.subject}</td><td className="font-black text-violet-700">{r.score}점</td><td>{normalizeTeacherAnalysisTier(r.tier)}등급</td><td>{r.updatedBy || r.createdBy || '-'}</td></tr>)}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
+                    const records = activeJoinedData.filter((row) => row.studentId === target.studentId).sort((a, b) => Number(a.year) - Number(b.year) || examOrder(a.exam) - examOrder(b.exam) || safeLower(a.subject).localeCompare(safeLower(b.subject)));
+                    const filtered = studentSubjectFilter === '전체' ? records : records.filter(r => r.subject === studentSubjectFilter);
+                    const subjectStats = SUBJECTS.map(subject => {
+                      const arr = records.filter(r => r.subject === subject);
+                      if (!arr.length) return null;
+                      return { subject, avg: Math.round(arr.reduce((s,r)=>s+Number(r.score||0),0)/arr.length), count: arr.length };
+                    }).filter(Boolean).sort((a,b) => b.avg - a.avg);
+                    const best = subjectStats[0];
+                    const weak = subjectStats[subjectStats.length-1];
+                    const chartSeries = filtered.map(r => ({ exam: `${EXAM_SHORT_LABELS[r.exam] || r.exam} ${r.subject}`, score:r.score }));
+                    const displayRows = sortRows(filtered, studentSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), subject:r=>safeLower(r.subject), detailSubject:r=>safeLower(r.detailSubject||''), score:r=>Number(r.score), tier:r=>normalizeTeacherAnalysisTier(r.tier), owner:r=>safeLower(r.updatedBy || r.createdBy || '') });
+                    return <div className="space-y-5"><div className="text-lg font-black text-slate-900">{target.name} · {target.school} · {target.grade}학년</div><div className="grid md:grid-cols-3 gap-4"><div className="bg-slate-50 border border-slate-200 rounded-2xl p-4"><div className="text-sm text-slate-500 font-bold">강세 과목</div><div className="mt-2 text-2xl font-black text-emerald-700">{best ? best.subject : '-'}</div><div className="text-sm text-slate-500">평균 {best ? best.avg : '-'}점</div></div><div className="bg-slate-50 border border-slate-200 rounded-2xl p-4"><div className="text-sm text-slate-500 font-bold">보완 과목</div><div className="mt-2 text-2xl font-black text-rose-600">{weak ? weak.subject : '-'}</div><div className="text-sm text-slate-500">평균 {weak ? weak.avg : '-'}점</div></div><div className="bg-slate-50 border border-slate-200 rounded-2xl p-4"><div className="text-sm text-slate-500 font-bold">기록 수</div><div className="mt-2 text-2xl font-black text-violet-700">{records.length}건</div><div className="text-sm text-slate-500">과목별 입력 누적</div></div></div>{chartSeries.length ? <SimpleLineChart series={chartSeries} /> : <div className="py-8 text-center text-slate-400">표시할 그래프 데이터가 없습니다.</div>}<div className="overflow-x-auto mini-scroll"><table className="w-full text-sm text-center table-fixed"><thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b"><tr>{[['year','연도'],['exam','시험'],['subject','과목'],['detailSubject','세부과목'],['score','점수'],['tier','등급'],['owner','입력자']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => setStudentSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{displayRows.map((r) => <tr key={r.docId}><td className="py-3">{r.year}</td><td>{EXAM_SHORT_LABELS[r.exam] || r.exam}</td><td>{r.subject}</td><td>{r.detailSubject || '-'}</td><td className="font-black text-violet-700">{r.score}점</td><td>{normalizeTeacherAnalysisTier(r.tier)}등급</td><td>{r.updatedBy || r.createdBy || '-'}</td></tr>)}</tbody></table></div></div>;
                   })()}
                 </Card>
               </div>
@@ -1214,14 +1235,26 @@
 
             {view === 'teamExam' && (
               <div className="space-y-6">
-                <Card title="시험 분석 아카이브">
+                <Card title="시험 분석 입력">
+                  <form onSubmit={saveTeamExam} className="space-y-4">
+                    <div className="grid md:grid-cols-4 gap-4">
+                      <select value={teamExamForm.year} onChange={e=>setTeamExamForm({...teamExamForm, year:Number(e.target.value)})} className="border border-slate-300 rounded-xl p-2.5">{YEARS.map(y=><option key={y} value={y}>{y}년</option>)}</select>
+                      <select value={teamExamForm.exam} onChange={e=>setTeamExamForm({...teamExamForm, exam:e.target.value})} className="border border-slate-300 rounded-xl p-2.5">{EXAMS.map(ex=><option key={ex} value={ex}>{EXAM_SHORT_LABELS[ex]}</option>)}</select>
+                      <select value={teamExamForm.school} onChange={e=>setTeamExamForm({...teamExamForm, school:e.target.value})} className="border border-slate-300 rounded-xl p-2.5"><option value="">학교 선택</option>{SCHOOL_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                      <select value={teamExamForm.grade} onChange={e=>setTeamExamForm({...teamExamForm, grade:Number(e.target.value)})} className="border border-slate-300 rounded-xl p-2.5">{GRADES.map(g=><option key={g} value={g}>{g}학년</option>)}</select>
+                    </div>
+                    <div className="grid md:grid-cols-4 gap-4">
+                      <select value={teamExamForm.subject} onChange={e=>setTeamExamForm({...teamExamForm, subject:e.target.value})} className="border border-slate-300 rounded-xl p-2.5">{SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                      <input value={teamExamForm.detailSubject} onChange={e=>setTeamExamForm({...teamExamForm, detailSubject:e.target.value})} placeholder="세부과목" className="border border-slate-300 rounded-xl p-2.5" />
+                      <input value={teamExamForm.difficulty} onChange={e=>setTeamExamForm({...teamExamForm, difficulty:Number(e.target.value)})} type="number" min="1" max="5" placeholder="난이도" className="border border-slate-300 rounded-xl p-2.5" />
+                      <input value={teamExamForm.review} onChange={e=>setTeamExamForm({...teamExamForm, review:e.target.value})} placeholder="총평" className="border border-slate-300 rounded-xl p-2.5" />
+                    </div>
+                    <button type="submit" className="rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white font-black px-5 py-3">시험 분석 저장</button>
+                  </form>
+                </Card>
+                <Card title="시험 분석 아카이브" right={<span className="text-xs text-slate-400">헤더 클릭 정렬</span>}>
                   <div className="overflow-x-auto mini-scroll">
-                    <table className="w-full text-sm text-center">
-                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b"><tr><th className="py-3">연도</th><th>시험</th><th>학교</th><th>학년</th><th>과목</th><th>난이도</th><th>작성자</th></tr></thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {teamExamData.length ? teamExamData.map((item) => <tr key={item.docId}><td className="py-3">{item.year}</td><td>{EXAM_SHORT_LABELS[item.exam] || item.exam}</td><td>{item.school || '-'}</td><td>{item.grade ? `${item.grade}학년` : '-'}</td><td>{item.subject}{item.detailSubject ? ` (${item.detailSubject})` : ''}</td><td>{item.difficulty || '-'}</td><td>{item.updatedBy || item.createdBy || '-'}</td></tr>) : <tr><td colSpan="7" className="py-10 text-slate-400">저장된 시험 분석이 없습니다.</td></tr>}
-                      </tbody>
-                    </table>
+                    <table className="w-full text-sm text-center"><thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b"><tr>{[['year','연도'],['exam','시험'],['school','학교'],['grade','학년'],['subject','과목'],['difficulty','난이도'],['updatedBy','작성자']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => setTeamExamSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{sortRows(teamExamData, teamExamSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), school:r=>safeLower(r.school||''), grade:r=>Number(r.grade||0), subject:r=>safeLower(r.subject||''), difficulty:r=>Number(r.difficulty||0), updatedBy:r=>safeLower(r.updatedBy || r.createdBy || '') }).length ? sortRows(teamExamData, teamExamSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), school:r=>safeLower(r.school||''), grade:r=>Number(r.grade||0), subject:r=>safeLower(r.subject||''), difficulty:r=>Number(r.difficulty||0), updatedBy:r=>safeLower(r.updatedBy || r.createdBy || '') }).map((item) => <tr key={item.docId}><td className="py-3">{item.year}</td><td>{EXAM_SHORT_LABELS[item.exam] || item.exam}</td><td>{item.school || '-'}</td><td>{item.grade ? `${item.grade}학년` : '-'}</td><td>{item.subject}{item.detailSubject ? ` (${item.detailSubject})` : ''}</td><td>{item.difficulty || '-'}</td><td>{item.updatedBy || item.createdBy || '-'}</td></tr>) : <tr><td colSpan="7" className="py-10 text-slate-400">저장된 시험 분석이 없습니다.</td></tr>}</tbody></table>
                   </div>
                 </Card>
               </div>
