@@ -9,7 +9,6 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Dokdo&display=swap" rel="stylesheet">
@@ -146,7 +145,7 @@
       line-height: 1.34;
     }
     .top-context-wrap {
-      border-radius: 30px;
+      border-radius: 24px;
       background: rgba(255,255,255,0.88);
       border: 1px solid rgba(226,232,240,0.95);
       box-shadow: 0 10px 22px rgba(15,23,42,0.05);
@@ -255,6 +254,13 @@
       text-shadow: 0 10px 26px rgba(91, 33, 182, 0.18);
       letter-spacing: 0.18em;
     }
+  </style>
+
+
+  <style>
+    /* recovery patch: keep login stable and strengthen rounded feel */
+    .teacher-chip, .nav-pill, .nav-pill-active { border-radius: 18px !important; }
+    .rounded-top-unify, .top-filter-chip { border-radius: 18px !important; }
   </style>
 
 </head>
@@ -510,11 +516,8 @@
         review: '',
         specialNote: '',
       });
-      const [dataWarning, setDataWarning] = useState('');
-      const [uploadYear, setUploadYear] = useState(2026);
-      const [uploadStatus, setUploadStatus] = useState('');
 
-      const getPath = (name) => name;
+      const getPath = (name) => typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/${name}` : `openacademy/data/${name}`;
 
       useEffect(() => {
         const initFirebase = async () => {
@@ -543,7 +546,7 @@
               // 6) appId
               // ===============================
               firebaseConfig = {
-             apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
+  apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
   authDomain: "open-school-3f74c.firebaseapp.com",
   projectId: "open-school-3f74c",
   storageBucket: "open-school-3f74c.firebasestorage.app",
@@ -563,7 +566,7 @@
               await signInAnonymously(auth);
             }
 
-            onAuthStateChanged(auth, (u) => { setUser(u || null); setIsLoading(false); });
+            onAuthStateChanged(auth, (u) => setUser(u || null));
           } catch (error) {
             setInitError('Firebase 초기화 실패: ' + error.message);
             setIsLoading(false);
@@ -587,21 +590,21 @@
             snapshot.forEach((d) => items.push({ teacherId: d.id, ...d.data() }));
             setTeachersData(items.filter((t) => t.isActive !== false).sort((a,b) => String(a.name||'').localeCompare(String(b.name||''), 'ko')));
             ready.teachers = true; finish();
-          }, (error) => { ready.teachers = true; finish(); setDataWarning('teachers 데이터를 읽을 수 없습니다: ' + error.message); });
+          }, (error) => { setInitError('teachers 데이터를 읽을 수 없습니다: ' + error.message); setIsLoading(false); });
 
           unsubStudents = onSnapshot(collection(db, getPath('students')), (snapshot) => {
             const items = [];
             snapshot.forEach((d) => items.push({ studentId: d.id, ...d.data() }));
             setStudentsData(items);
             ready.students = true; finish();
-          }, (error) => { ready.students = true; finish(); setDataWarning('students 데이터를 읽을 수 없습니다: ' + error.message); });
+          }, (error) => { setInitError('students 데이터를 읽을 수 없습니다: ' + error.message); setIsLoading(false); });
 
           unsubScores = onSnapshot(collection(db, getPath('scores')), (snapshot) => {
             const items = [];
             snapshot.forEach((d) => items.push({ docId: d.id, ...d.data() }));
             setScoresData(items);
             ready.scores = true; finish();
-          }, (error) => { ready.scores = true; finish(); setDataWarning('scores 데이터를 읽을 수 없습니다: ' + error.message); });
+          }, (error) => { setInitError('scores 데이터를 읽을 수 없습니다: ' + error.message); setIsLoading(false); });
 
           unsubTeam = onSnapshot(collection(db, getPath('teamExams')), (snapshot) => {
             const items = [];
@@ -1082,94 +1085,6 @@
         }
       };
 
-      const handleExcelUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file || !db || !window.FirebaseAPI) return;
-        if (!window.XLSX) {
-          setUploadStatus('엑셀 파서가 로드되지 않았습니다.');
-          return;
-        }
-        setUploadStatus('엑셀 파일을 읽는 중입니다...');
-        try {
-          const buffer = await file.arrayBuffer();
-          const workbook = window.XLSX.read(buffer, { type: 'array' });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: '' });
-
-          const { addDoc, updateDoc, doc, collection, query, where, getDocs } = window.FirebaseAPI;
-          let savedCount = 0;
-
-          for (const raw of rows) {
-            const name = String(raw['학생명'] || raw['이름'] || '').trim();
-            const school = String(raw['학교'] || '').trim();
-            const grade = Number(raw['학년'] || 0);
-            const exam = String(raw['시험'] || '').trim();
-            const subject = String(raw['과목'] || '').trim();
-            const detailSubject = String(raw['세부과목'] || raw['세부 과목'] || '').trim();
-            const score = Number(raw['점수'] || raw['원점수'] || 0);
-            const tier = Number(raw['등급'] || 0);
-            const className = String(raw['학원반'] || raw['반'] || '').trim();
-            const year = Number(raw['연도'] || uploadYear || 2026);
-
-            if (!name || !school || !grade || !exam || !subject || Number.isNaN(score) || !tier) continue;
-
-            const studentQuery = query(collection(db, getPath('students')), where('name', '==', name), where('year', '==', year));
-            const studentSnapshot = await getDocs(studentQuery);
-
-            let studentId = '';
-            if (!studentSnapshot.empty) {
-              const target = studentSnapshot.docs[0];
-              studentId = target.id;
-              await updateDoc(doc(db, getPath('students'), studentId), {
-                school,
-                grade,
-                year,
-                deleted: false,
-                updatedAt: new Date().toISOString(),
-                updatedBy: currentTeacher?.name || '알수없음',
-              });
-            } else {
-              const created = await addDoc(collection(db, getPath('students')), {
-                name,
-                school,
-                grade,
-                year,
-                isWithdrawn: false,
-                createdAt: new Date().toISOString(),
-                createdBy: currentTeacher?.name || '알수없음',
-                updatedAt: new Date().toISOString(),
-                updatedBy: currentTeacher?.name || '알수없음',
-                deleted: false,
-              });
-              studentId = created.id;
-            }
-
-            await addDoc(collection(db, getPath('scores')), {
-              studentId,
-              year,
-              exam,
-              subject,
-              detailSubject,
-              score,
-              tier,
-              className,
-              createdAt: new Date().toISOString(),
-              createdBy: currentTeacher?.name || '알수없음',
-              updatedAt: new Date().toISOString(),
-              updatedBy: currentTeacher?.name || '알수없음',
-              deleted: false,
-            });
-            savedCount += 1;
-          }
-
-          setUploadStatus(savedCount ? `엑셀 업로드 완료: ${savedCount}건 저장됨` : '저장 가능한 행이 없었습니다. 헤더명을 확인해주세요.');
-        } catch (error) {
-          setUploadStatus('엑셀 업로드 오류: ' + error.message);
-        } finally {
-          e.target.value = '';
-        }
-      };
-
       if (initError) {
         return <div className="min-h-screen flex flex-col items-center justify-center p-6"><div className="bg-white border border-red-200 rounded-3xl p-6 max-w-2xl w-full"><h2 className="text-2xl font-black text-red-600 mb-3">연결 오류</h2><div className="text-sm text-red-600 whitespace-pre-wrap">{initError}</div></div></div>;
       }
@@ -1200,7 +1115,6 @@
                 </div>
                 <h2 className="text-3xl font-black text-slate-900">빠른 PIN 로그인</h2>
                 <p className="mt-2 text-slate-500 leading-7">선생님 선택 버튼을 먼저 누른 뒤,<br/>고유 PIN 번호 입력하고 바로 로그인!!!</p>
-                {dataWarning ? <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">{dataWarning}</div> : null}
                 <form onSubmit={handleTeacherLogin} className="mt-8 space-y-4">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-3">선생님 선택</label>
@@ -1471,30 +1385,6 @@
                       </div>
                     </Card>
                   </div>
-
-
-                  <Card title="엑셀 업로드 입력" right={<span className="text-xs text-slate-400">헤더: 학생명 / 학교 / 학년 / 시험 / 과목 / 세부과목 / 점수 / 등급 / 학원반 / 연도(선택)</span>}>
-                    <div className="grid lg:grid-cols-[160px_1fr] gap-4 items-end">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">기본 연도</label>
-                        <select value={uploadYear} onChange={(e)=>setUploadYear(Number(e.target.value))} className="w-full rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">
-                          {YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}
-                        </select>
-                      </div>
-                      <div className="rounded-2xl border border-dashed border-violet-300 bg-violet-50/50 px-4 py-4">
-                        <div className="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
-                          <div className="text-sm text-slate-600 leading-6">
-                            .xlsx / .xls / .csv 파일 업로드 가능. 연도 컬럼이 비어 있으면 위의 기본 연도를 사용합니다.
-                          </div>
-                          <label className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white px-4 py-2.5 text-sm font-black cursor-pointer">
-                            <i className="fas fa-file-arrow-up mr-2"></i>엑셀 파일 선택
-                            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleExcelUpload} />
-                          </label>
-                        </div>
-                        {uploadStatus ? <div className="mt-3 text-sm font-semibold text-violet-700">{uploadStatus}</div> : null}
-                      </div>
-                    </div>
-                  </Card>
 
                   <div className="card-3d rounded-[30px] p-5">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
