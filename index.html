@@ -449,8 +449,12 @@
       const [dashboardSort, setDashboardSort] = useState({ key: 'score', direction: 'desc' });
 
       const [manageTeacherFilter, setManageTeacherFilter] = useState('전체');
+      const [manageListFilters, setManageListFilters] = useState({ school: '전체', grade: '전체' });
       const [selectedQuickStudentId, setSelectedQuickStudentId] = useState('');
       const [manageStudent, setManageStudent] = useState({ year: 2026, name: '', school: '', customSchool: '', grade: 1 });
+      const [renameSearchKeyword, setRenameSearchKeyword] = useState('');
+      const [renameStudentId, setRenameStudentId] = useState('');
+      const [renameStudentForm, setRenameStudentForm] = useState({ year: 2026, name: '', school: '', customSchool: '', grade: 1 });
       const [modal, setModal] = useState({ isOpen: false, mode: 'add' });
       const [modalForm, setModalForm] = useState({ docId: null, exam: '', subject: '', detailSubject: '', score: '', tier: '', className: '' });
       const [quickEntryExamMap, setQuickEntryExamMap] = useState({});
@@ -462,12 +466,11 @@
       const [schoolView, setSchoolView] = useState({ year: 2026, exam: EXAMS[0], school: '전체', grade: '전체', subject: '전체' });
       const [subjectView, setSubjectView] = useState({ year: 2026, exam: EXAMS[0], subject: '수학', detailSubject: '전체' });
       const [subjectSort, setSubjectSort] = useState({ key: 'score', direction: 'desc' });
-      
+
       const [studentAnalysisStudentId, setStudentAnalysisStudentId] = useState('');
       const [selectedTestStudentIds, setSelectedTestStudentIds] = useState([]);
-      const [renameStudentName, setRenameStudentName] = useState('');
       const [isRenamingStudent, setIsRenamingStudent] = useState(false);
-      const [teamExamForm, setTeamExamForm] = useState({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', difficulty: 3, review: '', specialNote: '' });
+      const [teamExamForm, setTeamExamForm] = useState({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', cut1: '', cut2: '', cut3: '', cut4: '', difficulty: 3, review: '', specialNote: '' });
       const [teamExamFilters, setTeamExamFilters] = useState({ year: '전체', school: '전체' });
 
       const getPath = (name) => typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/${name}` : `openacademy/data/${name}`;
@@ -693,7 +696,17 @@
         setManageStudent(p => ({ ...p, [name]: value }));
       };
 
-      const finalSchoolValue = manageStudent.school === '직접입력' ? manageStudent.customSchool : manageStudent.school;
+      const resolveSchoolValue = (school, customSchool='') => school === '직접입력' ? customSchool : school;
+      const buildStudentFormFromStudent = (student) => ({
+        year: Number(student?.year || 2026),
+        name: student?.name || '',
+        school: SCHOOL_OPTIONS.includes(student?.school) ? student.school : (student?.school ? '직접입력' : ''),
+        customSchool: SCHOOL_OPTIONS.includes(student?.school) ? '' : (student?.school || ''),
+        grade: Number(student?.grade || 1),
+      });
+
+      const finalSchoolValue = resolveSchoolValue(manageStudent.school, manageStudent.customSchool);
+      const renameFinalSchoolValue = resolveSchoolValue(renameStudentForm.school, renameStudentForm.customSchool);
 
       const selectedManageStudentInfo = useMemo(() => {
         const exactSchool = finalSchoolValue || '';
@@ -706,9 +719,62 @@
         ) || null;
       }, [studentsData, manageStudent, finalSchoolValue]);
 
+      const renameSearchCandidates = useMemo(() => {
+        const keyword = String(renameSearchKeyword || '').trim().toLowerCase();
+        if (!keyword) return [];
+        return activeStudents
+          .filter((student) => String(student.name || '').toLowerCase().includes(keyword))
+          .slice(0, 12);
+      }, [activeStudents, renameSearchKeyword]);
+
+      const selectedRenameStudentInfo = useMemo(() => {
+        if (!renameStudentId) return null;
+        return studentsData.find((student) => !student.deleted && student.studentId === renameStudentId) || null;
+      }, [studentsData, renameStudentId]);
+
       useEffect(() => {
-        setRenameStudentName(selectedManageStudentInfo?.name || '');
-      }, [selectedManageStudentInfo]);
+        if (!selectedRenameStudentInfo) {
+          setRenameStudentForm({ year: 2026, name: '', school: '', customSchool: '', grade: 1 });
+          return;
+        }
+        setRenameStudentForm(buildStudentFormFromStudent(selectedRenameStudentInfo));
+      }, [selectedRenameStudentInfo]);
+
+      const quickSearchStudents = useMemo(() => {
+        const keyword = String(selectedQuickStudentId || '').trim().toLowerCase();
+        const rows = (manageTeacherFilter === '전체' ? activeJoinedData : activeJoinedData.filter(r => r.createdBy===manageTeacherFilter || r.updatedBy===manageTeacherFilter));
+        const map = new Map();
+        rows.forEach((r) => {
+          if (!map.has(r.studentId)) {
+            map.set(r.studentId, { id: r.studentId, name: r.name, school: r.school, grade: r.grade, year: r.year });
+          }
+        });
+        const base = Array.from(map.values()).filter((student) =>
+          (manageListFilters.school === '전체' || student.school === manageListFilters.school) &&
+          (manageListFilters.grade === '전체' || Number(student.grade) === Number(manageListFilters.grade))
+        );
+        if (!keyword) return base.slice(0, 60);
+        return base.filter((student) => String(student.name || '').toLowerCase().includes(keyword)).slice(0, 20);
+      }, [selectedQuickStudentId, activeJoinedData, manageTeacherFilter, manageListFilters]);
+
+      const currentManageStudentRecord = selectedManageStudentInfo || studentsData.find((student) =>
+        !student.deleted &&
+        Number(student.year) === Number(manageStudent.year) &&
+        String(student.name || '').trim() === String(manageStudent.name || '').trim()
+      ) || null;
+
+      const resetManageSideInputs = (source) => {
+        if (source !== 'new') {
+          setManageStudent((prev) => ({ ...prev, name: '', school: '', customSchool: '', grade: 1 }));
+        }
+        if (source !== 'rename') {
+          setRenameSearchKeyword('');
+          setRenameStudentId('');
+        }
+        if (source !== 'search') {
+          setSelectedQuickStudentId('');
+        }
+      };
 
       const openScoreModal = (exam, subject, record = null) => {
         if (!manageStudent.name || !finalSchoolValue) return alert('상단에서 학생명과 학교를 정확히 입력해주세요.');
@@ -884,34 +950,60 @@
       };
 
       const handleStudentRename = async () => {
-        if (!db || !window.FirebaseAPI || !selectedManageStudentInfo) return;
-        const nextName = String(renameStudentName || '').trim();
-        if (!nextName) {
-          alert('변경할 학생 이름을 입력해주세요.');
+        if (!db || !window.FirebaseAPI || !selectedRenameStudentInfo) return;
+        const nextName = String(renameStudentForm.name || '').trim();
+        const nextSchool = String(renameFinalSchoolValue || '').trim();
+        const nextGrade = Number(renameStudentForm.grade || 0);
+        const nextYear = Number(renameStudentForm.year || 0);
+
+        if (!nextName || !nextSchool || !nextGrade || !nextYear) {
+          alert('이름, 학교, 학년, 연도를 모두 입력해주세요.');
           return;
         }
-        if (nextName === String(selectedManageStudentInfo.name || '').trim()) {
-          alert('기존 이름과 동일합니다.');
-          return;
-        }
+
         const duplicate = studentsData.find((student) =>
           !student.deleted &&
-          student.studentId !== selectedManageStudentInfo.studentId &&
-          Number(student.year) === Number(selectedManageStudentInfo.year) &&
+          student.studentId !== selectedRenameStudentInfo.studentId &&
+          Number(student.year) === nextYear &&
+          Number(student.grade) === nextGrade &&
+          String(student.school || '').trim() === nextSchool &&
           String(student.name || '').trim() === nextName
         );
-        if (duplicate && !window.confirm('같은 연도에 같은 이름의 학생이 이미 있습니다. 그래도 변경할까요?')) return;
+        if (duplicate && !window.confirm('같은 연도·학교·학년·이름의 학생이 이미 있습니다. 그래도 수정할까요?')) return;
+
         try {
           setIsRenamingStudent(true);
-          const { updateDoc, doc } = window.FirebaseAPI;
-          await updateDoc(doc(db, getPath('students'), selectedManageStudentInfo.studentId), {
+          const { updateDoc, doc, query, where, getDocs, collection, writeBatch } = window.FirebaseAPI;
+
+          await updateDoc(doc(db, getPath('students'), selectedRenameStudentInfo.studentId), {
             name: nextName,
+            school: nextSchool,
+            grade: nextGrade,
+            year: nextYear,
             updatedAt: new Date().toISOString(),
           });
-          setManageStudent((prev) => ({ ...prev, name: nextName }));
-          alert('학생 이름이 변경되었습니다.');
+
+          if (Number(selectedRenameStudentInfo.year || 0) !== nextYear) {
+            const scoreQuery = query(collection(db, getPath('scores')), where('studentId', '==', selectedRenameStudentInfo.studentId));
+            const scoreSnap = await getDocs(scoreQuery);
+            if (!scoreSnap.empty) {
+              const batch = writeBatch(db);
+              scoreSnap.docs.forEach((scoreDoc) => {
+                batch.update(doc(db, getPath('scores'), scoreDoc.id), {
+                  year: nextYear,
+                  updatedAt: new Date().toISOString(),
+                  updatedBy: currentTeacher?.name || '',
+                });
+              });
+              await batch.commit();
+            }
+          }
+
+          setRenameSearchKeyword(nextName);
+          setManageStudent(buildStudentFormFromStudent({ name: nextName, school: nextSchool, grade: nextGrade, year: nextYear }));
+          alert('학생 정보가 수정되었습니다.');
         } catch (error) {
-          alert('학생 이름 변경 중 오류가 발생했습니다: ' + error.message);
+          alert('학생 정보 수정 중 오류가 발생했습니다: ' + error.message);
         } finally {
           setIsRenamingStudent(false);
         }
@@ -930,7 +1022,7 @@
             updatedBy: currentTeacher?.name || '',
             deleted: false,
           });
-          setTeamExamForm({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', difficulty: 3, review: '', specialNote: '' });
+          setTeamExamForm({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', cut1: '', cut2: '', cut3: '', cut4: '', difficulty: 3, review: '', specialNote: '' });
           alert('시험 분석이 저장되었습니다.');
         } catch (error) {
           alert('시험 분석 저장 중 오류가 발생했습니다: ' + error.message);
@@ -1187,115 +1279,174 @@
 
             {view === 'manage' && (
               <div className="space-y-6">
-                <div className="grid lg:grid-cols-2 gap-6">
-                  <Card title="학생 선택 / 신규 입력">
+                <div className="grid xl:grid-cols-3 gap-6">
+                  <Card title="학생 신입생 입력" right={<span className="inline-flex items-center gap-2 text-xs font-black text-violet-700"><i className="fas fa-user-plus"></i>신규 입력 전용</span>}>
                     <div className="space-y-4">
-                      <div className="flex gap-4">
-                        <select name="year" value={manageStudent.year} onChange={handleManageStudentChange} className="w-24 border border-slate-300 rounded-xl p-2.5 outline-none">
+                      <div className="text-sm text-slate-500 leading-6">새 학생을 등록하거나 기존 학생 성적을 바로 입력하는 카드입니다.</div>
+                      <div className="flex gap-3">
+                        <select name="year" value={manageStudent.year} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} className="w-28 border border-slate-300 rounded-xl p-2.5 outline-none">
                           {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
                         </select>
-                        <input type="text" name="name" list="manage-student-options" value={manageStudent.name} onChange={handleManageStudentChange} placeholder="학생 이름" className="flex-1 border-2 border-violet-300 rounded-xl p-2.5 font-bold outline-none" /><datalist id="manage-student-options">{activeStudents.filter((student) => Number(student.year) === Number(manageStudent.year) && Number(student.grade) === Number(manageStudent.grade) && ((manageStudent.school === '직접입력' ? manageStudent.customSchool : manageStudent.school) ? student.school === (manageStudent.school === '직접입력' ? manageStudent.customSchool : manageStudent.school) : true)).map((student) => <option key={student.studentId} value={student.name} />)}</datalist>
+                        <select name="grade" value={manageStudent.grade} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} className="w-28 border border-slate-300 rounded-xl p-2.5 outline-none">
+                          {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
+                        </select>
                       </div>
-                      <div className="flex gap-4">
-                        <select name="school" value={manageStudent.school} onChange={handleManageStudentChange} className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none">
+                      <input type="text" name="name" list="manage-student-options" value={manageStudent.name} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} placeholder="신입생 이름 입력" className="w-full border-2 border-violet-300 rounded-xl p-3 font-bold outline-none" />
+                      <datalist id="manage-student-options">
+                        {activeStudents.filter((student) => Number(student.year) === Number(manageStudent.year) && Number(student.grade) === Number(manageStudent.grade) && (finalSchoolValue ? student.school === finalSchoolValue : true)).map((student) => <option key={student.studentId} value={student.name} />)}
+                      </datalist>
+                      <div className="flex gap-3">
+                        <select name="school" value={manageStudent.school} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none">
                           <option value="">학교 선택</option>
                           {SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                           <option value="직접입력">직접입력</option>
                         </select>
-                        {manageStudent.school === '직접입력' && <input type="text" name="customSchool" value={manageStudent.customSchool} onChange={handleManageStudentChange} placeholder="학교명 입력" className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none" />}
-                        <select name="grade" value={manageStudent.grade} onChange={handleManageStudentChange} className="w-24 border border-slate-300 rounded-xl p-2.5 outline-none">
-                          {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
-                        </select>
+                        {manageStudent.school === '직접입력' && <input type="text" name="customSchool" value={manageStudent.customSchool} onChange={(e)=>{ resetManageSideInputs('new'); handleManageStudentChange(e); }} placeholder="학교명 입력" className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none" />}
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <div className="text-sm font-bold text-slate-700">학생 이름 변경</div>
-                        <div className="mt-2 flex flex-col md:flex-row gap-3">
-                          <input value={renameStudentName} onChange={e=>setRenameStudentName(e.target.value)} placeholder="변경할 학생 이름" className="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 outline-none" />
-                          <button type="button" onClick={handleStudentRename} disabled={!selectedManageStudentInfo || isRenamingStudent} className={`rounded-xl px-4 py-2.5 text-sm font-black text-white ${!selectedManageStudentInfo || isRenamingStudent ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}>{isRenamingStudent ? '변경 중...' : '이름 변경'}</button>
-                        </div>
-                        <div className="mt-2 text-xs text-slate-500">현재 선택된 학생 문서의 이름만 바뀝니다. 동명이인 신입생 구분용 이름 변경도 여기서 처리하면 됩니다.</div>
-                      </div>
-                      <div className="pt-2 flex justify-between items-center border-t border-slate-100">
-                        <span className="text-sm font-bold text-slate-500">재원 상태 관리</span>
-                        {studentsData.find(s=>s.name===manageStudent.name && s.year===manageStudent.year) && (
-                          <button type="button" onClick={async () => {
-                            const st = studentsData.find(s=>s.name===manageStudent.name && s.year===manageStudent.year);
-                            await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('students'), st.studentId), { isWithdrawn: !st.isWithdrawn });
-                          }} className={`px-4 py-2 rounded-xl text-xs font-black text-white ${studentsData.find(s=>s.name===manageStudent.name && s.year===manageStudent.year).isWithdrawn ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                            {studentsData.find(s=>s.name===manageStudent.name && s.year===manageStudent.year).isWithdrawn ? '복귀 처리' : '퇴원 처리'}
-                          </button>
-                        )}
+                      <div className="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-6 text-violet-800">
+                        이름 · 학교 · 학년을 입력하면 아래 성적 보드에서 바로 점수/등급 입력이 가능합니다.
                       </div>
                     </div>
                   </Card>
 
-                  <Card title="엑셀 일괄 업로드">
-                    <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-violet-400 hover:bg-violet-50 transition-all cursor-pointer relative">
-                       <input type="file" accept=".xlsx, .xls, .csv" onChange={handleExcelUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                       <i className="fas fa-file-excel text-4xl text-emerald-500 mb-3"></i>
-                       <div className="font-bold text-slate-700">엑셀 파일 클릭하여 학생 기본정보 업로드</div>
-                       <div className="text-xs text-slate-500 mt-2">필수 헤더: 학생명, 학교, 학년, 연도</div>
-                       <div className="text-[11px] text-slate-400 mt-1">점수/등급은 업로드하지 않고, 실제 입력한 선생님 정보만 이후에 붙습니다.</div>
+                  <Card title="학생이름 변경" right={<span className="inline-flex items-center gap-2 text-xs font-black text-amber-700"><i className="fas fa-pen"></i>학생 정보 수정</span>}>
+                    <div className="space-y-4">
+                      <div className="text-sm text-slate-500 leading-6">수정할 학생을 검색한 뒤 이름, 학교, 학년, 연도를 한 번에 바꿀 수 있습니다.</div>
+                      <input value={renameSearchKeyword} onChange={(e)=>{ resetManageSideInputs('rename'); setRenameSearchKeyword(e.target.value); setRenameStudentId(''); }} placeholder="수정할 학생 이름 검색" className="w-full border-2 border-amber-300 rounded-xl p-3 font-bold outline-none" />
+                      {renameSearchKeyword && !renameStudentId && (
+                        <div className="max-h-[180px] overflow-y-auto mini-scroll space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          {renameSearchCandidates.length ? renameSearchCandidates.map((student) => (
+                            <button key={student.studentId} type="button" onClick={()=>{ setRenameStudentId(student.studentId); setRenameSearchKeyword(student.name); setSelectedQuickStudentId(''); }} className="w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2 hover:border-amber-300 hover:bg-amber-50">
+                              <div className="font-black text-slate-800">{student.name}</div>
+                              <div className="text-xs text-slate-500 mt-1">{student.school} · {student.grade}학년 · {student.year}년</div>
+                            </button>
+                          )) : <div className="text-sm text-slate-400">검색 결과가 없습니다.</div>}
+                        </div>
+                      )}
+                      <div className={`space-y-3 ${selectedRenameStudentInfo ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                        <div className="grid grid-cols-2 gap-3">
+                          <select value={renameStudentForm.year} onChange={(e)=>setRenameStudentForm((p)=>({...p, year:Number(e.target.value)}))} className="border border-slate-300 rounded-xl p-2.5 outline-none">
+                            {YEARS.map(y => <option key={y} value={y}>{y}년</option>)}
+                          </select>
+                          <select value={renameStudentForm.grade} onChange={(e)=>setRenameStudentForm((p)=>({...p, grade:Number(e.target.value)}))} className="border border-slate-300 rounded-xl p-2.5 outline-none">
+                            {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
+                          </select>
+                        </div>
+                        <input value={renameStudentForm.name} onChange={(e)=>setRenameStudentForm((p)=>({...p, name:e.target.value}))} placeholder="학생 이름" className="w-full border border-slate-300 rounded-xl p-2.5 outline-none" />
+                        <div className="flex gap-3">
+                          <select value={renameStudentForm.school} onChange={(e)=>setRenameStudentForm((p)=>({...p, school:e.target.value, customSchool:e.target.value === '직접입력' ? p.customSchool : ''}))} className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none">
+                            <option value="">학교 선택</option>
+                            {SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                            <option value="직접입력">직접입력</option>
+                          </select>
+                          {renameStudentForm.school === '직접입력' && <input value={renameStudentForm.customSchool} onChange={(e)=>setRenameStudentForm((p)=>({...p, customSchool:e.target.value}))} placeholder="학교명 입력" className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none" />}
+                        </div>
+                        <button type="button" onClick={handleStudentRename} disabled={!selectedRenameStudentInfo || isRenamingStudent} className={`w-full rounded-2xl px-4 py-3 text-sm font-black text-white ${!selectedRenameStudentInfo || isRenamingStudent ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}>{isRenamingStudent ? '수정 중...' : '학생 정보 저장'}</button>
+                      </div>
                     </div>
                   </Card>
 
-                  {isAdminUser && (
-                    <Card title="관리자 전용 테스트데이터 정리" right={<span className="text-xs text-amber-700 font-bold">삭제할 학생을 선택한 뒤 실행</span>}>
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 space-y-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="text-sm font-black text-amber-800">관리자: 수최</div>
-                            <div className="mt-2 text-sm text-amber-700 leading-6">
-                              감지된 테스트 학생 명단을 확인하고, 원하는 학생만 골라 Firebase에서 실제 삭제할 수 있습니다.
-                            </div>
-                            <div className="mt-2 text-xs text-amber-700">
-                              감지 기준: 테스트 / test / sample / 샘플 / demo / 임시 / tmp / temp / 가짜 또는 아직 성적이 한 건도 없는 학생
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleDeleteTestData}
-                            disabled={isDeletingTestData || !selectedTestStudentIds.length}
-                            className={`shrink-0 rounded-2xl px-4 py-3 text-sm font-black text-white ${isDeletingTestData || !selectedTestStudentIds.length ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'}`}
-                          >
-                            {isDeletingTestData ? '삭제 중...' : '선택 학생 삭제'}
+                  <Card title="입력 학생 검색" right={<span className="inline-flex items-center gap-2 text-xs font-black text-sky-700"><i className="fas fa-magnifying-glass"></i>빠른 선택</span>}>
+                    <div className="space-y-4">
+                      <div className="text-sm text-slate-500 leading-6">이미 입력된 학생을 빠르게 찾아 아래 성적 보드에 바로 연결합니다.</div>
+                      <input value={selectedQuickStudentId} onChange={(e)=>{ resetManageSideInputs('search'); setSelectedQuickStudentId(e.target.value); }} placeholder="입력 학생 이름 검색" className="w-full border-2 border-sky-300 rounded-xl p-3 font-bold outline-none" />
+                      <div className="max-h-[280px] overflow-y-auto mini-scroll space-y-2">
+                        {quickSearchStudents.length ? quickSearchStudents.map((student) => (
+                          <button key={student.id} type="button" onClick={() => {
+                            resetManageSideInputs('search');
+                            setSelectedQuickStudentId(student.name);
+                            setManageStudent({
+                              year: student.year,
+                              name: student.name,
+                              school: SCHOOL_OPTIONS.includes(student.school) ? student.school : '직접입력',
+                              customSchool: SCHOOL_OPTIONS.includes(student.school) ? '' : student.school,
+                              grade: student.grade
+                            });
+                          }} className="w-full text-left rounded-2xl border border-slate-200 bg-white px-3 py-3 hover:border-sky-300 hover:bg-sky-50">
+                            <div className="font-black text-slate-800">{student.name}</div>
+                            <div className="text-xs text-slate-500 mt-1">{student.school} · {student.grade}학년 · {student.year}년</div>
                           </button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 text-xs font-bold">
-                          <button type="button" onClick={() => setSelectedTestStudentIds(detectedTestStudents.map((student) => student.studentId))} className="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800">전체 선택</button>
-                          <button type="button" onClick={() => setSelectedTestStudentIds([])} className="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800">선택 해제</button>
-                          <span className="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800">선택 학생 {selectedTestStudentIds.length}명</span>
-                          <span className="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800">관련 성적 {scoresData.filter((score) => !score.deleted && selectedTestStudentIds.includes(score.studentId)).length}건</span>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-2">
-                          {detectedTestStudents.length ? detectedTestStudents.map((student) => {
-                            const checked = selectedTestStudentIds.includes(student.studentId);
-                            const relatedCount = scoresData.filter((score) => !score.deleted && score.studentId === student.studentId).length;
-                            return (
-                              <label key={student.studentId} className={`flex items-start gap-3 rounded-2xl border px-3 py-3 cursor-pointer ${checked ? 'bg-white border-amber-300' : 'bg-amber-50 border-amber-200'}`}>
-                                <input type="checkbox" checked={checked} onChange={(e) => setSelectedTestStudentIds((prev) => e.target.checked ? [...new Set([...prev, student.studentId])] : prev.filter((id) => id !== student.studentId))} />
-                                <div className="min-w-0">
-                                  <div className="font-black text-amber-900">{student.name}</div>
-                                  <div className="text-xs text-amber-700 mt-1">{student.school || '-'} · {student.grade || '-'}학년 · {student.year || '-'}년</div>
-                                  <div className="text-[11px] text-amber-600 mt-1">관련 성적 {relatedCount}건</div>
-                                </div>
-                              </label>
-                            );
-                          }) : <div className="text-sm text-amber-700">감지된 테스트 학생이 없습니다.</div>}
-                        </div>
+                        )) : <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">검색 결과가 없습니다.</div>}
                       </div>
-                    </Card>
-                  )}
+                      {isAdminUser && (
+                        <label className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700 cursor-pointer">
+                          <i className="fas fa-file-excel"></i>학생명단 업로드
+                          <input type="file" accept=".xlsx, .xls, .csv" onChange={handleExcelUpload} className="hidden" />
+                        </label>
+                      )}
+                    </div>
+                  </Card>
                 </div>
 
-                <div className="grid xl:grid-cols-[280px_1fr] gap-6">
-                  <Card title="담당 학생 리스트" className="max-h-[600px] overflow-y-auto mini-scroll">
-                    <select value={manageTeacherFilter} onChange={e=>setManageTeacherFilter(e.target.value)} className="w-full mb-4 border border-slate-200 p-2 rounded-lg">
-                      <option value="전체">전체 선생님</option>
-                      {orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}
-                    </select>
+                {isAdminUser && (
+                  <Card title="관리자 전용 테스트데이터 정리" right={<span className="text-xs text-amber-700 font-bold">삭제할 학생을 선택한 뒤 실행</span>}>
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 space-y-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-black text-amber-800">관리자: 수최</div>
+                          <div className="mt-2 text-sm text-amber-700 leading-6">
+                            감지된 테스트 학생 명단을 확인하고, 원하는 학생만 골라 Firebase에서 실제 삭제할 수 있습니다.
+                          </div>
+                          <div className="mt-2 text-xs text-amber-700">
+                            감지 기준: 테스트 / test / sample / 샘플 / demo / 임시 / tmp / temp / 가짜 또는 아직 성적이 한 건도 없는 학생
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleDeleteTestData}
+                          disabled={isDeletingTestData || !selectedTestStudentIds.length}
+                          className={`shrink-0 rounded-2xl px-4 py-3 text-sm font-black text-white ${isDeletingTestData || !selectedTestStudentIds.length ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'}`}
+                        >
+                          {isDeletingTestData ? '삭제 중...' : '선택 학생 삭제'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs font-bold">
+                        <button type="button" onClick={() => setSelectedTestStudentIds(detectedTestStudents.map((student) => student.studentId))} className="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800">전체 선택</button>
+                        <button type="button" onClick={() => setSelectedTestStudentIds([])} className="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800">선택 해제</button>
+                        <span className="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800">선택 학생 {selectedTestStudentIds.length}명</span>
+                        <span className="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800">관련 성적 {scoresData.filter((score) => !score.deleted && selectedTestStudentIds.includes(score.studentId)).length}건</span>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-2">
+                        {detectedTestStudents.length ? detectedTestStudents.map((student) => {
+                          const checked = selectedTestStudentIds.includes(student.studentId);
+                          const relatedCount = scoresData.filter((score) => !score.deleted && score.studentId === student.studentId).length;
+                          return (
+                            <label key={student.studentId} className={`flex items-start gap-3 rounded-2xl border px-3 py-3 cursor-pointer ${checked ? 'bg-white border-amber-300' : 'bg-amber-50 border-amber-200'}`}>
+                              <input type="checkbox" checked={checked} onChange={(e) => setSelectedTestStudentIds((prev) => e.target.checked ? [...new Set([...prev, student.studentId])] : prev.filter((id) => id !== student.studentId))} />
+                              <div className="min-w-0">
+                                <div className="font-black text-amber-900">{student.name}</div>
+                                <div className="text-xs text-amber-700 mt-1">{student.school || '-'} · {student.grade || '-'}학년 · {student.year || '-'}년</div>
+                                <div className="text-[11px] text-amber-600 mt-1">관련 성적 {relatedCount}건</div>
+                              </div>
+                            </label>
+                          );
+                        }) : <div className="text-sm text-amber-700">감지된 테스트 학생이 없습니다.</div>}
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                <div className="grid xl:grid-cols-[320px_1fr] gap-6">
+                  <Card title="담당 학생 리스트" className="max-h-[680px] overflow-y-auto mini-scroll">
+                    <div className="space-y-3 mb-4">
+                      <select value={manageTeacherFilter} onChange={e=>setManageTeacherFilter(e.target.value)} className="w-full border border-slate-200 p-2.5 rounded-xl">
+                        <option value="전체">전체 선생님</option>
+                        {orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}
+                      </select>
+                      <select value={manageListFilters.school} onChange={e=>setManageListFilters((p)=>({...p, school:e.target.value}))} className="w-full border border-slate-200 p-2.5 rounded-xl">
+                        <option value="전체">전체 학교</option>
+                        {SCHOOL_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <select value={manageListFilters.grade} onChange={e=>setManageListFilters((p)=>({...p, grade:e.target.value}))} className="w-full border border-slate-200 p-2.5 rounded-xl">
+                        <option value="전체">전체 학년</option>
+                        {GRADES.map(g=><option key={g} value={g}>{g}학년</option>)}
+                      </select>
+                    </div>
                     <div className="space-y-2">
-                      {teacherManagedStudents.map(st => (
+                      {teacherManagedStudents.filter((st) =>
+                        (manageListFilters.school === '전체' || st.school === manageListFilters.school) &&
+                        (manageListFilters.grade === '전체' || Number(st.grade) === Number(manageListFilters.grade))
+                      ).map(st => (
                         <button key={st.id} onClick={() => setManageStudent({ year: st.year, name: st.name, school: SCHOOL_OPTIONS.includes(st.school)?st.school:'직접입력', customSchool: SCHOOL_OPTIONS.includes(st.school)?'':st.school, grade: st.grade })} className="w-full text-left px-3 py-2.5 rounded-2xl border border-slate-200 hover:bg-violet-50 hover:border-violet-300 transition-colors">
                           <div className="font-black text-slate-800">{st.name}</div>
                           <div className="text-xs text-slate-500 mt-1">{st.school} | {st.grade}학년 | {st.year}년</div>
@@ -1304,11 +1455,22 @@
                     </div>
                   </Card>
 
-                  <div className={`transition-opacity ${manageStudent.name ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}><Card title={`${manageStudent.name||'선택안됨'} 학생 성적 보드`} right={<span className="text-sm text-slate-500">{manageStudent.year}년 · {finalSchoolValue || '학교 미선택'} · {manageStudent.grade}학년</span>}>
+                  <div className={`transition-opacity ${manageStudent.name ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                    <Card title={`${manageStudent.name||'선택안됨'} 학생 성적 보드`} right={<span className="text-sm text-slate-500">{manageStudent.year}년 · {finalSchoolValue || '학교 미선택'} · {manageStudent.grade}학년</span>}>
                       <div className="flex flex-wrap gap-2 mb-4">
                         {EXAMS.map(ex => (
                           <button key={ex} onClick={()=>setFilters({...filters, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${filters.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>
                         ))}
+                      </div>
+                      <div className="mb-4 flex justify-between items-center border-t border-slate-100 pt-4">
+                        <span className="text-sm font-bold text-slate-500">재원 상태 관리</span>
+                        {currentManageStudentRecord && (
+                          <button type="button" onClick={async () => {
+                            await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('students'), currentManageStudentRecord.studentId), { isWithdrawn: !currentManageStudentRecord.isWithdrawn });
+                          }} className={`px-4 py-2 rounded-xl text-xs font-black text-white ${currentManageStudentRecord.isWithdrawn ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                            {currentManageStudentRecord.isWithdrawn ? '복귀 처리' : '퇴원 처리'}
+                          </button>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {SUBJECTS.map(sub => {
@@ -1506,8 +1668,7 @@
                 <Card title="시험 분석 입력">
                   <form onSubmit={saveTeamExam} className="space-y-4">
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={()=>setTeamExamForm({...teamExamForm, year: 2026})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.year === 2026 ? 'btn-pill-active' : 'btn-pill-inactive'}`}>2026년</button>
-                      <button type="button" onClick={()=>setTeamExamForm({...teamExamForm, year: 2027})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.year === 2027 ? 'btn-pill-active' : 'btn-pill-inactive'}`}>2027년</button>
+                      {YEARS.map(year => <button type="button" key={year} onClick={()=>setTeamExamForm({...teamExamForm, year})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.year === year ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{year}년</button>)}
                       {SCHOOL_OPTIONS.map((school) => <button type="button" key={school} onClick={()=>setTeamExamForm({...teamExamForm, school: school})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.school === school ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{school}</button>)}
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1527,10 +1688,17 @@
                       <input value={teamExamForm.subjectiveCount} onChange={e=>setTeamExamForm({...teamExamForm, subjectiveCount:e.target.value})} type="number" min="0" placeholder="주 문항수" className="border border-slate-300 rounded-xl p-2.5" />
                       <input value={teamExamForm.subjectivePoints} onChange={e=>setTeamExamForm({...teamExamForm, subjectivePoints:e.target.value})} type="number" min="0" placeholder="주 배점" className="border border-slate-300 rounded-xl p-2.5" />
                     </div>
+                    <div className="grid md:grid-cols-4 gap-4">
+                      <input value={teamExamForm.cut1} onChange={e=>setTeamExamForm({...teamExamForm, cut1:e.target.value})} type="number" min="0" max="100" placeholder="1등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
+                      <input value={teamExamForm.cut2} onChange={e=>setTeamExamForm({...teamExamForm, cut2:e.target.value})} type="number" min="0" max="100" placeholder="2등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
+                      <input value={teamExamForm.cut3} onChange={e=>setTeamExamForm({...teamExamForm, cut3:e.target.value})} type="number" min="0" max="100" placeholder="3등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
+                      <input value={teamExamForm.cut4} onChange={e=>setTeamExamForm({...teamExamForm, cut4:e.target.value})} type="number" min="0" max="100" placeholder="4등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
+                    </div>
                     <div className="grid md:grid-cols-2 gap-4">
                       <input value={teamExamForm.review} onChange={e=>setTeamExamForm({...teamExamForm, review:e.target.value})} placeholder="총평" className="border border-slate-300 rounded-xl p-2.5" />
                       <input value={teamExamForm.specialNote} onChange={e=>setTeamExamForm({...teamExamForm, specialNote:e.target.value})} placeholder="특이사항" className="border border-slate-300 rounded-xl p-2.5" />
                     </div>
+                    <div className="text-xs text-slate-500">등급컷 원점수는 몰라도 저장되도록 선택 입력으로 처리했습니다.</div>
                     <button type="submit" className="rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white font-black px-5 py-3">시험 분석 저장</button>
                   </form>
                 </Card>
@@ -1545,10 +1713,10 @@
                   <div className="overflow-x-auto mini-scroll">
                     <table className="w-full text-sm text-center">
                       <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
-                        <tr>{[['year','연도'],['exam','시험'],['school','학교'],['grade','학년'],['subject','과목'],['difficulty','난이도'],['updatedBy','작성자']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => setTeamExamSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr>
+                        <tr>{[['year','연도'],['exam','시험'],['school','학교'],['grade','학년'],['subject','과목'],['detailSubject','세부과목'],['difficulty','난이도'],['reviewNote','총평 및 특이사항']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => setTeamExamSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {sortRows(teamExamData.filter(item => (teamExamFilters.year === '전체' || Number(item.year) === Number(teamExamFilters.year)) && (teamExamFilters.school === '전체' || item.school === teamExamFilters.school)), teamExamSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), school:r=>safeLower(r.school||''), grade:r=>Number(r.grade||0), subject:r=>safeLower(r.subject||''), difficulty:r=>Number(r.difficulty||0), updatedBy:r=>safeLower(r.updatedBy || r.createdBy || '') }).length ? sortRows(teamExamData.filter(item => (teamExamFilters.year === '전체' || Number(item.year) === Number(teamExamFilters.year)) && (teamExamFilters.school === '전체' || item.school === teamExamFilters.school)), teamExamSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), school:r=>safeLower(r.school||''), grade:r=>Number(r.grade||0), subject:r=>safeLower(r.subject||''), difficulty:r=>Number(r.difficulty||0), updatedBy:r=>safeLower(r.updatedBy || r.createdBy || '') }).map((item) => <tr key={item.docId}><td className="py-3">{item.year}</td><td>{EXAM_SHORT_LABELS[item.exam] || item.exam}</td><td>{item.school || '-'}</td><td>{item.grade ? `${item.grade}학년` : '-'}</td><td>{item.subject}{item.detailSubject ? ` (${item.detailSubject})` : ''}</td><td>{item.difficulty || '-'} · {item.difficulty <= 3 ? '하' : item.difficulty <= 7 ? '중' : '상'}</td><td>{item.updatedBy || item.createdBy || '-'}</td></tr>) : <tr><td colSpan="7" className="py-10 text-slate-400">저장된 시험 분석이 없습니다.</td></tr>}
+                        {sortRows(teamExamData.filter(item => (teamExamFilters.year === '전체' || Number(item.year) === Number(teamExamFilters.year)) && (teamExamFilters.school === '전체' || item.school === teamExamFilters.school)).map(item => ({ ...item, reviewNote: [item.review, item.specialNote].filter(Boolean).join(' / ') })), teamExamSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), school:r=>safeLower(r.school||''), grade:r=>Number(r.grade||0), subject:r=>safeLower(r.subject||''), detailSubject:r=>safeLower(r.detailSubject||''), difficulty:r=>Number(r.difficulty||0), reviewNote:r=>safeLower(r.reviewNote || '') }).length ? sortRows(teamExamData.filter(item => (teamExamFilters.year === '전체' || Number(item.year) === Number(teamExamFilters.year)) && (teamExamFilters.school === '전체' || item.school === teamExamFilters.school)).map(item => ({ ...item, reviewNote: [item.review, item.specialNote].filter(Boolean).join(' / ') })), teamExamSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), school:r=>safeLower(r.school||''), grade:r=>Number(r.grade||0), subject:r=>safeLower(r.subject||''), detailSubject:r=>safeLower(r.detailSubject||''), difficulty:r=>Number(r.difficulty||0), reviewNote:r=>safeLower(r.reviewNote || '') }).map((item) => <tr key={item.docId}><td className="py-3">{item.year}</td><td>{EXAM_SHORT_LABELS[item.exam] || item.exam}</td><td>{item.school || '-'}</td><td>{item.grade ? `${item.grade}학년` : '-'}</td><td>{item.subject || '-'}</td><td>{item.detailSubject || '-'}</td><td>{item.difficulty || '-'} · {item.difficulty <= 3 ? '하' : item.difficulty <= 7 ? '중' : '상'}</td><td className="text-left px-3">{item.reviewNote || '-'}</td></tr>) : <tr><td colSpan="8" className="py-10 text-slate-400">저장된 시험 분석이 없습니다.</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -1556,7 +1724,7 @@
               </div>
             )}
 
-            
+
           </main>
 
           {/* Modal */}
