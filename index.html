@@ -829,7 +829,7 @@
       })();
 
       const dashboardSummaryCards = (() => {
-        const rows = filteredDashboardData;
+        const rows = activeJoinedData.filter(d => d.year === filters.year && d.exam === filters.exam && (filters.school==='전체'||d.school===filters.school) && (filters.grade==='전체'||d.grade===filters.grade) && (filters.className==='전체'||d.className===filters.className) && (activeSubject==='전체'||d.subject===activeSubject));
         return {
           top90: rows.filter(r => Number(r.score) >= 90).length,
           score80: rows.filter(r => Number(r.score) >= 80 && Number(r.score) < 90).length,
