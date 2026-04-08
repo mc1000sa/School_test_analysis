@@ -145,6 +145,50 @@
     }
     .btn-pill-inactive:hover { background: #f8fafc; border-color: #cbd5e1; }
 
+    .top-context-wrap {
+      border-radius: 24px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(226,232,240,0.95);
+      box-shadow: 0 10px 22px rgba(15,23,42,0.05);
+    }
+    .top-context-chip {
+      border-radius: 999px;
+      border: 1px solid rgba(226,232,240,0.95);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+      color: #475569;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 10px 15px;
+      transition: all .18s ease;
+      white-space: nowrap;
+    }
+    .top-context-chip:hover { transform: translateY(-1px); border-color: rgba(196,181,253,0.9); }
+    .top-context-chip-active {
+      color: #fff;
+      border-color: rgba(124,58,237,0.38);
+      background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 58%, #4f46e5 100%);
+      box-shadow: 0 14px 24px rgba(109,40,217,0.18);
+    }
+    .teacher-chip-1 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,243,255,0.94)); }
+    .teacher-chip-2 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(239,246,255,0.94)); }
+    .teacher-chip-3 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(236,253,245,0.94)); }
+    .teacher-chip-4 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,247,237,0.94)); }
+    .teacher-chip-5 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,245,255,0.94)); }
+    .teacher-chip-6 { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(238,242,255,0.94)); }
+    .admin-badge {
+      border-radius: 999px;
+      background: linear-gradient(135deg, #f59e0b, #f97316);
+      color: white;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      box-shadow: 0 10px 18px rgba(249,115,22,0.18);
+    }
+    @media (max-width: 767px) {
+      .mobile-safe-bottom { padding-bottom: 84px; }
+      .top-nav-scroll { overflow-x: auto; white-space: nowrap; }
+      .top-nav-scroll::-webkit-scrollbar { display: none; }
+    }
+
     @media print {
       @page { size: A4 portrait; margin: 12mm; }
       html, body { background: #fff !important; }
@@ -351,6 +395,8 @@
       const [isLoggedIn, setIsLoggedIn] = useState(false);
       const [currentTeacher, setCurrentTeacher] = useState(null);
       const [isDeletingTestData, setIsDeletingTestData] = useState(false);
+      const [authReady, setAuthReady] = useState(false);
+      const [dataReady, setDataReady] = useState(false);
 
       const [view, setView] = useState('dashboard');
       
@@ -382,14 +428,14 @@
         const initFirebase = async () => {
           try {
             let attempts = 0;
-            while (!window.FirebaseAPI && attempts < 50) {
+            while (!window.FirebaseAPI && attempts < 80) {
               await new Promise((r) => setTimeout(r, 100));
               attempts++;
             }
-            if (!window.FirebaseAPI) throw new Error('Firebase 모듈 로드 지연');
-            
-            let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-              // Firebase 6종 키를 직접 심을 때는 아래 6개 값만 실제 값으로 바꿔주세요.
+            if (!window.FirebaseAPI) throw new Error('Firebase 모듈을 불러오지 못했습니다.');
+
+            const hasInjectedConfig = typeof __firebase_config !== 'undefined' && __firebase_config;
+            const firebaseConfig = hasInjectedConfig ? JSON.parse(__firebase_config) : {
   apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
   authDomain: "open-school-3f74c.firebaseapp.com",
   projectId: "open-school-3f74c",
@@ -398,17 +444,41 @@
   appId: "1:623260231783:web:33dded88508aa05d498cc2",
             };
 
+            const values = Object.values(firebaseConfig || {});
+            if (!hasInjectedConfig && values.some((v) => String(v || '').startsWith('YOUR_'))) {
+              throw new Error('Firebase 6종 키가 비어 있습니다. index.html 안 firebaseConfig 자리에 실제 값을 넣어주세요.');
+            }
+
             const app = !window.FirebaseAPI.getApps().length ? window.FirebaseAPI.initializeApp(firebaseConfig) : window.FirebaseAPI.getApp();
             const auth = window.FirebaseAPI.getAuth(app);
-            setDb(window.FirebaseAPI.getFirestore(app));
+            const firestore = window.FirebaseAPI.getFirestore(app);
+            setDb(firestore);
 
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-              await window.FirebaseAPI.signInWithCustomToken(auth, __initial_auth_token).catch(()=>console.warn('Custom token failed'));
-            } else {
-              await window.FirebaseAPI.signInAnonymously(auth).catch(()=>console.warn('Anonymous auth failed. Functionality might be limited.'));
-            }
-            window.FirebaseAPI.onAuthStateChanged(auth, (u) => { setUser(u || null); setIsLoading(false); });
-            setIsLoading(false); // Make sure it stops loading even if auth fails
+            await new Promise(async (resolve, reject) => {
+              const timeoutId = setTimeout(() => reject(new Error('Firebase 인증 대기 시간이 초과되었습니다.')), 12000);
+              const unsubscribe = window.FirebaseAPI.onAuthStateChanged(auth, async (u) => {
+                clearTimeout(timeoutId);
+                unsubscribe();
+                setUser(u || null);
+                setAuthReady(true);
+                resolve();
+              }, (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+              });
+
+              try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                  await window.FirebaseAPI.signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                  await window.FirebaseAPI.signInAnonymously(auth);
+                }
+              } catch (authError) {
+                clearTimeout(timeoutId);
+                unsubscribe();
+                reject(authError);
+              }
+            });
           } catch (error) {
             setInitError('Firebase 초기화 실패: ' + error.message);
             setIsLoading(false);
@@ -418,19 +488,41 @@
       }, []);
 
       useEffect(() => {
-        if (!db || !window.FirebaseAPI) return;
+        if (!db || !window.FirebaseAPI || !authReady || !user) return;
         const { collection, onSnapshot } = window.FirebaseAPI;
         let unsubs = [];
+        const ready = { teachers: false, students: false, scores: false, team: false };
+        const markReady = (key) => {
+          ready[key] = true;
+          if (Object.values(ready).every(Boolean)) {
+            setDataReady(true);
+            setIsLoading(false);
+          }
+        };
+
         try {
-          unsubs.push(onSnapshot(collection(db, getPath('teachers')), (s) => setTeachersData(s.docs.map(d => ({ teacherId: d.id, ...d.data() })).filter(t => t.isActive !== false))));
-          unsubs.push(onSnapshot(collection(db, getPath('students')), (s) => setStudentsData(s.docs.map(d => ({ studentId: d.id, ...d.data() })))));
-          unsubs.push(onSnapshot(collection(db, getPath('scores')), (s) => setScoresData(s.docs.map(d => ({ docId: d.id, ...d.data() })))));
-          unsubs.push(onSnapshot(collection(db, getPath('teamExams')), (s) => setTeamExamData(s.docs.map(d => ({ docId: d.id, ...d.data() })).filter(t => !t.deleted))));
+          unsubs.push(onSnapshot(collection(db, getPath('teachers')), (s) => {
+            setTeachersData(s.docs.map(d => ({ teacherId: d.id, ...d.data() })).filter(t => t.isActive !== false));
+            markReady('teachers');
+          }, (error) => { setInitError('teachers 데이터를 읽을 수 없습니다: ' + error.message); setIsLoading(false); }));
+          unsubs.push(onSnapshot(collection(db, getPath('students')), (s) => {
+            setStudentsData(s.docs.map(d => ({ studentId: d.id, ...d.data() })));
+            markReady('students');
+          }, (error) => { setInitError('students 데이터를 읽을 수 없습니다: ' + error.message); setIsLoading(false); }));
+          unsubs.push(onSnapshot(collection(db, getPath('scores')), (s) => {
+            setScoresData(s.docs.map(d => ({ docId: d.id, ...d.data() })));
+            markReady('scores');
+          }, (error) => { setInitError('scores 데이터를 읽을 수 없습니다: ' + error.message); setIsLoading(false); }));
+          unsubs.push(onSnapshot(collection(db, getPath('teamExams')), (s) => {
+            setTeamExamData(s.docs.map(d => ({ docId: d.id, ...d.data() })).filter(t => !t.deleted));
+            markReady('team');
+          }, () => markReady('team')));
         } catch (error) {
-          console.warn('DB Subscription error:', error);
+          setInitError('데이터베이스 연결 실패: ' + error.message);
+          setIsLoading(false);
         }
         return () => unsubs.forEach(u => u && u());
-      }, [db]);
+      }, [db, authReady, user]);
 
       const joinedData = useMemo(() => scoresData.filter(s => !s.deleted).map(score => {
         const student = studentsData.find(s => s.studentId === score.studentId && !s.deleted) || {};
@@ -492,8 +584,8 @@
         e.preventDefault();
         if (!selectedTeacherName) return setLoginError('선생님을 선택해주세요.');
         const t = teachersData.find(t => t.name === selectedTeacherName && String(t.pin||'') === loginPin);
-        if (!t && loginPin !== '0000') return setLoginError('PIN이 올바르지 않습니다.'); // Allow '0000' as fallback if configured
-        setCurrentTeacher(t || { name: selectedTeacherName, teacherId: 'temp' });
+        if (!t) return setLoginError('PIN이 올바르지 않습니다.');
+        setCurrentTeacher(t);
         setIsLoggedIn(true); setLoginError('');
       };
 
@@ -609,7 +701,8 @@
       };
 
 
-      if (isLoading) return <div className="min-h-screen flex items-center justify-center text-violet-700 font-bold text-xl">로딩중...</div>;
+      if (isLoading) return <div className="min-h-screen flex items-center justify-center text-violet-700 font-bold text-xl">연결 준비 중...</div>;
+      if (initError) return <div className="min-h-screen flex items-center justify-center p-6"><div className="bg-white border border-rose-200 rounded-[28px] p-6 max-w-2xl w-full"><div className="text-2xl font-black text-rose-600 mb-3">연결 오류</div><div className="text-sm text-rose-600 whitespace-pre-wrap leading-7">{initError}</div></div></div>;
       
       if (!isLoggedIn) {
         return (
@@ -618,8 +711,8 @@
               <div className="hidden md:flex rounded-[36px] hero-panel p-10 flex-col justify-end relative overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.18),transparent_28%)]"></div>
                 <div className="relative z-10">
-                  <h1 className="login-main-title text-[40px] text-slate-900"><span className="block">열린학원</span><span className="mt-2 block">성적분석 포털사이트</span></h1>
-                  <p className="login-copy-title mt-8 text-[32px] leading-[1.6] text-slate-800">입력은 쉽고 빠르게,<br/>분석은 깊이 있게!!!</p>
+                  <h1 className="login-main-title text-[34px] md:text-[42px] text-slate-900"><span className="block">열린학원</span><span className="mt-2 block">성적분석 포털사이트</span></h1>
+                  <p className="login-copy-title mt-8 text-[26px] md:text-[34px] leading-[1.7] text-slate-800">입력은 쉽고 빠르게,<br/>분석은 깊이 있게!!!</p>
                   <div className="creator-signature mt-12 text-[14px]">Created by mOOn_Mathematics</div>
                 </div>
               </div>
@@ -630,8 +723,8 @@
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-3">선생님 선택</label>
                     <div className="grid grid-cols-3 gap-3">
-                      {teachersData.map((t) => (
-                        <button type="button" key={t.teacherId} onClick={() => setSelectedTeacherName(t.name)} className={`teacher-chip ${selectedTeacherName === t.name ? 'teacher-chip-selected' : 'bg-white'}`}>
+                      {teachersData.map((t, idx) => (
+                        <button type="button" key={t.teacherId} onClick={() => setSelectedTeacherName(t.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selectedTeacherName === t.name ? 'teacher-chip-selected' : ''}`}>
                           {t.name}
                         </button>
                       ))}
@@ -672,6 +765,29 @@
           tierImproved: s.scores.some(x=>x.tierDelta > 0)
         }));
       }, [activeJoinedData, teacherAnalysisTeacher, teacherAnalysisView, currentTeacher]);
+      const sortedTeacherAnalysisRows = useMemo(() => {
+        const getValue = (row, key) => {
+          if (key === 'name') return safeLower(row.name);
+          if (key === 'school') return safeLower(row.school);
+          if (key === 'grade') return Number(row.grade || 0);
+          if (key === 'subjectNames') return safeLower(row.subjectNames || '');
+          if (key === 'exam') return examOrder(row.scores?.[0]?.exam || '');
+          if (key === 'score') return Number(row.average || 0);
+          if (key === 'tier') return Number(Math.min(...(row.scores || []).map((s) => Number(s.tier || 5))) || 0);
+          if (key === 'bestDelta') return Number(Math.max(...(row.scores || []).map((s) => (Number(s.score || 0) - Number(s.prev?.score || 0)))) || 0);
+          return '';
+        };
+        const items = [...teacherAnalysisRows];
+        items.sort((a, b) => {
+          const av = getValue(a, teacherAnalysisSort.key);
+          const bv = getValue(b, teacherAnalysisSort.key);
+          if (av < bv) return teacherAnalysisSort.direction === 'asc' ? -1 : 1;
+          if (av > bv) return teacherAnalysisSort.direction === 'asc' ? 1 : -1;
+          return 0;
+        });
+        return items;
+      }, [teacherAnalysisRows, teacherAnalysisSort]);
+
       
       const teacherManagedStudents = useMemo(() => {
         const target = manageTeacherFilter;
@@ -682,6 +798,28 @@
         });
         return Array.from(map.values());
       }, [activeJoinedData, manageTeacherFilter]);
+
+      const titleMap = Object.fromEntries(MENU_ITEMS.map((item) => [item.key, item.label]));
+      const adminPill = isAdminUser ? <span className="admin-badge px-3 py-1.5 text-xs">관리자</span> : null;
+      const topContextBar = (() => {
+        if (view === 'dashboard') {
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar">{EXAMS.map((exam) => <button key={exam} type="button" onClick={() => setFilters((p) => ({ ...p, exam }))} className={`top-context-chip ${filters.exam === exam ? 'top-context-chip-active' : ''}`}>{EXAM_SHORT_LABELS[exam]}</button>)}</div>;
+        }
+        if (view === 'manage') {
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar"><span className="px-2 text-xs font-bold text-slate-400 whitespace-nowrap">선생님 빠른 선택</span><button type="button" onClick={() => setManageTeacherFilter('전체')} className={`top-context-chip ${manageTeacherFilter === '전체' ? 'top-context-chip-active' : ''}`}>전체</button>{teachersData.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setManageTeacherFilter(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${manageTeacherFilter === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
+        }
+        if (view === 'teacherAnalysis') {
+          const activeTeacher = teacherAnalysisTeacher || currentTeacher?.name || '';
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar">{teachersData.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setTeacherAnalysisTeacher(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${activeTeacher === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
+        }
+        if (view === 'schoolAnalysis') {
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setSchoolView((p) => ({ ...p, school: '전체' }))} className={`top-context-chip ${schoolView.school === '전체' ? 'top-context-chip-active' : ''}`}>전체 학교</button>{SCHOOL_OPTIONS.map((school) => <button key={school} type="button" onClick={() => setSchoolView((p) => ({ ...p, school }))} className={`top-context-chip ${schoolView.school === school ? 'top-context-chip-active' : ''}`}>{school}</button>)}</div>;
+        }
+        if (view === 'subjectAnalysis') {
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-3 py-3 max-w-full overflow-x-auto no-scrollbar">{SUBJECTS.map((subject) => <button key={subject} type="button" onClick={() => setSubjectView((p) => ({ ...p, subject }))} className={`top-context-chip ${subjectView.subject === subject ? 'top-context-chip-active' : ''}`}>{subject}</button>)}</div>;
+        }
+        return null;
+      })();
 
       return (
         <div className="app-shell font-sans text-slate-800">
@@ -696,15 +834,31 @@
             </div>
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
               <div className="text-xs text-slate-500 font-bold mb-1">로그인</div>
-              <div className="font-black text-slate-900">{currentTeacher.name} 선생님</div>
+              <div className="flex items-center justify-between gap-2"><div className="font-black text-slate-900">{currentTeacher.name} 선생님</div>{adminPill}</div>
             </div>
           </aside>
 
-          <main className="content-wrap xl:pl-[290px] p-6 space-y-6">
-            <header className="flex justify-between items-center bg-white p-4 rounded-[24px] shadow-sm border border-slate-200">
-              <h2 className="text-2xl font-black text-slate-900">{MENU_ITEMS.find(m=>m.key===view)?.label}</h2>
-              <div className="flex gap-2">
-                <button onClick={() => window.print()} className="px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200"><i className="fas fa-print mr-2"></i>인쇄</button>
+          <main className="content-wrap xl:pl-[290px] p-4 sm:p-6 space-y-6 mobile-safe-bottom">
+            <header className="sticky top-0 z-20 bg-white/95 border-b border-slate-200/75 rounded-[28px] p-4 sm:p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-violet-700">열린학원 성적분석 포털</div>
+                  <h2 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900">{titleMap[view]}</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : null}
+                  <button onClick={() => window.print()} className="px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200"><i className="fas fa-print mr-2"></i>인쇄</button>
+                </div>
+              </div>
+              <div className="mt-4">{topContextBar}</div>
+              <div className="xl:hidden mt-4 top-nav-scroll">
+                <div className="flex gap-2 min-w-max pb-1">
+                  {MENU_ITEMS.map((item) => (
+                    <button key={item.key} onClick={() => setView(item.key)} className={`rounded-full px-4 py-2.5 text-sm font-bold border transition-all whitespace-nowrap ${view === item.key ? 'text-white border-transparent bg-gradient-to-r from-violet-700 to-indigo-600 shadow-md shadow-violet-200' : 'text-slate-600 border-slate-200 bg-white hover:bg-slate-50'}`}>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </header>
 
@@ -827,7 +981,7 @@
                     </select>
                     <div className="space-y-2">
                       {teacherManagedStudents.map(st => (
-                        <button key={st.id} onClick={() => setManageStudent({ year: st.year, name: st.name, school: SCHOOL_OPTIONS.includes(st.school)?st.school:'직접입력', customSchool: SCHOOL_OPTIONS.includes(st.school)?'':st.school, grade: st.grade })} className="w-full text-left p-3 rounded-xl border border-slate-200 hover:bg-violet-50 hover:border-violet-300 transition-colors">
+                        <button key={st.id} onClick={() => setManageStudent({ year: st.year, name: st.name, school: SCHOOL_OPTIONS.includes(st.school)?st.school:'직접입력', customSchool: SCHOOL_OPTIONS.includes(st.school)?'':st.school, grade: st.grade })} className="w-full text-left px-3 py-2.5 rounded-2xl border border-slate-200 hover:bg-violet-50 hover:border-violet-300 transition-colors">
                           <div className="font-black text-slate-800">{st.name}</div>
                           <div className="text-xs text-slate-500 mt-1">{st.school} | {st.grade}학년 | {st.year}년</div>
                         </button>
@@ -887,14 +1041,30 @@
                   <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center"><div className="text-sm text-slate-500 font-bold">전체 평균</div><div className="text-3xl font-black mt-2 text-violet-700">{Math.round(teacherAnalysisRows.reduce((a,b)=>a+(b.average||0),0)/(teacherAnalysisRows.length||1))}점</div></div>
                 </div>
 
-                <Card title="상세 성적 변화 리스트">
+                <Card title="상세 성적 변화 리스트" right={<div className="text-xs text-slate-500">헤더 클릭 정렬</div>}>
+                  <div className="mb-3 text-xs font-bold text-amber-700">※ 선생님별 등급 분포와 표에서는 6~9등급 입력값을 모두 5등급으로 통일해서 표시합니다.</div>
                   <div className="overflow-x-auto mini-scroll">
                     <table className="w-full text-sm text-center">
                       <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
-                        <tr><th className="py-3">학생명</th><th>학교</th><th>학년</th><th>과목명</th><th>점수</th><th>등급</th><th>변화</th></tr>
+                        <tr>
+                          {[
+                            { key:'name', label:'학생명' },
+                            { key:'school', label:'학교' },
+                            { key:'grade', label:'학년' },
+                            { key:'subjectNames', label:'과목명' },
+                            { key:'exam', label:'시험명' },
+                            { key:'score', label:'점수' },
+                            { key:'tier', label:'등급' },
+                            { key:'bestDelta', label:'변화' },
+                          ].map((col) => (
+                            <th key={col.key} onClick={() => setTeacherAnalysisSort((prev) => ({ key: col.key, direction: prev.key === col.key && prev.direction === 'asc' ? 'desc' : 'asc' }))} className="py-3 px-3 cursor-pointer hover:bg-slate-100 whitespace-nowrap">
+                              {col.label}
+                            </th>
+                          ))}
+                        </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {teacherAnalysisRows.map(row => (
+                        {sortedTeacherAnalysisRows.map(row => (
                           <React.Fragment key={row.studentId}>
                             {row.scores.map((score, i) => (
                               <tr key={score.docId} className="hover:bg-slate-50">
@@ -902,8 +1072,9 @@
                                 {i===0 && <td rowSpan={row.scores.length} className="border-r border-slate-100">{row.school}</td>}
                                 {i===0 && <td rowSpan={row.scores.length} className="border-r border-slate-100">{row.grade}</td>}
                                 <td className="py-3">{score.subject} {score.detailSubject&&`(${score.detailSubject})`}</td>
+                                <td>{EXAM_SHORT_LABELS[score.exam] || score.exam}</td>
                                 <td className="font-bold text-slate-800">{score.score}점</td>
-                                <td>{score.tier}등급</td>
+                                <td>{normalizeTeacherAnalysisTier(score.tier)}등급</td>
                                 <td>{formatScoreDelta(score, score.prev)}</td>
                               </tr>
                             ))}
@@ -915,6 +1086,122 @@
                 </Card>
               </div>
             )}
+
+
+            {view === 'schoolAnalysis' && (
+              <div className="space-y-6">
+                <Card title="학교별 성적 현황">
+                  <div className="grid md:grid-cols-4 gap-4">
+                    <select value={schoolView.year} onChange={e => setSchoolView((p) => ({ ...p, year: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{YEARS.map(y => <option key={y} value={y}>{y}년</option>)}</select>
+                    <select value={schoolView.exam} onChange={e => setSchoolView((p) => ({ ...p, exam: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{EXAMS.map(ex => <option key={ex} value={ex}>{EXAM_SHORT_LABELS[ex]}</option>)}</select>
+                    <select value={schoolView.school} onChange={e => setSchoolView((p) => ({ ...p, school: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학교</option>{SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={schoolView.subject} onChange={e => setSchoolView((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 과목</option>{SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                  </div>
+                </Card>
+                <Card title="학교별 평균 점수">
+                  <div className="overflow-x-auto mini-scroll">
+                    <table className="w-full text-sm text-center">
+                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
+                        <tr><th className="py-3">학교</th><th>학년</th><th>과목</th><th>학생수</th><th>평균</th><th>1등급 비율</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(() => {
+                          const rows = activeJoinedData.filter(r => Number(r.year) === Number(schoolView.year) && r.exam === schoolView.exam && (schoolView.school === '전체' || r.school === schoolView.school) && (schoolView.subject === '전체' || r.subject === schoolView.subject));
+                          const grouped = {};
+                          rows.forEach(r => {
+                            const key = [r.school, r.grade, r.subject].join('__');
+                            grouped[key] = grouped[key] || [];
+                            grouped[key].push(r);
+                          });
+                          const items = Object.entries(grouped).map(([key, arr]) => {
+                            const [school, grade, subject] = key.split('__');
+                            const avg = Math.round(arr.reduce((sum, item) => sum + Number(item.score || 0), 0) / arr.length);
+                            const topRate = Math.round((arr.filter(item => normalizeTeacherAnalysisTier(item.tier) === 1).length / arr.length) * 100);
+                            return { school, grade, subject, count: arr.length, avg, topRate };
+                          }).sort((a, b) => b.avg - a.avg);
+                          return items.length ? items.map((row) => <tr key={`${row.school}-${row.grade}-${row.subject}`}><td className="py-3 font-bold">{row.school}</td><td>{row.grade}학년</td><td>{row.subject}</td><td>{row.count}명</td><td className="font-black text-violet-700">{row.avg}점</td><td>{row.topRate}%</td></tr>) : <tr><td colSpan="6" className="py-10 text-slate-400">데이터가 없습니다.</td></tr>;
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            {view === 'subjectAnalysis' && (
+              <div className="space-y-6">
+                <Card title="과목별 성적 현황">
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <select value={subjectView.year} onChange={e => setSubjectView((p) => ({ ...p, year: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{YEARS.map(y => <option key={y} value={y}>{y}년</option>)}</select>
+                    <select value={subjectView.exam} onChange={e => setSubjectView((p) => ({ ...p, exam: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{EXAMS.map(ex => <option key={ex} value={ex}>{EXAM_SHORT_LABELS[ex]}</option>)}</select>
+                    <select value={subjectView.subject} onChange={e => setSubjectView((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                  </div>
+                </Card>
+                <Card title="과목별 상세 명단">
+                  <div className="overflow-x-auto mini-scroll">
+                    <table className="w-full text-sm text-center">
+                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
+                        <tr><th className="py-3">학교</th><th>학년</th><th>학생명</th><th>세부과목</th><th>점수</th><th>등급</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {activeJoinedData.filter(r => Number(r.year) === Number(subjectView.year) && r.exam === subjectView.exam && r.subject === subjectView.subject).sort((a, b) => Number(b.score || 0) - Number(a.score || 0)).map((r) => <tr key={r.docId}><td className="py-3">{r.school}</td><td>{r.grade}학년</td><td className="font-bold">{r.name}</td><td>{r.detailSubject || '-'}</td><td className="font-black text-violet-700">{r.score}점</td><td>{normalizeTeacherAnalysisTier(r.tier)}등급</td></tr>)}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            {view === 'studentAnalysis' && (
+              <div className="space-y-6">
+                <Card title="학생별 성적 추이">
+                  <div className="grid md:grid-cols-[320px_1fr] gap-4">
+                    <select value={studentAnalysisStudentId} onChange={e => setStudentAnalysisStudentId(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 outline-none">
+                      <option value="">학생 선택</option>
+                      {activeStudents.map((student) => <option key={student.studentId} value={student.studentId}>{student.name} · {student.school}</option>)}
+                    </select>
+                    <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">학생을 선택하면 시험 순서대로 점수 기록을 볼 수 있습니다.</div>
+                  </div>
+                </Card>
+                <Card title="학생별 기록">
+                  {(() => {
+                    const target = activeStudents.find((student) => student.studentId === studentAnalysisStudentId);
+                    if (!target) return <div className="py-10 text-center text-slate-400">학생을 먼저 선택해주세요.</div>;
+                    const records = activeJoinedData.filter((row) => row.studentId === target.studentId).sort((a, b) => Number(a.year) - Number(b.year) || examOrder(a.exam) - examOrder(b.exam));
+                    return (
+                      <div className="space-y-5">
+                        <div className="text-lg font-black text-slate-900">{target.name} · {target.school} · {target.grade}학년</div>
+                        <SimpleLineChart series={records} />
+                        <div className="overflow-x-auto mini-scroll">
+                          <table className="w-full text-sm text-center">
+                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b"><tr><th className="py-3">연도</th><th>시험</th><th>과목</th><th>점수</th><th>등급</th><th>입력자</th></tr></thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {records.map((r) => <tr key={r.docId}><td className="py-3">{r.year}</td><td>{EXAM_SHORT_LABELS[r.exam] || r.exam}</td><td>{r.subject}</td><td className="font-black text-violet-700">{r.score}점</td><td>{normalizeTeacherAnalysisTier(r.tier)}등급</td><td>{r.updatedBy || r.createdBy || '-'}</td></tr>)}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </Card>
+              </div>
+            )}
+
+            {view === 'teamExam' && (
+              <div className="space-y-6">
+                <Card title="시험 분석 아카이브">
+                  <div className="overflow-x-auto mini-scroll">
+                    <table className="w-full text-sm text-center">
+                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b"><tr><th className="py-3">연도</th><th>시험</th><th>학교</th><th>학년</th><th>과목</th><th>난이도</th><th>작성자</th></tr></thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {teamExamData.length ? teamExamData.map((item) => <tr key={item.docId}><td className="py-3">{item.year}</td><td>{EXAM_SHORT_LABELS[item.exam] || item.exam}</td><td>{item.school || '-'}</td><td>{item.grade ? `${item.grade}학년` : '-'}</td><td>{item.subject}{item.detailSubject ? ` (${item.detailSubject})` : ''}</td><td>{item.difficulty || '-'}</td><td>{item.updatedBy || item.createdBy || '-'}</td></tr>) : <tr><td colSpan="7" className="py-10 text-slate-400">저장된 시험 분석이 없습니다.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </div>
+            )}
+
           </main>
 
           {/* Modal */}
