@@ -197,8 +197,8 @@
       align-items: stretch;
     }
     .login-left, .login-right {
-      background: rgba(255,255,255,0.76); border: 1px solid rgba(115, 88, 255, 0.12); border-radius: 32px;
-      box-shadow: var(--shadow); backdrop-filter: blur(18px);
+      background: rgba(255,255,255,0.88); border: 1px solid rgba(115, 88, 255, 0.11); border-radius: 32px;
+      box-shadow: 0 18px 44px rgba(77, 48, 168, 0.10); backdrop-filter: blur(14px);
       overflow: hidden;
     }
     .login-left { padding: 34px 34px 26px; display: flex; flex-direction: column; min-height: 680px; }
@@ -209,11 +209,11 @@
       font-size: 12px; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase;
     }
     .login-title {
-      margin: 22px 0 0; font-size: clamp(30px, 4.2vw, 56px); line-height: 1.32; font-weight: 580;
+      margin: 22px 0 0; font-size: clamp(30px, 4.2vw, 54px); line-height: 1.46; font-weight: 520;
       letter-spacing: -0.04em; color: #2a2147;
     }
     .login-desc {
-      margin-top: 18px; font-size: 16px; line-height: 2.0; color: #625b84; white-space: pre-line;
+      margin-top: 18px; font-size: 16px; line-height: 2.15; color: #625b84; white-space: pre-line;
     }
     .teacher-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
     .teacher-btn {
@@ -228,12 +228,12 @@
       margin-top: 18px; min-height: 54px; display: flex; align-items: center; padding: 14px 16px; border-radius: 18px;
       background: rgba(106, 69, 255, 0.06); border: 1px solid rgba(106,69,255,0.12); color: #41395f; font-weight: 650;
     }
-    .left-footer { margin-top: auto; padding-top: 20px; color: #7d7698; font-size: 13px; letter-spacing: 0.02em; }
+    .left-footer { margin-top: auto; padding-top: 20px; font-size: 13px; letter-spacing: 0.03em; color: rgba(58, 47, 103, 0.42); text-shadow: 1px 1px 0 rgba(255,255,255,0.95), -1px -1px 0 rgba(109, 87, 181, 0.10); }
 
     .login-logo-wrap {
       display: flex; justify-content: center; align-items: center; min-height: 180px;
-      border-radius: 26px; border: 1px dashed rgba(115, 88, 255, 0.16); background: rgba(247,243,255,0.9);
-      margin-bottom: 24px; padding: 20px;
+      border-radius: 26px; border: 1px solid rgba(115, 88, 255, 0.12); background: linear-gradient(180deg, rgba(248,244,255,0.96), rgba(243,238,255,0.92));
+      margin-bottom: 24px; padding: 20px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
     }
     .login-logo-wrap img { max-width: min(280px, 100%); max-height: 140px; object-fit: contain; display: block; }
     .login-logo-placeholder { color: #8a81a9; text-align: center; line-height: 1.8; }
@@ -341,7 +341,7 @@
 
         <div id="selectedTeacherBox" class="selected-teacher-box">선택된 선생님: 없음</div>
 
-        <div class="left-footer">Created by mOOn_cHAe</div>
+        <div class="left-footer">Created by mOOn_Mathematics</div>
       </section>
 
       <section class="login-right">
@@ -357,7 +357,7 @@
 
           <button id="loginBtn" class="btn">로그인</button>
           <div class="helper">선생님 버튼을 먼저 선택한 뒤 PIN 번호를 입력하세요.</div>
-          <div class="notice">※ Firebase 키와 프로젝트 설정은 보안상 비워두었습니다. 아래 코드의 <strong>firebaseConfig</strong> 부분에 직접 삽입한 뒤 사용하세요.</div>
+          <div class="notice">※ Firebase 설정 6종(apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId)은 보안상 비워두었습니다. 아래 코드의 <strong>firebaseConfig</strong> 영역에 직접 입력해야 정상 동작합니다.</div>
         </div>
       </section>
     </div>
@@ -667,15 +667,22 @@
     // ==============================
     // Firebase 설정
     // ==============================
-    // 아래 객체에 본인의 Firebase 키 / 프로젝트 정보를 직접 넣어야 정상 동작합니다.
-    // 예시:
+    // [중요] 아래 6개 항목을 본인의 Firebase 프로젝트 값으로 직접 입력해야 정상 동작합니다.
+    // 1) apiKey
+    // 2) authDomain
+    // 3) projectId
+    // 4) storageBucket
+    // 5) messagingSenderId
+    // 6) appId
+    //
+    // 예시)
     // const firebaseConfig = {
-    //   apiKey: "...",
-    //   authDomain: "...",
-    //   projectId: "...",
-    //   storageBucket: "...",
-    //   messagingSenderId: "...",
-    //   appId: "..."
+    //   apiKey: "여기에 apiKey 입력",
+    //   authDomain: "여기에 authDomain 입력",
+    //   projectId: "여기에 projectId 입력",
+    //   storageBucket: "여기에 storageBucket 입력",
+    //   messagingSenderId: "여기에 messagingSenderId 입력",
+    //   appId: "여기에 appId 입력"
     // };
     const firebaseConfig = {
   apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
@@ -1218,7 +1225,7 @@
       resetForm();
 
       if (!hasFirebaseConfig(firebaseConfig)) {
-        $('teacherButtons').innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Firebase 키가 비어 있습니다.<br>index 파일 하단의 firebaseConfig에 직접 삽입한 뒤 사용하세요.</div>`;
+        $('teacherButtons').innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Firebase 설정 6종이 비어 있습니다.<br>index 파일 하단의 firebaseConfig 영역에 직접 입력한 뒤 사용하세요.</div>`;
         return;
       }
 
