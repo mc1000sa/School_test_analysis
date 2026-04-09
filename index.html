@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>열린 학교시험 성적분석 v5.02</title>
+  <title>열린 학교시험 성적분석 포털 v6.0</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -210,9 +210,178 @@
       .top-nav-scroll::-webkit-scrollbar { display: none; }
     }
 
+    .teamprint-toolbar-card {
+      background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(245,243,255,0.96) 55%, rgba(239,246,255,0.96) 100%);
+      border: 1px solid rgba(226,232,240,0.95);
+      box-shadow: 0 14px 28px rgba(15,23,42,0.05);
+    }
+    .teamprint-page {
+      background: #ffffff;
+      border: 1px solid rgba(226,232,240,0.9);
+      border-radius: 28px;
+      box-shadow: 0 18px 40px rgba(15,23,42,0.08);
+      padding: 20px;
+    }
+    .teamprint-page-label {
+      font-size: 12px;
+      font-weight: 800;
+      color: #7c3aed;
+      letter-spacing: 0.02em;
+    }
+    .teamprint-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .teamprint-card {
+      min-height: 360px;
+      border-radius: 24px;
+      border: 1px solid rgba(221,214,254,0.95);
+      background:
+        radial-gradient(circle at top right, rgba(196,181,253,0.18), transparent 28%),
+        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 14px 24px rgba(15,23,42,0.05);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .teamprint-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .teamprint-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(196,181,253,0.9);
+      background: rgba(245,243,255,0.9);
+      color: #6d28d9;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .teamprint-title {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: #111827;
+      line-height: 1.1;
+    }
+    .teamprint-subtitle {
+      font-size: 14px;
+      font-weight: 700;
+      color: #64748b;
+      margin-top: 6px;
+    }
+    .teamprint-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .teamprint-meta-box {
+      border-radius: 18px;
+      border: 1px solid rgba(226,232,240,0.95);
+      background: rgba(248,250,252,0.92);
+      padding: 12px 14px;
+    }
+    .teamprint-meta-label {
+      font-size: 11px;
+      font-weight: 900;
+      color: #94a3b8;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .teamprint-meta-value {
+      margin-top: 6px;
+      font-size: 17px;
+      font-weight: 900;
+      color: #0f172a;
+      line-height: 1.35;
+      white-space: pre-line;
+    }
+    .teamprint-note-box {
+      border-radius: 20px;
+      border: 1px solid rgba(226,232,240,0.95);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+      padding: 14px 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .teamprint-note-title {
+      font-size: 12px;
+      font-weight: 900;
+      color: #7c3aed;
+      letter-spacing: 0.03em;
+      margin-bottom: 8px;
+    }
+    .teamprint-note-text {
+      font-size: 14px;
+      line-height: 1.75;
+      color: #334155;
+      white-space: pre-line;
+      word-break: keep-all;
+      flex: 1;
+    }
+    .teamprint-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-top: 4px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #94a3b8;
+    }
+
     @media print {
-      @page { size: A4 portrait; margin: 12mm; }
+      @page { size: A4 portrait; margin: 10mm; }
       html, body { background: #fff !important; }
+
+      body.printing-team-exam .desktop-sidebar,
+      body.printing-team-exam header,
+      body.printing-team-exam .teamexam-screen,
+      body.printing-team-exam .teamexam-archive-table,
+      body.printing-team-exam .teamprint-toolbar-card {
+        display: none !important;
+      }
+      body.printing-team-exam .content-wrap {
+        padding: 0 !important;
+      }
+      body.printing-team-exam main {
+        padding: 0 !important;
+      }
+      body.printing-team-exam .teamprint-root {
+        display: block !important;
+        margin: 0 !important;
+      }
+      body.printing-team-exam .teamprint-page {
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        min-height: auto !important;
+        page-break-after: always;
+        break-after: page;
+      }
+      body.printing-team-exam .teamprint-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+      body.printing-team-exam .teamprint-grid {
+        gap: 10mm !important;
+      }
+      body.printing-team-exam .teamprint-card {
+        min-height: 125mm !important;
+        box-shadow: none !important;
+      }
       body * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .app-shell { background: #fff !important; min-height: auto !important; }
       .content-wrap { padding-left: 0 !important; }
@@ -309,6 +478,36 @@
     }
 
     function safeLower(v) { return String(v || '').toLowerCase(); }
+
+    function chunkArray(arr, size) {
+      const result = [];
+      for (let i = 0; i < arr.length; i += size) result.push(arr.slice(i, i + size));
+      return result;
+    }
+
+    function difficultyLabel(value) {
+      const n = Number(value || 0);
+      if (!n) return '-';
+      if (n <= 3) return '하';
+      if (n <= 7) return '중';
+      return '상';
+    }
+
+    function buildQuestionInfo(item) {
+      const parts = [];
+      if (item.objectiveCount || item.objectivePoints) {
+        const count = item.objectiveCount ? `${item.objectiveCount}문항` : '';
+        const points = item.objectivePoints ? `${item.objectivePoints}점` : '';
+        parts.push(`객관식 ${[count, points].filter(Boolean).join(' · ')}`);
+      }
+      if (item.subjectiveCount || item.subjectivePoints) {
+        const count = item.subjectiveCount ? `${item.subjectiveCount}문항` : '';
+        const points = item.subjectivePoints ? `${item.subjectivePoints}점` : '';
+        parts.push(`주관식 ${[count, points].filter(Boolean).join(' · ')}`);
+      }
+      return parts.length ? parts.join('\n') : '문항 정보 미입력';
+    }
+
 
     function compareStatus(curr, prev) {
       if (!prev) return { score: 'new', tier: 'new' };
@@ -472,6 +671,7 @@
       const [isRenamingStudent, setIsRenamingStudent] = useState(false);
       const [teamExamForm, setTeamExamForm] = useState({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', cut1: '', cut2: '', cut3: '', cut4: '', difficulty: 3, review: '', specialNote: '' });
       const [teamExamFilters, setTeamExamFilters] = useState({ year: '전체', school: '전체' });
+      const [teamExamPublicFilters, setTeamExamPublicFilters] = useState({ year: '전체', exam: '전체', school: '전체', grade: '전체', subject: '전체' });
 
       const getPath = (name) => typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/${name}` : `openacademy/data/${name}`;
 
@@ -1037,6 +1237,58 @@
           if (av > bv) return sortState.direction === 'asc' ? 1 : -1;
           return 0;
         });
+      };
+
+      const teamExamArchiveRows = useMemo(() => {
+        return sortRows(
+          teamExamData
+            .filter(item => (teamExamFilters.year === '전체' || Number(item.year) === Number(teamExamFilters.year)) && (teamExamFilters.school === '전체' || item.school === teamExamFilters.school))
+            .map(item => ({ ...item, reviewNote: [item.review, item.specialNote].filter(Boolean).join(' / ') })),
+          teamExamSort,
+          {
+            year:r=>Number(r.year),
+            exam:r=>examOrder(r.exam),
+            school:r=>safeLower(r.school||''),
+            grade:r=>Number(r.grade||0),
+            subject:r=>safeLower(r.subject||''),
+            detailSubject:r=>safeLower(r.detailSubject||''),
+            difficulty:r=>Number(r.difficulty||0),
+            reviewNote:r=>safeLower(r.reviewNote || '')
+          }
+        );
+      }, [teamExamData, teamExamFilters, teamExamSort]);
+
+      const teamExamPublicCards = useMemo(() => {
+        return teamExamData
+          .filter((item) => teamExamPublicFilters.year === '전체' || Number(item.year) === Number(teamExamPublicFilters.year))
+          .filter((item) => teamExamPublicFilters.exam === '전체' || item.exam === teamExamPublicFilters.exam)
+          .filter((item) => teamExamPublicFilters.school === '전체' || item.school === teamExamPublicFilters.school)
+          .filter((item) => teamExamPublicFilters.grade === '전체' || Number(item.grade) === Number(teamExamPublicFilters.grade))
+          .filter((item) => teamExamPublicFilters.subject === '전체' || item.subject === teamExamPublicFilters.subject)
+          .sort((a,b) =>
+            Number(a.year || 0) - Number(b.year || 0) ||
+            examOrder(a.exam) - examOrder(b.exam) ||
+            String(a.school || '').localeCompare(String(b.school || ''), 'ko') ||
+            Number(a.grade || 0) - Number(b.grade || 0) ||
+            String(a.subject || '').localeCompare(String(b.subject || ''), 'ko') ||
+            String(a.detailSubject || '').localeCompare(String(b.detailSubject || ''), 'ko')
+          )
+          .map((item) => ({
+            ...item,
+            questionInfo: buildQuestionInfo(item),
+            difficultyText: `${item.difficulty || '-'} · ${difficultyLabel(item.difficulty)}`,
+            noteText: [item.review, item.specialNote].filter(Boolean).join('\n\n') || '총평 및 특이사항이 아직 입력되지 않았습니다.',
+          }));
+      }, [teamExamData, teamExamPublicFilters]);
+
+      const teamExamPublicPages = useMemo(() => chunkArray(teamExamPublicCards, 4), [teamExamPublicCards]);
+
+      const printTeamExamCards = () => {
+        document.body.classList.add('printing-team-exam');
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => document.body.classList.remove('printing-team-exam'), 200);
+        }, 80);
       };
 
       const schoolAnalysisRows = (() => {
@@ -1683,62 +1935,148 @@
 
             {view === 'teamExam' && (
               <div className="space-y-6">
-                <Card title="시험 분석 입력">
-                  <form onSubmit={saveTeamExam} className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {YEARS.map(year => <button type="button" key={year} onClick={()=>setTeamExamForm({...teamExamForm, year})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.year === year ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{year}년</button>)}
-                      {SCHOOL_OPTIONS.map((school) => <button type="button" key={school} onClick={()=>setTeamExamForm({...teamExamForm, school: school})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.school === school ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{school}</button>)}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {EXAMS.map(ex => <button type="button" key={ex} onClick={()=>setTeamExamForm({...teamExamForm, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>)}
-                    </div>
-                    <div className="grid md:grid-cols-4 gap-4">
-                      <select value={teamExamForm.grade} onChange={e=>setTeamExamForm({...teamExamForm, grade:Number(e.target.value)})} className="border border-slate-300 rounded-xl p-2.5">{GRADES.map(g=><option key={g} value={g}>{g}학년</option>)}</select>
-                      <select value={teamExamForm.subject} onChange={e=>setTeamExamForm({...teamExamForm, subject:e.target.value})} className="border border-slate-300 rounded-xl p-2.5">{SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                      <input value={teamExamForm.detailSubject} onChange={e=>setTeamExamForm({...teamExamForm, detailSubject:e.target.value})} placeholder="세부과목" className="border border-slate-300 rounded-xl p-2.5" />
-                      <select value={teamExamForm.difficulty} onChange={e=>setTeamExamForm({...teamExamForm, difficulty:Number(e.target.value)})} className="border border-slate-300 rounded-xl p-2.5">
-                        {Array.from({length:10}, (_,i)=>i+1).map(v => <option key={v} value={v}>{v} · {v <= 3 ? '하' : v <= 7 ? '중' : '상'}</option>)}
-                      </select>
-                    </div>
-                    <div className="grid md:grid-cols-4 gap-4">
-                      <input value={teamExamForm.objectiveCount} onChange={e=>setTeamExamForm({...teamExamForm, objectiveCount:e.target.value})} type="number" min="0" placeholder="객 문항수" className="border border-slate-300 rounded-xl p-2.5" />
-                      <input value={teamExamForm.objectivePoints} onChange={e=>setTeamExamForm({...teamExamForm, objectivePoints:e.target.value})} type="number" min="0" placeholder="객 배점" className="border border-slate-300 rounded-xl p-2.5" />
-                      <input value={teamExamForm.subjectiveCount} onChange={e=>setTeamExamForm({...teamExamForm, subjectiveCount:e.target.value})} type="number" min="0" placeholder="주 문항수" className="border border-slate-300 rounded-xl p-2.5" />
-                      <input value={teamExamForm.subjectivePoints} onChange={e=>setTeamExamForm({...teamExamForm, subjectivePoints:e.target.value})} type="number" min="0" placeholder="주 배점" className="border border-slate-300 rounded-xl p-2.5" />
-                    </div>
-                    <div className="grid md:grid-cols-4 gap-4">
-                      <input value={teamExamForm.cut1} onChange={e=>setTeamExamForm({...teamExamForm, cut1:e.target.value})} type="number" min="0" max="100" placeholder="1등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
-                      <input value={teamExamForm.cut2} onChange={e=>setTeamExamForm({...teamExamForm, cut2:e.target.value})} type="number" min="0" max="100" placeholder="2등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
-                      <input value={teamExamForm.cut3} onChange={e=>setTeamExamForm({...teamExamForm, cut3:e.target.value})} type="number" min="0" max="100" placeholder="3등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
-                      <input value={teamExamForm.cut4} onChange={e=>setTeamExamForm({...teamExamForm, cut4:e.target.value})} type="number" min="0" max="100" placeholder="4등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <input value={teamExamForm.review} onChange={e=>setTeamExamForm({...teamExamForm, review:e.target.value})} placeholder="총평" className="border border-slate-300 rounded-xl p-2.5" />
-                      <input value={teamExamForm.specialNote} onChange={e=>setTeamExamForm({...teamExamForm, specialNote:e.target.value})} placeholder="특이사항" className="border border-slate-300 rounded-xl p-2.5" />
-                    </div>
-                    <div className="text-xs text-slate-500">등급컷 원점수는 몰라도 저장되도록 선택 입력으로 처리했습니다.</div>
-                    <button type="submit" className="rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white font-black px-5 py-3">시험 분석 저장</button>
-                  </form>
-                </Card>
+                <div className="space-y-6 teamexam-screen">
+                  <Card title="시험 분석 입력">
+                    <form onSubmit={saveTeamExam} className="space-y-4">
+                      <div className="flex flex-wrap gap-2">
+                        {YEARS.map(year => <button type="button" key={year} onClick={()=>setTeamExamForm({...teamExamForm, year})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.year === year ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{year}년</button>)}
+                        {SCHOOL_OPTIONS.map((school) => <button type="button" key={school} onClick={()=>setTeamExamForm({...teamExamForm, school: school})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.school === school ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{school}</button>)}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {EXAMS.map(ex => <button type="button" key={ex} onClick={()=>setTeamExamForm({...teamExamForm, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${teamExamForm.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>)}
+                      </div>
+                      <div className="grid md:grid-cols-4 gap-4">
+                        <select value={teamExamForm.grade} onChange={e=>setTeamExamForm({...teamExamForm, grade:Number(e.target.value)})} className="border border-slate-300 rounded-xl p-2.5">{GRADES.map(g=><option key={g} value={g}>{g}학년</option>)}</select>
+                        <select value={teamExamForm.subject} onChange={e=>setTeamExamForm({...teamExamForm, subject:e.target.value})} className="border border-slate-300 rounded-xl p-2.5">{SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                        <input value={teamExamForm.detailSubject} onChange={e=>setTeamExamForm({...teamExamForm, detailSubject:e.target.value})} placeholder="세부과목" className="border border-slate-300 rounded-xl p-2.5" />
+                        <select value={teamExamForm.difficulty} onChange={e=>setTeamExamForm({...teamExamForm, difficulty:Number(e.target.value)})} className="border border-slate-300 rounded-xl p-2.5">
+                          {Array.from({length:10}, (_,i)=>i+1).map(v => <option key={v} value={v}>{v} · {v <= 3 ? '하' : v <= 7 ? '중' : '상'}</option>)}
+                        </select>
+                      </div>
+                      <div className="grid md:grid-cols-4 gap-4">
+                        <input value={teamExamForm.objectiveCount} onChange={e=>setTeamExamForm({...teamExamForm, objectiveCount:e.target.value})} type="number" min="0" placeholder="객 문항수" className="border border-slate-300 rounded-xl p-2.5" />
+                        <input value={teamExamForm.objectivePoints} onChange={e=>setTeamExamForm({...teamExamForm, objectivePoints:e.target.value})} type="number" min="0" placeholder="객 배점" className="border border-slate-300 rounded-xl p-2.5" />
+                        <input value={teamExamForm.subjectiveCount} onChange={e=>setTeamExamForm({...teamExamForm, subjectiveCount:e.target.value})} type="number" min="0" placeholder="주 문항수" className="border border-slate-300 rounded-xl p-2.5" />
+                        <input value={teamExamForm.subjectivePoints} onChange={e=>setTeamExamForm({...teamExamForm, subjectivePoints:e.target.value})} type="number" min="0" placeholder="주 배점" className="border border-slate-300 rounded-xl p-2.5" />
+                      </div>
+                      <div className="grid md:grid-cols-4 gap-4">
+                        <input value={teamExamForm.cut1} onChange={e=>setTeamExamForm({...teamExamForm, cut1:e.target.value})} type="number" min="0" max="100" placeholder="1등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
+                        <input value={teamExamForm.cut2} onChange={e=>setTeamExamForm({...teamExamForm, cut2:e.target.value})} type="number" min="0" max="100" placeholder="2등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
+                        <input value={teamExamForm.cut3} onChange={e=>setTeamExamForm({...teamExamForm, cut3:e.target.value})} type="number" min="0" max="100" placeholder="3등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
+                        <input value={teamExamForm.cut4} onChange={e=>setTeamExamForm({...teamExamForm, cut4:e.target.value})} type="number" min="0" max="100" placeholder="4등급컷 원점수" className="border border-slate-300 rounded-xl p-2.5" />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <input value={teamExamForm.review} onChange={e=>setTeamExamForm({...teamExamForm, review:e.target.value})} placeholder="총평" className="border border-slate-300 rounded-xl p-2.5" />
+                        <input value={teamExamForm.specialNote} onChange={e=>setTeamExamForm({...teamExamForm, specialNote:e.target.value})} placeholder="특이사항" className="border border-slate-300 rounded-xl p-2.5" />
+                      </div>
+                      <div className="text-xs text-slate-500">등급컷 원점수는 몰라도 저장되도록 선택 입력으로 처리했습니다.</div>
+                      <button type="submit" className="rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white font-black px-5 py-3">시험 분석 저장</button>
+                    </form>
+                  </Card>
 
-                <Card title="시험 분석 아카이브" right={<span className="text-xs text-slate-400">헤더 클릭 정렬</span>}>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <button type="button" onClick={()=>setTeamExamFilters({...teamExamFilters, year:'전체'})} className={`px-4 py-2 btn-pill text-sm ${teamExamFilters.year === '전체' ? 'btn-pill-active' : 'btn-pill-inactive'}`}>전체 연도</button>
-                    {YEARS.map(y => <button type="button" key={y} onClick={()=>setTeamExamFilters({...teamExamFilters, year:y})} className={`px-4 py-2 btn-pill text-sm ${teamExamFilters.year === y ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{y}년</button>)}
-                    <button type="button" onClick={()=>setTeamExamFilters({...teamExamFilters, school:'전체'})} className={`px-4 py-2 btn-pill text-sm ${teamExamFilters.school === '전체' ? 'btn-pill-active' : 'btn-pill-inactive'}`}>전체 학교</button>
-                    {SCHOOL_OPTIONS.map(school => <button type="button" key={school} onClick={()=>setTeamExamFilters({...teamExamFilters, school})} className={`px-4 py-2 btn-pill text-sm ${teamExamFilters.school === school ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{school}</button>)}
-                  </div>
-                  <div className="overflow-x-auto mini-scroll">
-                    <table className="w-full text-sm text-center">
-                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
-                        <tr>{[['year','연도'],['exam','시험'],['school','학교'],['grade','학년'],['subject','과목'],['detailSubject','세부과목'],['difficulty','난이도'],['reviewNote','총평 및 특이사항']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => setTeamExamSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {sortRows(teamExamData.filter(item => (teamExamFilters.year === '전체' || Number(item.year) === Number(teamExamFilters.year)) && (teamExamFilters.school === '전체' || item.school === teamExamFilters.school)).map(item => ({ ...item, reviewNote: [item.review, item.specialNote].filter(Boolean).join(' / ') })), teamExamSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), school:r=>safeLower(r.school||''), grade:r=>Number(r.grade||0), subject:r=>safeLower(r.subject||''), detailSubject:r=>safeLower(r.detailSubject||''), difficulty:r=>Number(r.difficulty||0), reviewNote:r=>safeLower(r.reviewNote || '') }).length ? sortRows(teamExamData.filter(item => (teamExamFilters.year === '전체' || Number(item.year) === Number(teamExamFilters.year)) && (teamExamFilters.school === '전체' || item.school === teamExamFilters.school)).map(item => ({ ...item, reviewNote: [item.review, item.specialNote].filter(Boolean).join(' / ') })), teamExamSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), school:r=>safeLower(r.school||''), grade:r=>Number(r.grade||0), subject:r=>safeLower(r.subject||''), detailSubject:r=>safeLower(r.detailSubject||''), difficulty:r=>Number(r.difficulty||0), reviewNote:r=>safeLower(r.reviewNote || '') }).map((item) => <tr key={item.docId}><td className="py-3">{item.year}</td><td>{EXAM_SHORT_LABELS[item.exam] || item.exam}</td><td>{item.school || '-'}</td><td>{item.grade ? `${item.grade}학년` : '-'}</td><td>{item.subject || '-'}</td><td>{item.detailSubject || '-'}</td><td>{item.difficulty || '-'} · {item.difficulty <= 3 ? '하' : item.difficulty <= 7 ? '중' : '상'}</td><td className="text-left px-3">{item.reviewNote || '-'}</td></tr>) : <tr><td colSpan="8" className="py-10 text-slate-400">저장된 시험 분석이 없습니다.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
+                  <Card title="학부모 공개용 카드뉴스 출력" right={<button type="button" onClick={printTeamExamCards} className="rounded-full bg-gradient-to-r from-violet-700 to-indigo-600 px-4 py-2 text-xs font-black text-white shadow-md"><i className="fas fa-print mr-2"></i>카드뉴스 인쇄</button>}>
+                    <div className="teamprint-toolbar-card rounded-[24px] p-4">
+                      <div className="grid md:grid-cols-5 gap-3">
+                        <select value={teamExamPublicFilters.year} onChange={(e)=>setTeamExamPublicFilters({...teamExamPublicFilters, year:e.target.value})} className="border border-slate-300 rounded-xl p-2.5">
+                          <option value="전체">전체 연도</option>
+                          {YEARS.map((y)=><option key={y} value={y}>{y}년</option>)}
+                        </select>
+                        <select value={teamExamPublicFilters.exam} onChange={(e)=>setTeamExamPublicFilters({...teamExamPublicFilters, exam:e.target.value})} className="border border-slate-300 rounded-xl p-2.5">
+                          <option value="전체">전체 시험</option>
+                          {EXAMS.map((ex)=><option key={ex} value={ex}>{EXAM_SHORT_LABELS[ex]}</option>)}
+                        </select>
+                        <select value={teamExamPublicFilters.school} onChange={(e)=>setTeamExamPublicFilters({...teamExamPublicFilters, school:e.target.value})} className="border border-slate-300 rounded-xl p-2.5">
+                          <option value="전체">전체 학교</option>
+                          {SCHOOL_OPTIONS.map((school)=><option key={school} value={school}>{school}</option>)}
+                        </select>
+                        <select value={teamExamPublicFilters.grade} onChange={(e)=>setTeamExamPublicFilters({...teamExamPublicFilters, grade:e.target.value})} className="border border-slate-300 rounded-xl p-2.5">
+                          <option value="전체">전체 학년</option>
+                          {GRADES.map((g)=><option key={g} value={g}>{g}학년</option>)}
+                        </select>
+                        <select value={teamExamPublicFilters.subject} onChange={(e)=>setTeamExamPublicFilters({...teamExamPublicFilters, subject:e.target.value})} className="border border-slate-300 rounded-xl p-2.5">
+                          <option value="전체">전체 과목</option>
+                          {SUBJECTS.map((subject)=><option key={subject} value={subject}>{subject}</option>)}
+                        </select>
+                      </div>
+                      <div className="mt-3 text-xs leading-6 text-slate-500">
+                        선택한 시험 데이터가 A4 한 장당 4개 카드 형태로 정리됩니다. 학부모님 밴드 공개용으로 바로 인쇄하거나 PDF 저장하면 됩니다.
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card title="시험 분석 아카이브" right={<span className="text-xs text-slate-400">헤더 클릭 정렬</span>}>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <button type="button" onClick={()=>setTeamExamFilters({...teamExamFilters, year:'전체'})} className={`px-4 py-2 btn-pill text-sm ${teamExamFilters.year === '전체' ? 'btn-pill-active' : 'btn-pill-inactive'}`}>전체 연도</button>
+                      {YEARS.map(y => <button type="button" key={y} onClick={()=>setTeamExamFilters({...teamExamFilters, year:y})} className={`px-4 py-2 btn-pill text-sm ${teamExamFilters.year === y ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{y}년</button>)}
+                      <button type="button" onClick={()=>setTeamExamFilters({...teamExamFilters, school:'전체'})} className={`px-4 py-2 btn-pill text-sm ${teamExamFilters.school === '전체' ? 'btn-pill-active' : 'btn-pill-inactive'}`}>전체 학교</button>
+                      {SCHOOL_OPTIONS.map(school => <button type="button" key={school} onClick={()=>setTeamExamFilters({...teamExamFilters, school})} className={`px-4 py-2 btn-pill text-sm ${teamExamFilters.school === school ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{school}</button>)}
+                    </div>
+                    <div className="overflow-x-auto mini-scroll teamexam-archive-table">
+                      <table className="w-full text-sm text-center">
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
+                          <tr>{[['year','연도'],['exam','시험'],['school','학교'],['grade','학년'],['subject','과목'],['detailSubject','세부과목'],['difficulty','난이도'],['reviewNote','총평 및 특이사항']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => setTeamExamSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {teamExamArchiveRows.length ? teamExamArchiveRows.map((item) => <tr key={item.docId}><td className="py-3">{item.year}</td><td>{EXAM_SHORT_LABELS[item.exam] || item.exam}</td><td>{item.school || '-'}</td><td>{item.grade ? `${item.grade}학년` : '-'}</td><td>{item.subject || '-'}</td><td>{item.detailSubject || '-'}</td><td>{item.difficulty || '-'} · {difficultyLabel(item.difficulty)}</td><td className="text-left px-3">{item.reviewNote || '-'}</td></tr>) : <tr><td colSpan="8" className="py-10 text-slate-400">저장된 시험 분석이 없습니다.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="teamprint-root space-y-6">
+                  {teamExamPublicPages.length ? teamExamPublicPages.map((page, pageIndex) => (
+                    <div key={`teamprint-page-${pageIndex}`} className="teamprint-page">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <div className="teamprint-page-label">학부모 공개용 시험 분석 카드뉴스</div>
+                          <div className="text-lg font-black text-slate-900 mt-1">
+                            {teamExamPublicFilters.year === '전체' ? '전체 연도' : `${teamExamPublicFilters.year}년`} · {teamExamPublicFilters.exam === '전체' ? '전체 시험' : EXAM_SHORT_LABELS[teamExamPublicFilters.exam] || teamExamPublicFilters.exam}
+                          </div>
+                        </div>
+                        <div className="text-xs font-black text-slate-400">PAGE {pageIndex + 1} / {teamExamPublicPages.length}</div>
+                      </div>
+                      <div className="teamprint-grid">
+                        {page.map((item) => (
+                          <div key={item.docId} className="teamprint-card">
+                            <div className="teamprint-card-header">
+                              <div>
+                                <div className="teamprint-title">{item.school || '-'}</div>
+                                <div className="teamprint-subtitle">{item.grade ? `${item.grade}학년` : '-'} · {item.subject || '-'}{item.detailSubject ? ` (${item.detailSubject})` : ''}</div>
+                              </div>
+                              <span className="teamprint-badge">{EXAM_SHORT_LABELS[item.exam] || item.exam}</span>
+                            </div>
+
+                            <div className="teamprint-meta">
+                              <div className="teamprint-meta-box">
+                                <div className="teamprint-meta-label">문항정보</div>
+                                <div className="teamprint-meta-value">{item.questionInfo}</div>
+                              </div>
+                              <div className="teamprint-meta-box">
+                                <div className="teamprint-meta-label">난이도</div>
+                                <div className="teamprint-meta-value">{item.difficultyText}</div>
+                              </div>
+                            </div>
+
+                            <div className="teamprint-note-box">
+                              <div className="teamprint-note-title">총평 및 특이사항</div>
+                              <div className="teamprint-note-text">{item.noteText}</div>
+                            </div>
+
+                            <div className="teamprint-footer">
+                              <span>{item.year}년 {EXAM_SHORT_LABELS[item.exam] || item.exam}</span>
+                              <span>열린학원 시험 분석</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )) : (
+                    <Card title="카드뉴스 미리보기">
+                      <div className="py-16 text-center text-slate-400">선택한 조건에 맞는 시험 분석 데이터가 없습니다.</div>
+                    </Card>
+                  )}
+                </div>
               </div>
             )}
 
