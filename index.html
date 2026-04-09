@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>열린 학교시험 성적분석 v3.0</title>
+  <title>열린 학교시험 성적분석 v5.02</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -1175,12 +1175,32 @@
 
       const teacherManagedStudents = (() => {
         const target = manageTeacherFilter;
-        const rows = target === '전체' ? activeJoinedData : activeJoinedData.filter(r => r.createdBy===target || r.updatedBy===target);
-        const map = new Map();
-        rows.forEach(r => {
-          if(!map.has(r.studentId)) map.set(r.studentId, { id: r.studentId, name: r.name, school: r.school, grade: r.grade, year: r.year });
+        const ownedStudentIds = new Set(
+          activeJoinedData
+            .filter(r => target !== '전체' && (r.createdBy === target || r.updatedBy === target))
+            .map(r => r.studentId)
+        );
+
+        const baseStudents = activeStudents.filter((student) => {
+          if (target === '전체') return true;
+          return ownedStudentIds.has(student.studentId);
         });
-        return Array.from(map.values());
+
+        return baseStudents
+          .filter((student) => manageListFilters.school === '전체' || student.school === manageListFilters.school)
+          .filter((student) => manageListFilters.grade === '전체' || Number(student.grade) === Number(manageListFilters.grade))
+          .sort((a, b) =>
+            Number(a.grade || 0) - Number(b.grade || 0) ||
+            String(a.school || '').localeCompare(String(b.school || ''), 'ko') ||
+            String(a.name || '').localeCompare(String(b.name || ''), 'ko')
+          )
+          .map((student) => ({
+            id: student.studentId,
+            name: student.name,
+            school: student.school,
+            grade: student.grade,
+            year: student.year,
+          }));
       })();
 
       const titleMap = Object.fromEntries(MENU_ITEMS.map((item) => [item.key, item.label]));
