@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>열린 학교성적분석 v11.02</title>
+  <title>열린 학교성적분석_포털</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -675,6 +675,7 @@
 
       const [studentAnalysisStudentId, setStudentAnalysisStudentId] = useState('');
       const [selectedTestStudentIds, setSelectedTestStudentIds] = useState([]);
+      const [showTestStudentPanel, setShowTestStudentPanel] = useState(false);
       const [isRenamingStudent, setIsRenamingStudent] = useState(false);
       const [teamExamForm, setTeamExamForm] = useState({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', cut1: '', cut2: '', cut3: '', cut4: '', difficulty: 3, review: '', specialNote: '' });
       const [teamExamFilters, setTeamExamFilters] = useState({ year: '전체', school: '전체' });
