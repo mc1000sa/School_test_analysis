@@ -744,7 +744,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R6';
+    const APP_VERSION = 'OA-R7';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -1127,28 +1127,46 @@
             setDb(firestore);
 
             await new Promise(async (resolve, reject) => {
-              const timeoutId = setTimeout(() => reject(new Error('Firebase 인증 대기 시간이 초과되었습니다.')), 12000);
-              const unsubscribe = window.FirebaseAPI.onAuthStateChanged(auth, async (u) => {
+              let finished = false;
+              let unsubscribe = null;
+              const finish = (u) => {
+                if (finished) return;
+                finished = true;
                 clearTimeout(timeoutId);
-                unsubscribe();
+                if (typeof unsubscribe === 'function') unsubscribe();
                 setUser(u || null);
                 setAuthReady(true);
                 resolve();
-              }, (error) => {
+              };
+              const fail = (error) => {
+                if (finished) return;
+                finished = true;
                 clearTimeout(timeoutId);
+                if (typeof unsubscribe === 'function') unsubscribe();
                 reject(error);
+              };
+              const timeoutId = setTimeout(() => fail(new Error('Firebase 인증 대기 시간이 초과되었습니다.')), 15000);
+
+              unsubscribe = window.FirebaseAPI.onAuthStateChanged(auth, (u) => {
+                if (u) finish(u);
+              }, (error) => {
+                fail(error);
               });
 
               try {
+                let credential = null;
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                  await window.FirebaseAPI.signInWithCustomToken(auth, __initial_auth_token);
+                  credential = await window.FirebaseAPI.signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                  await window.FirebaseAPI.signInAnonymously(auth);
+                  credential = await window.FirebaseAPI.signInAnonymously(auth);
+                }
+                if (credential && credential.user) {
+                  finish(credential.user);
+                } else if (auth.currentUser) {
+                  finish(auth.currentUser);
                 }
               } catch (authError) {
-                clearTimeout(timeoutId);
-                unsubscribe();
-                reject(authError);
+                fail(authError);
               }
             });
           } catch (error) {
