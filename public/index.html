@@ -708,7 +708,7 @@
       <div class="instant-boot-title">시스템 가동 준비중입니다.
 잠시만 기다려주세요.</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R7</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R8</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -744,7 +744,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R7';
+    const APP_VERSION = 'OA-R8';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -1197,10 +1197,21 @@
       }, [initError, dataReady]);
 
       useEffect(() => {
-        if ((!isLoading && dataReady) || initError) {
+        if (initError || dataReady || bootForceReady) return;
+        const forceTimer = setTimeout(() => {
+          setBootForceReady(true);
+          setIsLoading(false);
+          setDataReady(true);
+        }, 20000);
+        return () => clearTimeout(forceTimer);
+      }, [initError, dataReady, bootForceReady]);
+
+
+      useEffect(() => {
+        if ((!isLoading && (dataReady || bootForceReady)) || initError) {
           if (typeof window.__hideInstantBootSplash === 'function') window.__hideInstantBootSplash();
         }
-      }, [isLoading, dataReady, initError]);
+      }, [isLoading, dataReady, bootForceReady, initError]);
 
       useEffect(() => {
         if (!db || !window.FirebaseAPI || !authReady || !user) return;
@@ -2310,7 +2321,8 @@
             : '1분 이상 본 화면이 지속될 시 F5를 눌러서 새로고침 한 번만 해주세요.';
 
       if (initError) return <div className="min-h-screen flex items-center justify-center p-6"><div className="bg-white border border-rose-200 rounded-[28px] p-6 max-w-2xl w-full"><div className="text-2xl font-black text-rose-600 mb-3">연결 오류</div><div className="text-sm text-rose-600 whitespace-pre-wrap leading-7">{initError}</div></div></div>;
-      if (isLoading || !dataReady) {
+      const effectiveDataReady = dataReady || bootForceReady;
+      if (isLoading || !effectiveDataReady) {
         return (
           <div className="boot-splash-wrap">
             <div className="boot-splash-card">
@@ -2320,7 +2332,7 @@
               {bootSlow && (
                 <div className="boot-slow-box">
                   <div className="boot-slow-title">초기 데이터를 불러오는 시간이 평소보다 길어지고 있습니다.</div>
-                  <div className="boot-slow-desc">처음 접속한 기기이거나 네트워크 상태에 따라 준비 시간이 조금 더 걸릴 수 있습니다.</div>
+                  <div className="boot-slow-desc">처음 접속한 기기이거나 네트워크 상태에 따라 준비 시간이 조금 더 걸릴 수 있습니다. 너무 오래 걸리면 로그인 화면으로 자동 전환됩니다.</div>
                   {bootVerySlow && <button type="button" onClick={() => window.location.reload()} className="boot-refresh-btn">새로고침</button>}
                 </div>
               )}
@@ -2349,6 +2361,7 @@
                   <div>
                     <h2 className="text-3xl font-black text-slate-900 mb-2">빠른 PIN 로그인</h2>
                     <p className="text-slate-500">선생님을 선택하고 4자리 PIN을 입력하세요.</p>
+                    {bootForceReady && !dataReady && <div className="mt-3 inline-flex items-center rounded-full px-3 py-1.5 bg-amber-50 border border-amber-200 text-[12px] font-bold text-amber-700">초기 데이터 연결이 지연되어 로그인 화면을 먼저 열었습니다.</div>}
                   </div>
                   <div className="md:hidden inline-flex items-center gap-2 rounded-full px-3 py-1.5 border border-violet-200 bg-violet-50 text-[11px] font-black text-violet-700">
                     <span className="text-slate-500">ver.</span>
