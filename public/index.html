@@ -551,6 +551,150 @@
       .school-print-table td, .school-print-table th { padding-left: 6px !important; padding-right: 6px !important; }
       .print-teacher-focus { display:block !important; margin-top: 8px !important; font-size: 28px !important; line-height: 1.15 !important; font-weight: 900 !important; color: #6d28d9 !important; }
     }
+
+    .instant-boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(124,58,237,0.14), transparent 24%),
+        radial-gradient(circle at 100% 0%, rgba(59,130,246,0.12), transparent 22%),
+        linear-gradient(180deg, #f8f9ff 0%, #f4f6fb 42%, #f8f9ff 100%);
+      transition: opacity .35s ease, visibility .35s ease;
+    }
+    .instant-boot-splash.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .instant-boot-inner {
+      width: 100%;
+      max-width: 760px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 16px;
+    }
+    .instant-boot-logo {
+      width: min(420px, 74vw);
+      filter: drop-shadow(0 18px 34px rgba(109,40,217,0.14));
+      animation: bootGlow 1.8s ease-in-out infinite alternate;
+    }
+    .instant-boot-title {
+      font-size: 31px;
+      line-height: 1.45;
+      font-weight: 900;
+      color: #334155;
+      letter-spacing: -0.03em;
+      white-space: pre-line;
+      word-break: keep-all;
+    }
+    .instant-boot-desc {
+      font-size: 17px;
+      line-height: 1.8;
+      font-weight: 700;
+      color: #64748b;
+      white-space: pre-line;
+      word-break: keep-all;
+    }
+    .instant-boot-version {
+      margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 7px 12px;
+      border: 1px solid rgba(196,181,253,0.75);
+      background: rgba(255,255,255,0.58);
+      box-shadow: 0 10px 22px rgba(15,23,42,0.06);
+      font-size: 11px;
+      font-weight: 900;
+      color: #6d28d9;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(8px);
+    }
+    .instant-boot-version .version-label { color:#7c8698; }
+    .boot-splash-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(124,58,237,0.14), transparent 24%),
+        radial-gradient(circle at 100% 0%, rgba(59,130,246,0.12), transparent 22%),
+        linear-gradient(180deg, #f8f9ff 0%, #f4f6fb 42%, #f8f9ff 100%);
+    }
+    .boot-splash-card {
+      width: 100%;
+      max-width: 760px;
+      min-height: 520px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      padding: 42px 28px;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }
+    .boot-splash-card::before { display:none; }
+    .boot-logo-wrap {
+      width: min(420px, 74vw);
+      position: relative;
+      z-index: 1;
+      filter: drop-shadow(0 18px 34px rgba(109,40,217,0.14));
+      animation: bootGlow 1.8s ease-in-out infinite alternate;
+    }
+    .boot-main-text {
+      position: relative;
+      z-index: 1;
+      margin-top: 22px;
+      font-size: 31px;
+      line-height: 1.45;
+      font-weight: 900;
+      color: #334155;
+      letter-spacing: -0.03em;
+      white-space: pre-line;
+      word-break: keep-all;
+    }
+    .boot-sub-text {
+      position: relative;
+      z-index: 1;
+      margin-top: 8px;
+      font-size: 17px;
+      line-height: 1.8;
+      font-weight: 700;
+      color: #64748b;
+      white-space: pre-line;
+      word-break: keep-all;
+    }
+    .boot-slow-box {
+      position: relative;
+      z-index: 1;
+      margin-top: 18px;
+      border-radius: 20px;
+      border: 1px solid rgba(226,232,240,0.95);
+      background: rgba(255,255,255,0.84);
+      box-shadow: 0 16px 28px rgba(15,23,42,0.06);
+      padding: 15px 18px;
+      max-width: 620px;
+      backdrop-filter: blur(10px);
+    }
+    @keyframes bootGlow {
+      from { transform: translateY(0); opacity: .96; }
+      to { transform: translateY(-2px); opacity: 1; }
+    }
+
     @media (max-width: 1279px) {
       .desktop-sidebar { display:none !important; }
       .content-wrap { padding-left: 0 !important; }
@@ -558,7 +702,40 @@
   </style>
 </head>
 <body>
+  <div id="instantBootSplash" class="instant-boot-splash">
+    <div class="instant-boot-inner">
+      <img src="./logo.png" alt="열린학원 로고" class="instant-boot-logo" onerror="this.style.display='none'">
+      <div class="instant-boot-title">시스템 가동 준비중입니다.
+잠시만 기다려주세요.</div>
+      <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>v2026.04.16-06</span></div>
+    </div>
+  </div>
   <div id="root"></div>
+
+  <script>
+    (function(){
+      var start = Date.now();
+      var splash = document.getElementById('instantBootSplash');
+      var desc = document.getElementById('instantBootDesc');
+      function updateBootText(){
+        if (!desc) return;
+        var sec = Math.floor((Date.now() - start) / 1000);
+        if (sec < 8) desc.textContent = '데이터를 안전하게 불러오는 중입니다.';
+        else if (sec < 20) desc.textContent = '선생님과 학생 데이터를 차례대로 정리하고 있습니다.';
+        else if (sec < 60) desc.textContent = '조금만 더 기다려주세요. 처음 접속한 기기에서는 준비 시간이 더 걸릴 수 있습니다.';
+        else desc.textContent = '1분 이상 본 화면이 지속될 시 F5를 눌러서 새로고침 한 번만 해주세요.';
+      }
+      updateBootText();
+      var timer = setInterval(updateBootText, 1000);
+      window.__hideInstantBootSplash = function(){
+        clearInterval(timer);
+        if (!splash) return;
+        splash.classList.add('hidden');
+        setTimeout(function(){ if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 450);
+      };
+    })();
+  </script>
 
   <script type="text/babel">
     const { useEffect, useMemo, useState } = React;
@@ -567,7 +744,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'v2026.04.16-05';
+    const APP_VERSION = 'v2026.04.16-06';
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
     const SCORE_BUCKETS = [
@@ -865,6 +1042,7 @@
       const [dataReady, setDataReady] = useState(false);
       const [bootSlow, setBootSlow] = useState(false);
       const [bootVerySlow, setBootVerySlow] = useState(false);
+      const [bootElapsed, setBootElapsed] = useState(0);
 
       const [view, setView] = useState('dashboard');
       
@@ -986,13 +1164,24 @@
           setBootVerySlow(false);
           return;
         }
+        const startedAt = Date.now();
+        const tick = () => setBootElapsed(Math.floor((Date.now() - startedAt) / 1000));
+        tick();
+        const intervalId = setInterval(tick, 1000);
         const slowTimer = setTimeout(() => setBootSlow(true), 12000);
         const verySlowTimer = setTimeout(() => setBootVerySlow(true), 60000);
         return () => {
+          clearInterval(intervalId);
           clearTimeout(slowTimer);
           clearTimeout(verySlowTimer);
         };
       }, [initError, dataReady]);
+
+      useEffect(() => {
+        if ((!isLoading && dataReady) || initError) {
+          if (typeof window.__hideInstantBootSplash === 'function') window.__hideInstantBootSplash();
+        }
+      }, [isLoading, dataReady, initError]);
 
       useEffect(() => {
         if (!db || !window.FirebaseAPI || !authReady || !user) return;
@@ -1880,14 +2069,53 @@
       const escapeHtml = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
       const getTeacherAnalysisHeading = () => teacherAnalysisTeacher === '전체' ? '전체 선생님' : (teacherAnalysisTeacher || currentTeacherName || '전체 선생님');
 
+      const printHtmlInFrame = (html, errorMessage) => {
+        const existingFrame = document.getElementById('oa-print-frame');
+        if (existingFrame) existingFrame.remove();
+        const iframe = document.createElement('iframe');
+        iframe.id = 'oa-print-frame';
+        iframe.setAttribute('aria-hidden', 'true');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '1px';
+        iframe.style.height = '1px';
+        iframe.style.opacity = '0';
+        iframe.style.pointerEvents = 'none';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        const cleanup = () => {
+          setTimeout(() => {
+            if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+          }, 300);
+        };
+        try {
+          const doc = iframe.contentWindow.document;
+          doc.open();
+          doc.write(html);
+          doc.close();
+          iframe.onload = () => {
+            setTimeout(() => {
+              try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.onafterprint = cleanup;
+                iframe.contentWindow.print();
+                setTimeout(cleanup, 1500);
+              } catch (error) {
+                cleanup();
+                alert(errorMessage || '인쇄를 시작할 수 없습니다.');
+              }
+            }, 120);
+          };
+        } catch (error) {
+          cleanup();
+          alert(errorMessage || '인쇄를 시작할 수 없습니다.');
+        }
+      };
+
       const printSchoolAnalysisLandscape = () => {
         const summary = buildPrintSummaryText();
         const rows = schoolAnalysisRows || [];
-        const popup = window.open('', '_blank', 'width=1500,height=950');
-        if (!popup) {
-          alert('팝업이 차단되어 인쇄 창을 열 수 없습니다.');
-          return;
-        }
         const tierStyles = {
           1: { wrap: '#f5f3ff', border: '#ddd6fe', text: '#6d28d9', bar1: '#8b5cf6', bar2: '#d946ef' },
           2: { wrap: '#f0f9ff', border: '#bae6fd', text: '#0369a1', bar1: '#38bdf8', bar2: '#22d3ee' },
@@ -1928,9 +2156,8 @@
           .rate-track{height:8px;border-radius:999px;background:rgba(255,255,255,0.9);overflow:hidden;}
           .rate-fill{height:100%;border-radius:999px;}
           .rate-text{margin-top:6px;font-size:12px;font-weight:900;}
-        </style></head><body><div class="wrap"><div class="summary"><div class="eyebrow">열린학원 성적분석 포털</div><h1>학교별 성적분석</h1><div class="sub">${escapeHtml(summary)}</div></div><table class="rates"><thead><tr><th>학교</th><th>학년</th><th>과목</th><th>학생수</th><th>평균</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th></tr></thead><tbody>${bodyRows}</tbody></table><script>window.onafterprint=function(){setTimeout(function(){window.close();},80);};window.onload=function(){setTimeout(function(){window.print();},120);};<\/script></div></body></html>`;
-        popup.document.write(html);
-        popup.document.close();
+        </style></head><body><div class="wrap"><div class="summary"><div class="eyebrow">열린학원 성적분석 포털</div><h1>학교별 성적분석</h1><div class="sub">${escapeHtml(summary)}</div></div><table class="rates"><thead><tr><th>학교</th><th>학년</th><th>과목</th><th>학생수</th><th>평균</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th></tr></thead><tbody>${bodyRows}</tbody></table></div></body></html>`;
+        printHtmlInFrame(html, '학교별 성적분석 인쇄를 시작할 수 없습니다.');
       };
 
       const handlePrintPage = () => {
@@ -1952,11 +2179,6 @@
           return;
         }
         const summary = [teamExamPublicFilters.year === '전체' ? '전체 연도' : `${teamExamPublicFilters.year}년`, teamExamPublicFilters.exam === '전체' ? '전체 시험' : (EXAM_SHORT_LABELS[teamExamPublicFilters.exam] || teamExamPublicFilters.exam), teamExamPublicFilters.school === '전체' ? '전체 학교' : teamExamPublicFilters.school, teamExamPublicFilters.grade === '전체' ? '전체 학년' : `${teamExamPublicFilters.grade}학년`, teamExamPublicFilters.subject === '전체' ? '전체 과목' : teamExamPublicFilters.subject].join(' · ');
-        const popup = window.open('', '_blank', 'width=1400,height=900');
-        if (!popup) {
-          alert('팝업이 차단되어 카드뉴스 인쇄 창을 열 수 없습니다.');
-          return;
-        }
         const pageHtml = pages.map((page, pageIndex) => `
           <section class="print-page">
             <div class="page-head">
@@ -2009,9 +2231,8 @@
           .value.compact { font-size:15px; line-height:1.35; }
           .note-text { font-size:13px; line-height:1.45; color:#334155; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
           .foot { margin-top:auto; display:flex; justify-content:space-between; font-size:11px; font-weight:800; color:#94a3b8; }
-        </style></head><body>${pageHtml}<script>window.onload=function(){setTimeout(function(){window.print();},120);};<\/script></body></html>`;
-        popup.document.write(html);
-        popup.document.close();
+        </style></head><body>${pageHtml}</body></html>`;
+        printHtmlInFrame(html, '카드뉴스 인쇄를 시작할 수 없습니다.');
       };
 
       const schoolAnalysisRows = (() => {
@@ -2034,16 +2255,30 @@
         return sortRows(items, schoolSort, { school:r=>safeLower(r.school), grade:r=>Number(r.grade), subject:r=>safeLower(r.subject), count:r=>Number(r.count), avg:r=>Number(r.avg), rate1:r=>Number(r.rate1), rate2:r=>Number(r.rate2), rate3:r=>Number(r.rate3), rate4:r=>Number(r.rate4), rate5:r=>Number(r.rate5) });
       })();
 
+      const bootMainMessage = bootElapsed < 12
+        ? '시스템 가동 준비중입니다.
+잠시만 기다려주세요.'
+        : bootElapsed < 30
+          ? '데이터를 불러오고 있습니다.
+조금만 더 기다려주세요.'
+          : '열린학원 시스템을 정리하고 있습니다.
+조금만 더 기다려주세요.';
+      const bootSubMessage = bootElapsed < 8
+        ? '데이터를 안전하게 불러오는 중입니다.'
+        : bootElapsed < 20
+          ? '선생님과 학생 데이터를 차례대로 준비하고 있습니다.'
+          : bootElapsed < 60
+            ? '처음 접속한 기기이거나 네트워크 상태에 따라 준비 시간이 조금 더 걸릴 수 있습니다.'
+            : '1분 이상 본 화면이 지속될 시 F5를 눌러서 새로고침 한 번만 해주세요.';
+
       if (initError) return <div className="min-h-screen flex items-center justify-center p-6"><div className="bg-white border border-rose-200 rounded-[28px] p-6 max-w-2xl w-full"><div className="text-2xl font-black text-rose-600 mb-3">연결 오류</div><div className="text-sm text-rose-600 whitespace-pre-wrap leading-7">{initError}</div></div></div>;
       if (isLoading || !dataReady) {
         return (
           <div className="boot-splash-wrap">
             <div className="boot-splash-card">
               <div className="boot-logo-wrap"><img src="./logo.png" alt="열린학원 로고" className="w-full h-auto object-contain" onError={(e)=>{e.currentTarget.style.display='none';}} /></div>
-              <div className="boot-main-text">시스템 가동 준비중입니다.
-잠시만 기다려주세요.</div>
-              <div className="boot-sub-text">1분 이상 본 화면이 지속될 시
-F5를 눌러서 새로고침 한 번만 해주세요.</div>
+              <div className="boot-main-text">{bootMainMessage}</div>
+              <div className="boot-sub-text">{bootSubMessage}</div>
               {bootSlow && (
                 <div className="boot-slow-box">
                   <div className="boot-slow-title">초기 데이터를 불러오는 시간이 평소보다 길어지고 있습니다.</div>
