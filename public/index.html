@@ -341,26 +341,26 @@
       color: #94a3b8;
     }
 
-    .version-badge {
-      position: fixed;
-      right: 14px;
-      bottom: 12px;
-      z-index: 80;
+    .login-version-badge {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      z-index: 5;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       border-radius: 999px;
-      padding: 7px 12px;
-      border: 1px solid rgba(196,181,253,0.95);
-      background: rgba(255,255,255,0.96);
-      box-shadow: 0 10px 24px rgba(15,23,42,0.10);
+      padding: 6px 11px;
+      border: 1px solid rgba(196,181,253,0.75);
+      background: rgba(255,255,255,0.48);
+      box-shadow: 0 8px 20px rgba(15,23,42,0.06);
       font-size: 11px;
       font-weight: 900;
       color: #6d28d9;
       letter-spacing: 0.02em;
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(6px);
     }
-    .version-badge .version-label { color:#94a3b8; }
+    .login-version-badge .version-label { color:#7c8698; }
     .admin-collapse-button {
       display: inline-flex;
       align-items: center;
@@ -424,6 +424,7 @@
       .student-analysis-print-card > div:first-child { display:none !important; }
       .student-analysis-highlight-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
       .school-print-table td, .school-print-table th { padding-left: 6px !important; padding-right: 6px !important; }
+      .print-teacher-focus { display:block !important; margin-top: 8px !important; font-size: 28px !important; line-height: 1.15 !important; font-weight: 900 !important; color: #6d28d9 !important; }
     }
     @media (max-width: 1279px) {
       .desktop-sidebar { display:none !important; }
@@ -441,7 +442,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'v2026.04.15-01';
+    const APP_VERSION = 'v2026.04.16-04';
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
     const SCORE_BUCKETS = [
@@ -737,6 +738,9 @@
       const [isDeletingTestData, setIsDeletingTestData] = useState(false);
       const [authReady, setAuthReady] = useState(false);
       const [dataReady, setDataReady] = useState(false);
+      const [teachersReady, setTeachersReady] = useState(false);
+      const [teachersLoadError, setTeachersLoadError] = useState('');
+      const [loginConnectSlow, setLoginConnectSlow] = useState(false);
 
       const [view, setView] = useState('dashboard');
       
@@ -844,6 +848,7 @@
                 reject(authError);
               }
             });
+            setIsLoading(false);
           } catch (error) {
             setInitError('Firebase 초기화 실패: ' + error.message);
             setIsLoading(false);
@@ -855,29 +860,53 @@
       useEffect(() => {
         if (!db || !window.FirebaseAPI || !authReady || !user) return;
         const { collection, onSnapshot } = window.FirebaseAPI;
+        const unsub = onSnapshot(collection(db, getPath('teachers')), (s) => {
+          setTeachersData(s.docs.map(d => ({ teacherId: d.id, ...d.data() })).filter(t => t.isActive !== false));
+          setTeachersReady(true);
+          setTeachersLoadError('');
+        }, (error) => {
+          setTeachersLoadError('선생님 목록을 불러오지 못했습니다: ' + error.message);
+          setTeachersReady(false);
+        });
+        return () => unsub && unsub();
+      }, [db, authReady, user]);
+
+      useEffect(() => {
+        if (isLoggedIn) {
+          setLoginConnectSlow(false);
+          return;
+        }
+        if (teachersReady || !authReady || initError) {
+          setLoginConnectSlow(false);
+          return;
+        }
+        const timer = setTimeout(() => setLoginConnectSlow(true), 4500);
+        return () => clearTimeout(timer);
+      }, [isLoggedIn, teachersReady, authReady, initError]);
+
+      useEffect(() => {
+        if (!db || !window.FirebaseAPI || !authReady || !user || !isLoggedIn) return;
+        const { collection, onSnapshot } = window.FirebaseAPI;
         let unsubs = [];
-        const ready = { teachers: false, students: false, scores: false, team: false, subjects: false, subjectDetails: false };
+        const ready = { students: false, scores: false, team: false, subjects: false, subjectDetails: false, dashboardRules: false };
         const markReady = (key) => {
           ready[key] = true;
           if (Object.values(ready).every(Boolean)) {
             setDataReady(true);
-            setIsLoading(false);
           }
         };
 
+        setDataReady(false);
+
         try {
-          unsubs.push(onSnapshot(collection(db, getPath('teachers')), (s) => {
-            setTeachersData(s.docs.map(d => ({ teacherId: d.id, ...d.data() })).filter(t => t.isActive !== false));
-            markReady('teachers');
-          }, (error) => { setInitError('teachers 데이터를 읽을 수 없습니다: ' + error.message); setIsLoading(false); }));
           unsubs.push(onSnapshot(collection(db, getPath('students')), (s) => {
             setStudentsData(s.docs.map(d => ({ studentId: d.id, ...d.data() })));
             markReady('students');
-          }, (error) => { setInitError('students 데이터를 읽을 수 없습니다: ' + error.message); setIsLoading(false); }));
+          }, (error) => { setInitError('students 데이터를 읽을 수 없습니다: ' + error.message); markReady('students'); }));
           unsubs.push(onSnapshot(collection(db, getPath('scores')), (s) => {
             setScoresData(s.docs.map(d => ({ docId: d.id, ...d.data() })));
             markReady('scores');
-          }, (error) => { setInitError('scores 데이터를 읽을 수 없습니다: ' + error.message); setIsLoading(false); }));
+          }, (error) => { setInitError('scores 데이터를 읽을 수 없습니다: ' + error.message); markReady('scores'); }));
           unsubs.push(onSnapshot(collection(db, getPath('teamExams')), (s) => {
             setTeamExamData(s.docs.map(d => ({ docId: d.id, ...d.data() })).filter(t => !t.deleted));
             markReady('team');
@@ -890,39 +919,35 @@
             setSubjectDetailCatalogData(s.docs.map(d => ({ docId: d.id, ...d.data() })).filter(item => !item.deleted));
             markReady('subjectDetails');
           }, () => markReady('subjectDetails')));
+          unsubs.push(onSnapshot(collection(db, getPath('dashboardRules')), (snap) => {
+            if (snap.empty) {
+              setDashboardCriteriaDocId('');
+              setDashboardCriteria(DASHBOARD_CRITERIA_DEFAULTS);
+              markReady('dashboardRules');
+              return;
+            }
+            const first = snap.docs[0];
+            const data = first.data() || {};
+            setDashboardCriteriaDocId(first.id);
+            setDashboardCriteria({
+              scoreImprove: Number(data.scoreImprove ?? DASHBOARD_CRITERIA_DEFAULTS.scoreImprove),
+              scoreDecline: Number(data.scoreDecline ?? DASHBOARD_CRITERIA_DEFAULTS.scoreDecline),
+              tierImprove: Number(data.tierImprove ?? DASHBOARD_CRITERIA_DEFAULTS.tierImprove),
+              tierDecline: Number(data.tierDecline ?? DASHBOARD_CRITERIA_DEFAULTS.tierDecline),
+              topScore: Number(data.topScore ?? DASHBOARD_CRITERIA_DEFAULTS.topScore),
+              topTier: Number(data.topTier ?? DASHBOARD_CRITERIA_DEFAULTS.topTier),
+              midMinScore: Number(data.midMinScore ?? DASHBOARD_CRITERIA_DEFAULTS.midMinScore),
+              riskScore: Number(data.riskScore ?? DASHBOARD_CRITERIA_DEFAULTS.riskScore),
+              riskTier: Number(data.riskTier ?? DASHBOARD_CRITERIA_DEFAULTS.riskTier),
+            });
+            markReady('dashboardRules');
+          }, () => markReady('dashboardRules')));
         } catch (error) {
           setInitError('데이터베이스 연결 실패: ' + error.message);
-          setIsLoading(false);
+          setDataReady(true);
         }
         return () => unsubs.forEach(u => u && u());
-      }, [db, authReady, user]);
-
-      useEffect(() => {
-        if (!db || !window.FirebaseAPI || !authReady || !user) return;
-        const { collection, onSnapshot } = window.FirebaseAPI;
-        const unsub = onSnapshot(collection(db, getPath('dashboardRules')), (snap) => {
-          if (snap.empty) {
-            setDashboardCriteriaDocId('');
-            setDashboardCriteria(DASHBOARD_CRITERIA_DEFAULTS);
-            return;
-          }
-          const first = snap.docs[0];
-          const data = first.data() || {};
-          setDashboardCriteriaDocId(first.id);
-          setDashboardCriteria({
-            scoreImprove: Number(data.scoreImprove ?? DASHBOARD_CRITERIA_DEFAULTS.scoreImprove),
-            scoreDecline: Number(data.scoreDecline ?? DASHBOARD_CRITERIA_DEFAULTS.scoreDecline),
-            tierImprove: Number(data.tierImprove ?? DASHBOARD_CRITERIA_DEFAULTS.tierImprove),
-            tierDecline: Number(data.tierDecline ?? DASHBOARD_CRITERIA_DEFAULTS.tierDecline),
-            topScore: Number(data.topScore ?? DASHBOARD_CRITERIA_DEFAULTS.topScore),
-            topTier: Number(data.topTier ?? DASHBOARD_CRITERIA_DEFAULTS.topTier),
-            midMinScore: Number(data.midMinScore ?? DASHBOARD_CRITERIA_DEFAULTS.midMinScore),
-            riskScore: Number(data.riskScore ?? DASHBOARD_CRITERIA_DEFAULTS.riskScore),
-            riskTier: Number(data.riskTier ?? DASHBOARD_CRITERIA_DEFAULTS.riskTier),
-          });
-        });
-        return () => unsub && unsub();
-      }, [db, authReady, user]);
+      }, [db, authReady, user, isLoggedIn]);
 
       const joinedData = useMemo(() => scoresData.filter(s => !s.deleted).map(score => {
         const student = studentsData.find(s => s.studentId === score.studentId && !s.deleted) || {};
@@ -1147,6 +1172,7 @@
 
       const handleLogin = (e) => {
         e.preventDefault();
+        if (!teachersReady) return setLoginError('선생님 목록을 아직 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
         if (!selectedTeacherName) return setLoginError('선생님을 선택해주세요.');
         const t = teachersData.find(t => t.name === selectedTeacherName && String(t.pin||'') === loginPin);
         if (!t) return setLoginError('PIN이 올바르지 않습니다.');
@@ -1715,7 +1741,7 @@
           return [String(filters.year) + '년', EXAM_SHORT_LABELS[filters.exam] || filters.exam, filters.school === '전체' ? '전체 학교' : filters.school, filters.grade === '전체' ? '전체 학년' : `${filters.grade}학년`, activeSubject === '전체' ? '전체 과목' : activeSubject].join(' · ');
         }
         if (view === 'teacherAnalysis') {
-          return [teacherAnalysisTeacher || currentTeacherName || '', String(teacherAnalysisView.year) + '년', EXAM_SHORT_LABELS[teacherAnalysisView.exam] || teacherAnalysisView.exam, teacherAnalysisView.school === '전체' ? '전체 학교' : teacherAnalysisView.school, teacherAnalysisView.grade === '전체' ? '전체 학년' : `${teacherAnalysisView.grade}학년`].filter(Boolean).join(' · ');
+          return [String(teacherAnalysisView.year) + '년', EXAM_SHORT_LABELS[teacherAnalysisView.exam] || teacherAnalysisView.exam, teacherAnalysisView.school === '전체' ? '전체 학교' : teacherAnalysisView.school, teacherAnalysisView.grade === '전체' ? '전체 학년' : `${teacherAnalysisView.grade}학년`].filter(Boolean).join(' · ');
         }
         if (view === 'schoolAnalysis') {
           return [String(schoolView.year) + '년', EXAM_SHORT_LABELS[schoolView.exam] || schoolView.exam, schoolView.school === '전체' ? '전체 학교' : schoolView.school, schoolView.grade === '전체' ? '전체 학년' : `${schoolView.grade}학년`, schoolView.subject === '전체' ? '전체 과목' : schoolView.subject].join(' · ');
@@ -1731,7 +1757,7 @@
       };
 
       const escapeHtml = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
+      const getTeacherAnalysisHeading = () => teacherAnalysisTeacher === '전체' ? '전체 선생님' : (teacherAnalysisTeacher || currentTeacherName || '전체 선생님');
 
       const printSchoolAnalysisLandscape = () => {
         const summary = buildPrintSummaryText();
@@ -1741,6 +1767,18 @@
           alert('팝업이 차단되어 인쇄 창을 열 수 없습니다.');
           return;
         }
+        const tierStyles = {
+          1: { wrap: '#f5f3ff', border: '#ddd6fe', text: '#6d28d9', bar1: '#8b5cf6', bar2: '#d946ef' },
+          2: { wrap: '#f0f9ff', border: '#bae6fd', text: '#0369a1', bar1: '#38bdf8', bar2: '#22d3ee' },
+          3: { wrap: '#ecfdf5', border: '#a7f3d0', text: '#047857', bar1: '#34d399', bar2: '#14b8a6' },
+          4: { wrap: '#fffbeb', border: '#fde68a', text: '#b45309', bar1: '#fbbf24', bar2: '#fb923c' },
+          5: { wrap: '#fff1f2', border: '#fecdd3', text: '#be123c', bar1: '#fb7185', bar2: '#f472b6' },
+        };
+        const renderRateCell = (value, tier) => {
+          const style = tierStyles[tier] || tierStyles[5];
+          const width = Math.max(8, Number(value || 0));
+          return `<td><div class="rate-box" style="background:${style.wrap};border-color:${style.border};"><div class="rate-track"><div class="rate-fill" style="width:${width}%;background:linear-gradient(90deg, ${style.bar1}, ${style.bar2});"></div></div><div class="rate-text" style="color:${style.text};">${escapeHtml(value)}%</div></div></td>`;
+        };
         const bodyRows = rows.length ? rows.map((row) => `
           <tr>
             <td>${escapeHtml(row.school)}</td>
@@ -1748,27 +1786,28 @@
             <td>${escapeHtml(row.subject)}</td>
             <td>${escapeHtml(row.count)}명</td>
             <td class="avg">${escapeHtml(row.avg)}점</td>
-            <td>${escapeHtml(row.rate1)}%</td>
-            <td>${escapeHtml(row.rate2)}%</td>
-            <td>${escapeHtml(row.rate3)}%</td>
-            <td>${escapeHtml(row.rate4)}%</td>
-            <td>${escapeHtml(row.rate5)}%</td>
+            ${[1,2,3,4,5].map((tier) => renderRateCell(row[`rate${tier}`], tier)).join('')}
           </tr>`).join('') : '<tr><td colspan="10" class="empty">데이터가 없습니다.</td></tr>';
         const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8" /><title>학교별 성적분석 인쇄</title><style>
           @page { size:A4 landscape; margin:10mm; }
-          body{font-family:Arial,"Noto Sans KR",sans-serif; margin:0; color:#0f172a;}
+          * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+          body{font-family:Arial,"Noto Sans KR",sans-serif; margin:0; color:#0f172a; background:#fff;}
           .wrap{padding:10mm;}
-          .summary{border:1px solid #dbe2ea;border-radius:18px;padding:14px 18px;margin-bottom:14px;}
+          .summary{border:1px solid #dbe2ea;border-radius:18px;padding:14px 18px;margin-bottom:14px;background:#fff;}
           .eyebrow{font-size:12px;font-weight:800;color:#7c3aed;}
           h1{margin:4px 0 6px 0;font-size:34px;}
           .sub{font-size:14px;font-weight:700;color:#64748b;}
-          table{width:100%;border-collapse:collapse;font-size:13px;text-align:center;}
+          table{width:100%;border-collapse:collapse;font-size:13px;text-align:center;table-layout:fixed;}
           thead{background:#f8fafc;color:#64748b;font-weight:800;}
-          th,td{padding:10px 8px;border-bottom:1px solid #e2e8f0;}
+          th,td{padding:10px 8px;border-bottom:1px solid #e2e8f0;vertical-align:middle;}
           .avg{font-weight:900;color:#6d28d9;}
           .empty{padding:32px 0;color:#94a3b8;}
           .rates td{white-space:nowrap;}
-        </style></head><body><div class="wrap"><div class="summary"><div class="eyebrow">열린학원 성적분석 포털</div><h1>학교별 성적분석</h1><div class="sub">${escapeHtml(summary)}</div></div><table class="rates"><thead><tr><th>학교</th><th>학년</th><th>과목</th><th>학생수</th><th>평균</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th></tr></thead><tbody>${bodyRows}</tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),120);<\/script></div></body></html>`;
+          .rate-box{min-width:92px;border:1px solid;border-radius:16px;padding:8px 10px;}
+          .rate-track{height:8px;border-radius:999px;background:rgba(255,255,255,0.9);overflow:hidden;}
+          .rate-fill{height:100%;border-radius:999px;}
+          .rate-text{margin-top:6px;font-size:12px;font-weight:900;}
+        </style></head><body><div class="wrap"><div class="summary"><div class="eyebrow">열린학원 성적분석 포털</div><h1>학교별 성적분석</h1><div class="sub">${escapeHtml(summary)}</div></div><table class="rates"><thead><tr><th>학교</th><th>학년</th><th>과목</th><th>학생수</th><th>평균</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th></tr></thead><tbody>${bodyRows}</tbody></table><script>window.onafterprint=function(){setTimeout(function(){window.close();},80);};window.onload=function(){setTimeout(function(){window.print();},120);};<\/script></div></body></html>`;
         popup.document.write(html);
         popup.document.close();
       };
@@ -1888,34 +1927,60 @@
                   <h1 className="login-main-title mt-8 text-[39px] md:text-[47px]"><span className="block login-title-metal">성적분석 포털사이트</span></h1>
                   <p className="login-copy-title mt-8 text-[24px] md:text-[32px] leading-[1.8] text-slate-500 italic">입력은 쉽고 빠르게,<br/>분석은 깊이 있게!!!</p>
                   <div className="creator-signature mt-12 text-[14px]">Created by mOOn_Mathematics</div>
+                  <div className="login-version-badge" aria-label="배포 버전"><span className="version-label">ver.</span><span>{APP_VERSION}</span></div>
                 </div>
               </div>
               <div className="glass rounded-[36px] panel-shadow soft-border p-8">
-                <h2 className="text-3xl font-black text-slate-900 mb-2">빠른 PIN 로그인</h2>
-                <p className="text-slate-500 mb-8">선생님을 선택하고 4자리 PIN을 입력하세요.</p>
-                <form onSubmit={handleLogin} className="space-y-6">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <h2 className="text-3xl font-black text-slate-900 mb-2">빠른 PIN 로그인</h2>
+                    <p className="text-slate-500">선생님을 선택하고 4자리 PIN을 입력하세요.</p>
+                  </div>
+                  <div className="md:hidden inline-flex items-center gap-2 rounded-full px-3 py-1.5 border border-violet-200 bg-violet-50 text-[11px] font-black text-violet-700">
+                    <span className="text-slate-500">ver.</span>
+                    <span>{APP_VERSION}</span>
+                  </div>
+                </div>
+                <form onSubmit={handleLogin} className="space-y-6 mt-8">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-3">선생님 선택</label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {orderedTeachers.map((t, idx) => (
-                        <button type="button" key={t.teacherId} onClick={() => setSelectedTeacherName(t.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selectedTeacherName === t.name ? 'teacher-chip-selected' : ''}`}>
-                          {t.name}
-                        </button>
-                      ))}
-                    </div>
+                    {teachersReady ? (
+                      <div className="grid grid-cols-3 gap-3">
+                        {orderedTeachers.map((t, idx) => (
+                          <button type="button" key={t.teacherId} onClick={() => setSelectedTeacherName(t.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selectedTeacherName === t.name ? 'teacher-chip-selected' : ''}`}>
+                            {t.name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                        <div className="text-sm font-bold text-violet-700">선생님 목록을 불러오는 중...</div>
+                        <div className="mt-2 text-sm text-slate-500">처음 접속한 기기에서는 몇 초 정도 더 걸릴 수 있어요.</div>
+                        {loginConnectSlow && (
+                          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <div className="text-sm font-black text-amber-700">연결이 조금 지연되고 있어요.</div>
+                            <div className="mt-1 text-xs leading-6 text-amber-700">잠시 기다린 뒤 자동으로 목록이 뜨지 않으면 새로고침해 주세요.</div>
+                            <button type="button" onClick={() => window.location.reload()} className="mt-3 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-amber-700">새로고침</button>
+                          </div>
+                        )}
+                        {teachersLoadError && <div className="mt-3 text-sm font-bold text-rose-600">{teachersLoadError}</div>}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">PIN 번호</label>
-                    <input type="password" maxLength="4" value={loginPin} onChange={e => setLoginPin(e.target.value.replace(/\D/g, ''))} className="w-full h-16 border-2 border-slate-200 rounded-2xl text-center text-3xl tracking-[1em] font-black focus:border-violet-400 outline-none" placeholder="••••" />
+                    <input type="password" maxLength="4" value={loginPin} onChange={e => setLoginPin(e.target.value.replace(/\D/g, ''))} className="w-full h-16 border-2 border-slate-200 rounded-2xl text-center text-3xl tracking-[1em] font-black focus:border-violet-400 outline-none disabled:bg-slate-100 disabled:text-slate-400" placeholder="••••" disabled={!teachersReady} />
                   </div>
                   {loginError && <div className="text-rose-600 text-sm font-bold">{loginError}</div>}
-                  <button type="submit" className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white font-bold text-lg shadow-lg">로그인</button>
+                  <button type="submit" disabled={!teachersReady} className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white font-bold text-lg shadow-lg disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed">로그인</button>
                 </form>
               </div>
             </div>
           </div>
         );
       }
+
+      if (!dataReady) return <div className="min-h-screen flex items-center justify-center text-violet-700 font-bold text-xl">분석 데이터를 불러오는 중...</div>;
 
       // Views Data Prep
       const dashboardBaseRows = activeJoinedData.filter((d) =>
@@ -2077,10 +2142,10 @@
       );
 
       // Teacher Analysis Logic
-      const teacherAnalysisTarget = teacherAnalysisTeacher || currentTeacherName;
+      const teacherAnalysisTarget = teacherAnalysisTeacher === '전체' ? '전체' : (teacherAnalysisTeacher || currentTeacherName);
       const teacherAnalysisRows = (() => {
         const rows = activeJoinedData.filter((r) =>
-          (r.createdBy === teacherAnalysisTarget || r.updatedBy === teacherAnalysisTarget) &&
+          (teacherAnalysisTarget === '전체' || r.createdBy === teacherAnalysisTarget || r.updatedBy === teacherAnalysisTarget) &&
           Number(r.year) === Number(teacherAnalysisView.year) &&
           r.exam === teacherAnalysisView.exam &&
           (teacherAnalysisView.school === '전체' || r.school === teacherAnalysisView.school) &&
@@ -2229,6 +2294,7 @@
             <div className="print-only print-summary-box">
               <div className="text-sm font-bold text-violet-700">열린학원 성적분석 포털</div>
               <div className="mt-1 text-2xl font-black text-slate-900">{titleMap[view]}</div>
+              {view === 'teacherAnalysis' ? <div className="print-teacher-focus">{getTeacherAnalysisHeading()}</div> : null}
               <div className="mt-2 text-sm font-bold text-slate-500">{buildPrintSummaryText()}</div>
             </div>
 
@@ -2668,7 +2734,7 @@
               <div className="space-y-6">
                 <Card className="print-hide">
                   <div className="flex flex-wrap gap-3 items-center">
-                    <select value={teacherAnalysisTeacher || currentTeacherName} onChange={e=>setTeacherAnalysisTeacher(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 font-bold text-violet-800 outline-none">{orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}</select>
+                    <select value={teacherAnalysisTeacher || currentTeacherName} onChange={e=>setTeacherAnalysisTeacher(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 font-bold text-violet-800 outline-none"><option value="전체">전체 선생님</option>{orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}</select>
                     <select value={teacherAnalysisView.school} onChange={e=>setTeacherAnalysisView({...teacherAnalysisView, school:e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학교</option>{SCHOOL_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select>
                     <select value={teacherAnalysisView.grade} onChange={e=>setTeacherAnalysisView({...teacherAnalysisView, grade:e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학년</option>{GRADES.map(g=><option key={g} value={g}>{g}학년</option>)}</select>
                     <div className="flex gap-2 flex-wrap">{EXAMS.map(ex => <button key={ex} onClick={()=>setTeacherAnalysisView({...teacherAnalysisView, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${teacherAnalysisView.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>)}</div>
@@ -2683,7 +2749,7 @@
                   <div className="print-metric-card bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center"><div className="print-metric-label text-sm text-slate-500 font-bold">전체 평균</div><div className="print-metric-value text-3xl font-black mt-2 text-violet-700">{sortedTeacherAnalysisRows.length ? Math.round(sortedTeacherAnalysisRows.reduce((sum,row)=>sum+Number(row.score||0),0)/sortedTeacherAnalysisRows.length) : 0}점</div></div>
                 </div>
 
-                <Card title="상세 성적 변화 리스트" right={<span className="text-xs text-slate-400">{(teacherAnalysisTeacher || currentTeacherName || "전체 선생님")} · {EXAM_SHORT_LABELS[teacherAnalysisView.exam] || teacherAnalysisView.exam}</span>}>
+                <Card title="상세 성적 변화 리스트" right={<span className="text-xs text-slate-400">{getTeacherAnalysisHeading()} · {EXAM_SHORT_LABELS[teacherAnalysisView.exam] || teacherAnalysisView.exam}</span>}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="text-xs font-bold text-amber-700">※ 6~9등급 입력값은 모두 5등급으로 통일해서 표시합니다.</div>
                     <div className="text-xs font-bold text-slate-500">
@@ -3018,7 +3084,6 @@
 
           </main>
 
-          <div className="version-badge print-hide"><span className="version-label">배포 버전</span><span>{APP_VERSION}</span></div>
 
           {/* Modal */}
           {modal.isOpen && (
