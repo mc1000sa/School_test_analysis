@@ -708,7 +708,7 @@
       <div class="instant-boot-title">시스템 가동 준비중입니다.
 잠시만 기다려주세요.</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>v2026.04.16-06</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R6</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -744,7 +744,8 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'v2026.04.16-06';
+    const APP_VERSION = 'OA-R6';
+    const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
     const SCORE_BUCKETS = [
@@ -1188,16 +1189,32 @@
         const { collection, onSnapshot } = window.FirebaseAPI;
         let unsubs = [];
         const ready = { teachers: false, students: false, scores: false, team: false, subjects: false, subjectDetails: false, dashboardRules: false };
+        const readyTimers = {};
+        const clearReadyTimer = (key) => {
+          if (readyTimers[key]) {
+            clearTimeout(readyTimers[key]);
+            delete readyTimers[key];
+          }
+        };
         const markReady = (key) => {
+          if (ready[key]) return;
           ready[key] = true;
+          clearReadyTimer(key);
           if (Object.values(ready).every(Boolean)) {
             setDataReady(true);
             setIsLoading(false);
           }
         };
+        const armReadyTimer = (key) => {
+          clearReadyTimer(key);
+          readyTimers[key] = setTimeout(() => {
+            markReady(key);
+          }, DATA_BOOT_TIMEOUT_MS);
+        };
 
         setDataReady(false);
         setIsLoading(true);
+        Object.keys(ready).forEach(armReadyTimer);
 
         try {
           unsubs.push(onSnapshot(collection(db, getPath('teachers')), (s) => {
@@ -1255,7 +1272,10 @@
           setIsLoading(false);
           setDataReady(true);
         }
-        return () => unsubs.forEach(u => u && u());
+        return () => {
+          Object.keys(readyTimers).forEach(clearReadyTimer);
+          unsubs.forEach(u => u && u());
+        };
       }, [db, authReady, user]);
 
       const joinedData = useMemo(() => scoresData.filter(s => !s.deleted).map(score => {
