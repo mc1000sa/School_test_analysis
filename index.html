@@ -341,26 +341,26 @@
       color: #94a3b8;
     }
 
-    .version-badge {
-      position: fixed;
-      right: 14px;
-      bottom: 12px;
-      z-index: 80;
+    .login-version-badge {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      z-index: 5;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       border-radius: 999px;
-      padding: 7px 12px;
-      border: 1px solid rgba(196,181,253,0.95);
-      background: rgba(255,255,255,0.96);
-      box-shadow: 0 10px 24px rgba(15,23,42,0.10);
+      padding: 6px 11px;
+      border: 1px solid rgba(196,181,253,0.75);
+      background: rgba(255,255,255,0.48);
+      box-shadow: 0 8px 20px rgba(15,23,42,0.06);
       font-size: 11px;
       font-weight: 900;
       color: #6d28d9;
       letter-spacing: 0.02em;
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(6px);
     }
-    .version-badge .version-label { color:#94a3b8; }
+    .login-version-badge .version-label { color:#7c8698; }
     .admin-collapse-button {
       display: inline-flex;
       align-items: center;
@@ -442,7 +442,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'v2026.04.15-01';
+    const APP_VERSION = 'v2026.04.16-03';
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
     const SCORE_BUCKETS = [
@@ -1902,6 +1902,7 @@
                   <h1 className="login-main-title mt-8 text-[39px] md:text-[47px]"><span className="block login-title-metal">성적분석 포털사이트</span></h1>
                   <p className="login-copy-title mt-8 text-[24px] md:text-[32px] leading-[1.8] text-slate-500 italic">입력은 쉽고 빠르게,<br/>분석은 깊이 있게!!!</p>
                   <div className="creator-signature mt-12 text-[14px]">Created by mOOn_Mathematics</div>
+                  <div className="login-version-badge" aria-label="배포 버전"><span className="version-label">ver.</span><span>{APP_VERSION}</span></div>
                 </div>
               </div>
               <div className="glass rounded-[36px] panel-shadow soft-border p-8">
@@ -3033,7 +3034,6 @@
 
           </main>
 
-          <div className="version-badge print-hide"><span className="version-label">배포 버전</span><span>{APP_VERSION}</span></div>
 
           {/* Modal */}
           {modal.isOpen && (
