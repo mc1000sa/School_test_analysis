@@ -1,0 +1,6 @@
+  apiKey: "AIzaSyCAT_dBqH8QHwJG-E1vNkWlBiyzRx8y-Ac",
+  authDomain: "open-school-3f74c.firebaseapp.com",
+  projectId: "open-school-3f74c",
+  storageBucket: "open-school-3f74c.firebasestorage.app",
+  messagingSenderId: "623260231783",
+  appId: "1:623260231783:web:33dded88508aa05d498cc2",

@@ -1,0 +1,104 @@
+Microsoft Windows [Version 10.0.19045.6466]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Users\mOOn\Desktop\open-school-portal>node -v
+v24.14.1
+
+C:\Users\mOOn\Desktop\open-school-portal>npm -v
+11.11.0
+
+C:\Users\mOOn\Desktop\open-school-portal>npm install -g firebase-tools
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated json-ptr@3.1.1: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 737 packages in 46s
+
+94 packages are looking for funding
+  run `npm fund` for details
+npm notice
+npm notice New minor version of npm available! 11.11.0 -> 11.12.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.12.1
+npm notice To update run: npm install -g npm@11.12.1
+npm notice
+
+C:\Users\mOOn\Desktop\open-school-portal>firebase --version
+15.14.0
+
+C:\Users\mOOn\Desktop\open-school-portal>firebase login
+i  The Firebase CLI’s MCP server feature can optionally make use of Gemini in Firebase. Learn more about Gemini in Firebase and how it uses your data: https://firebase.google.com/docs/gemini-in-firebase#how-gemini-in-firebase-uses-your-data
+√ Enable Gemini in Firebase features? No
+
+i  Firebase optionally collects CLI and Emulator Suite usage and error reporting information to help improve our products. Data is collected in accordance with Google's privacy policy (https://policies.google.com/privacy) and is not used to identify you.
+√ Allow Firebase to collect CLI and Emulator Suite usage and error reporting information? No
+
+Visit this URL on this device to log in:
+https://accounts.google.com/o/oauth2/auth?client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&scope=email%20openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloudplatformprojects.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ffirebase%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&response_type=code&state=703097100&redirect_uri=http%3A%2F%2Flocalhost%3A9005
+
+Waiting for authentication...
+
++  Success! Logged in as mc1000sa@gmail.com
+
+C:\Users\mOOn\Desktop\open-school-portal>firebase init hosting
+
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\Users\mOOn\Desktop\open-school-portal
+
+√ Are you ready to proceed? Yes
+
+=== Project Setup
+
+First, let's associate this project directory with a Firebase project.
+You can create multiple project aliases by running firebase use --add,
+
+√ Please select an option: Use an existing project
+√ Select a default Firebase project for this directory: open-school-3f74c (Open-school)
+
+=== Hosting Setup
+
+Your public directory is the folder (relative to your project directory) that
+will contain Hosting assets to be uploaded with firebase deploy. If you
+have a build process for your assets, use your build's output directory.
+
+√ What do you want to use as your public directory? public
+√ Configure as a single-page app (rewrite all urls to /index.html)? Yes
+√ Set up automatic builds and deploys with GitHub? No
+√ File public\index.html already exists. Overwrite? No
+i  Skipping write of public\index.html
+
+=== Agent Skills Setup
+If you are using an AI coding agent, Firebase Agent Skills make it an expert at Firebase.
+√ Would you like to install agent skills for Firebase? No
+
++  Wrote configuration info to firebase.json
++  Wrote project information to .firebaserc
++  Wrote .gitignore
+
++  Firebase initialization complete!
+
+C:\Users\mOOn\Desktop\open-school-portal>firebase deploy --only hosting
+
+=== Deploying to 'open-school-3f74c'...
+
+i  deploying hosting
+i  hosting[open-school-3f74c]: beginning deploy...
+i  hosting[open-school-3f74c]: found 2 files in public
++  hosting[open-school-3f74c]: file upload complete
+i  hosting[open-school-3f74c]: finalizing version...
++  hosting[open-school-3f74c]: version finalized
+i  hosting[open-school-3f74c]: releasing new version...
++  hosting[open-school-3f74c]: release complete
+
++  Deploy complete!
+
+Project Console: https://console.firebase.google.com/project/open-school-3f74c/overview
+Hosting URL: https://open-school-3f74c.web.app
+
+C:\Users\mOOn\Desktop\open-school-portal>
