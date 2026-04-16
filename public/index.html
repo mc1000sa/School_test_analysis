@@ -361,6 +361,131 @@
       backdrop-filter: blur(6px);
     }
     .login-version-badge .version-label { color:#7c8698; }
+    .boot-splash-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(124,58,237,0.14), transparent 24%),
+        radial-gradient(circle at 100% 0%, rgba(59,130,246,0.12), transparent 22%),
+        linear-gradient(180deg, #f8f9ff 0%, #f4f6fb 42%, #f8f9ff 100%);
+    }
+    .boot-splash-card {
+      width: 100%;
+      max-width: 760px;
+      min-height: 520px;
+      border-radius: 38px;
+      border: 1px solid rgba(226,232,240,0.95);
+      background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(245,243,255,0.96) 55%, rgba(239,246,255,0.96) 100%);
+      box-shadow: 0 24px 48px rgba(15,23,42,0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      padding: 42px 28px;
+    }
+    .boot-splash-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top left, rgba(124,58,237,0.12), transparent 30%);
+      pointer-events: none;
+    }
+    .boot-logo-wrap {
+      width: min(360px, 72vw);
+      position: relative;
+      z-index: 1;
+    }
+    .boot-main-text {
+      position: relative;
+      z-index: 1;
+      margin-top: 30px;
+      font-size: 32px;
+      line-height: 1.5;
+      font-weight: 900;
+      color: #334155;
+      letter-spacing: -0.03em;
+      white-space: pre-line;
+      word-break: keep-all;
+    }
+    .boot-sub-text {
+      position: relative;
+      z-index: 1;
+      margin-top: 14px;
+      font-size: 17px;
+      line-height: 1.8;
+      font-weight: 700;
+      color: #64748b;
+      white-space: pre-line;
+      word-break: keep-all;
+    }
+    .boot-slow-box {
+      position: relative;
+      z-index: 1;
+      margin-top: 22px;
+      border-radius: 22px;
+      border: 1px solid rgba(251,191,36,0.42);
+      background: rgba(255,251,235,0.95);
+      padding: 16px 18px;
+      max-width: 520px;
+    }
+    .boot-slow-title {
+      font-size: 14px;
+      font-weight: 900;
+      color: #b45309;
+    }
+    .boot-slow-desc {
+      margin-top: 6px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #92400e;
+      white-space: pre-line;
+    }
+    .boot-refresh-btn {
+      margin-top: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 42px;
+      padding: 0 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(196,181,253,0.95);
+      background: white;
+      color: #6d28d9;
+      font-size: 13px;
+      font-weight: 900;
+      box-shadow: 0 8px 18px rgba(15,23,42,0.06);
+    }
+    .boot-version {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 7px 12px;
+      border: 1px solid rgba(196,181,253,0.75);
+      background: rgba(255,255,255,0.72);
+      box-shadow: 0 8px 20px rgba(15,23,42,0.06);
+      font-size: 11px;
+      font-weight: 900;
+      color: #6d28d9;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(6px);
+    }
+    .boot-version .version-label { color:#7c8698; }
+    @media (max-width: 767px) {
+      .boot-splash-card { min-height: 460px; padding: 36px 20px 72px; }
+      .boot-main-text { font-size: 24px; }
+      .boot-sub-text { font-size: 15px; }
+    }
     .admin-collapse-button {
       display: inline-flex;
       align-items: center;
@@ -442,7 +567,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'v2026.04.16-04';
+    const APP_VERSION = 'v2026.04.16-05';
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
     const SCORE_BUCKETS = [
@@ -738,9 +863,8 @@
       const [isDeletingTestData, setIsDeletingTestData] = useState(false);
       const [authReady, setAuthReady] = useState(false);
       const [dataReady, setDataReady] = useState(false);
-      const [teachersReady, setTeachersReady] = useState(false);
-      const [teachersLoadError, setTeachersLoadError] = useState('');
-      const [loginConnectSlow, setLoginConnectSlow] = useState(false);
+      const [bootSlow, setBootSlow] = useState(false);
+      const [bootVerySlow, setBootVerySlow] = useState(false);
 
       const [view, setView] = useState('dashboard');
       
@@ -848,7 +972,6 @@
                 reject(authError);
               }
             });
-            setIsLoading(false);
           } catch (error) {
             setInitError('Firebase 초기화 실패: ' + error.message);
             setIsLoading(false);
@@ -858,47 +981,43 @@
       }, []);
 
       useEffect(() => {
+        if (initError || dataReady) {
+          setBootSlow(false);
+          setBootVerySlow(false);
+          return;
+        }
+        const slowTimer = setTimeout(() => setBootSlow(true), 12000);
+        const verySlowTimer = setTimeout(() => setBootVerySlow(true), 60000);
+        return () => {
+          clearTimeout(slowTimer);
+          clearTimeout(verySlowTimer);
+        };
+      }, [initError, dataReady]);
+
+      useEffect(() => {
         if (!db || !window.FirebaseAPI || !authReady || !user) return;
         const { collection, onSnapshot } = window.FirebaseAPI;
-        const unsub = onSnapshot(collection(db, getPath('teachers')), (s) => {
-          setTeachersData(s.docs.map(d => ({ teacherId: d.id, ...d.data() })).filter(t => t.isActive !== false));
-          setTeachersReady(true);
-          setTeachersLoadError('');
-        }, (error) => {
-          setTeachersLoadError('선생님 목록을 불러오지 못했습니다: ' + error.message);
-          setTeachersReady(false);
-        });
-        return () => unsub && unsub();
-      }, [db, authReady, user]);
-
-      useEffect(() => {
-        if (isLoggedIn) {
-          setLoginConnectSlow(false);
-          return;
-        }
-        if (teachersReady || !authReady || initError) {
-          setLoginConnectSlow(false);
-          return;
-        }
-        const timer = setTimeout(() => setLoginConnectSlow(true), 4500);
-        return () => clearTimeout(timer);
-      }, [isLoggedIn, teachersReady, authReady, initError]);
-
-      useEffect(() => {
-        if (!db || !window.FirebaseAPI || !authReady || !user || !isLoggedIn) return;
-        const { collection, onSnapshot } = window.FirebaseAPI;
         let unsubs = [];
-        const ready = { students: false, scores: false, team: false, subjects: false, subjectDetails: false, dashboardRules: false };
+        const ready = { teachers: false, students: false, scores: false, team: false, subjects: false, subjectDetails: false, dashboardRules: false };
         const markReady = (key) => {
           ready[key] = true;
           if (Object.values(ready).every(Boolean)) {
             setDataReady(true);
+            setIsLoading(false);
           }
         };
 
         setDataReady(false);
+        setIsLoading(true);
 
         try {
+          unsubs.push(onSnapshot(collection(db, getPath('teachers')), (s) => {
+            setTeachersData(s.docs.map(d => ({ teacherId: d.id, ...d.data() })).filter(t => t.isActive !== false));
+            markReady('teachers');
+          }, (error) => {
+            setInitError('teachers 데이터를 읽을 수 없습니다: ' + error.message);
+            markReady('teachers');
+          }));
           unsubs.push(onSnapshot(collection(db, getPath('students')), (s) => {
             setStudentsData(s.docs.map(d => ({ studentId: d.id, ...d.data() })));
             markReady('students');
@@ -944,12 +1063,14 @@
           }, () => markReady('dashboardRules')));
         } catch (error) {
           setInitError('데이터베이스 연결 실패: ' + error.message);
+          setIsLoading(false);
           setDataReady(true);
         }
         return () => unsubs.forEach(u => u && u());
-      }, [db, authReady, user, isLoggedIn]);
+      }, [db, authReady, user]);
 
       const joinedData = useMemo(() => scoresData.filter(s => !s.deleted).map(score => {
+
         const student = studentsData.find(s => s.studentId === score.studentId && !s.deleted) || {};
         return { ...score, name: student.name || '알수없음', school: student.school || '-', grade: student.grade || 0, year: student.year || score.year, isWithdrawn: student.isWithdrawn === true };
       }), [scoresData, studentsData]);
@@ -1172,7 +1293,7 @@
 
       const handleLogin = (e) => {
         e.preventDefault();
-        if (!teachersReady) return setLoginError('선생님 목록을 아직 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+        if (!teachersData.length) return setLoginError('시스템 준비가 아직 완료되지 않았습니다. 잠시 후 다시 시도해주세요.');
         if (!selectedTeacherName) return setLoginError('선생님을 선택해주세요.');
         const t = teachersData.find(t => t.name === selectedTeacherName && String(t.pin||'') === loginPin);
         if (!t) return setLoginError('PIN이 올바르지 않습니다.');
@@ -1913,8 +2034,28 @@
         return sortRows(items, schoolSort, { school:r=>safeLower(r.school), grade:r=>Number(r.grade), subject:r=>safeLower(r.subject), count:r=>Number(r.count), avg:r=>Number(r.avg), rate1:r=>Number(r.rate1), rate2:r=>Number(r.rate2), rate3:r=>Number(r.rate3), rate4:r=>Number(r.rate4), rate5:r=>Number(r.rate5) });
       })();
 
-      if (isLoading) return <div className="min-h-screen flex items-center justify-center text-violet-700 font-bold text-xl">연결 준비 중...</div>;
       if (initError) return <div className="min-h-screen flex items-center justify-center p-6"><div className="bg-white border border-rose-200 rounded-[28px] p-6 max-w-2xl w-full"><div className="text-2xl font-black text-rose-600 mb-3">연결 오류</div><div className="text-sm text-rose-600 whitespace-pre-wrap leading-7">{initError}</div></div></div>;
+      if (isLoading || !dataReady) {
+        return (
+          <div className="boot-splash-wrap">
+            <div className="boot-splash-card">
+              <div className="boot-logo-wrap"><img src="./logo.png" alt="열린학원 로고" className="w-full h-auto object-contain" onError={(e)=>{e.currentTarget.style.display='none';}} /></div>
+              <div className="boot-main-text">시스템 가동 준비중입니다.
+잠시만 기다려주세요.</div>
+              <div className="boot-sub-text">1분 이상 본 화면이 지속될 시
+F5를 눌러서 새로고침 한 번만 해주세요.</div>
+              {bootSlow && (
+                <div className="boot-slow-box">
+                  <div className="boot-slow-title">초기 데이터를 불러오는 시간이 평소보다 길어지고 있습니다.</div>
+                  <div className="boot-slow-desc">처음 접속한 기기이거나 네트워크 상태에 따라 준비 시간이 조금 더 걸릴 수 있습니다.</div>
+                  {bootVerySlow && <button type="button" onClick={() => window.location.reload()} className="boot-refresh-btn">새로고침</button>}
+                </div>
+              )}
+              <div className="boot-version" aria-label="배포 버전"><span className="version-label">ver.</span><span>{APP_VERSION}</span></div>
+            </div>
+          </div>
+        );
+      }
       
       if (!isLoggedIn) {
         return (
@@ -1944,43 +2085,26 @@
                 <form onSubmit={handleLogin} className="space-y-6 mt-8">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-3">선생님 선택</label>
-                    {teachersReady ? (
-                      <div className="grid grid-cols-3 gap-3">
-                        {orderedTeachers.map((t, idx) => (
-                          <button type="button" key={t.teacherId} onClick={() => setSelectedTeacherName(t.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selectedTeacherName === t.name ? 'teacher-chip-selected' : ''}`}>
-                            {t.name}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                        <div className="text-sm font-bold text-violet-700">선생님 목록을 불러오는 중...</div>
-                        <div className="mt-2 text-sm text-slate-500">처음 접속한 기기에서는 몇 초 정도 더 걸릴 수 있어요.</div>
-                        {loginConnectSlow && (
-                          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                            <div className="text-sm font-black text-amber-700">연결이 조금 지연되고 있어요.</div>
-                            <div className="mt-1 text-xs leading-6 text-amber-700">잠시 기다린 뒤 자동으로 목록이 뜨지 않으면 새로고침해 주세요.</div>
-                            <button type="button" onClick={() => window.location.reload()} className="mt-3 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-amber-700">새로고침</button>
-                          </div>
-                        )}
-                        {teachersLoadError && <div className="mt-3 text-sm font-bold text-rose-600">{teachersLoadError}</div>}
-                      </div>
-                    )}
+                    <div className="grid grid-cols-3 gap-3">
+                      {orderedTeachers.map((t, idx) => (
+                        <button type="button" key={t.teacherId} onClick={() => setSelectedTeacherName(t.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selectedTeacherName === t.name ? 'teacher-chip-selected' : ''}`}>
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">PIN 번호</label>
-                    <input type="password" maxLength="4" value={loginPin} onChange={e => setLoginPin(e.target.value.replace(/\D/g, ''))} className="w-full h-16 border-2 border-slate-200 rounded-2xl text-center text-3xl tracking-[1em] font-black focus:border-violet-400 outline-none disabled:bg-slate-100 disabled:text-slate-400" placeholder="••••" disabled={!teachersReady} />
+                    <input type="password" maxLength="4" value={loginPin} onChange={e => setLoginPin(e.target.value.replace(/\D/g, ''))} className="w-full h-16 border-2 border-slate-200 rounded-2xl text-center text-3xl tracking-[1em] font-black focus:border-violet-400 outline-none" placeholder="••••" />
                   </div>
                   {loginError && <div className="text-rose-600 text-sm font-bold">{loginError}</div>}
-                  <button type="submit" disabled={!teachersReady} className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white font-bold text-lg shadow-lg disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed">로그인</button>
+                  <button type="submit" className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white font-bold text-lg shadow-lg">로그인</button>
                 </form>
               </div>
             </div>
           </div>
         );
       }
-
-      if (!dataReady) return <div className="min-h-screen flex items-center justify-center text-violet-700 font-bold text-xl">분석 데이터를 불러오는 중...</div>;
 
       // Views Data Prep
       const dashboardBaseRows = activeJoinedData.filter((d) =>
@@ -2273,7 +2397,6 @@
                   <h2 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900">{titleMap[view]}</h2>
                 </div>
                 <div className="flex items-center gap-2 print-hide">
-                  <span className="hidden sm:inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-2 text-[11px] font-black text-violet-700">버전 {APP_VERSION}</span>
                   {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : null}
                   {isAdminUser ? <button onClick={handleExportAllData} className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full font-bold text-sm text-emerald-700 hover:bg-emerald-100"><i className="fas fa-file-export mr-2"></i>전체 엑셀</button> : null}
                   <button onClick={handlePrintPage} className="px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200"><i className="fas fa-print mr-2"></i>인쇄</button>
