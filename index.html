@@ -424,6 +424,7 @@
       .student-analysis-print-card > div:first-child { display:none !important; }
       .student-analysis-highlight-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
       .school-print-table td, .school-print-table th { padding-left: 6px !important; padding-right: 6px !important; }
+      .print-teacher-focus { display:block !important; margin-top: 8px !important; font-size: 28px !important; line-height: 1.15 !important; font-weight: 900 !important; color: #6d28d9 !important; }
     }
     @media (max-width: 1279px) {
       .desktop-sidebar { display:none !important; }
@@ -1715,7 +1716,7 @@
           return [String(filters.year) + '년', EXAM_SHORT_LABELS[filters.exam] || filters.exam, filters.school === '전체' ? '전체 학교' : filters.school, filters.grade === '전체' ? '전체 학년' : `${filters.grade}학년`, activeSubject === '전체' ? '전체 과목' : activeSubject].join(' · ');
         }
         if (view === 'teacherAnalysis') {
-          return [teacherAnalysisTeacher || currentTeacherName || '', String(teacherAnalysisView.year) + '년', EXAM_SHORT_LABELS[teacherAnalysisView.exam] || teacherAnalysisView.exam, teacherAnalysisView.school === '전체' ? '전체 학교' : teacherAnalysisView.school, teacherAnalysisView.grade === '전체' ? '전체 학년' : `${teacherAnalysisView.grade}학년`].filter(Boolean).join(' · ');
+          return [String(teacherAnalysisView.year) + '년', EXAM_SHORT_LABELS[teacherAnalysisView.exam] || teacherAnalysisView.exam, teacherAnalysisView.school === '전체' ? '전체 학교' : teacherAnalysisView.school, teacherAnalysisView.grade === '전체' ? '전체 학년' : `${teacherAnalysisView.grade}학년`].filter(Boolean).join(' · ');
         }
         if (view === 'schoolAnalysis') {
           return [String(schoolView.year) + '년', EXAM_SHORT_LABELS[schoolView.exam] || schoolView.exam, schoolView.school === '전체' ? '전체 학교' : schoolView.school, schoolView.grade === '전체' ? '전체 학년' : `${schoolView.grade}학년`, schoolView.subject === '전체' ? '전체 과목' : schoolView.subject].join(' · ');
@@ -1731,7 +1732,7 @@
       };
 
       const escapeHtml = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
+      const getTeacherAnalysisHeading = () => teacherAnalysisTeacher === '전체' ? '전체 선생님' : (teacherAnalysisTeacher || currentTeacherName || '전체 선생님');
 
       const printSchoolAnalysisLandscape = () => {
         const summary = buildPrintSummaryText();
@@ -1741,6 +1742,18 @@
           alert('팝업이 차단되어 인쇄 창을 열 수 없습니다.');
           return;
         }
+        const tierStyles = {
+          1: { wrap: '#f5f3ff', border: '#ddd6fe', text: '#6d28d9', bar1: '#8b5cf6', bar2: '#d946ef' },
+          2: { wrap: '#f0f9ff', border: '#bae6fd', text: '#0369a1', bar1: '#38bdf8', bar2: '#22d3ee' },
+          3: { wrap: '#ecfdf5', border: '#a7f3d0', text: '#047857', bar1: '#34d399', bar2: '#14b8a6' },
+          4: { wrap: '#fffbeb', border: '#fde68a', text: '#b45309', bar1: '#fbbf24', bar2: '#fb923c' },
+          5: { wrap: '#fff1f2', border: '#fecdd3', text: '#be123c', bar1: '#fb7185', bar2: '#f472b6' },
+        };
+        const renderRateCell = (value, tier) => {
+          const style = tierStyles[tier] || tierStyles[5];
+          const width = Math.max(8, Number(value || 0));
+          return `<td><div class="rate-box" style="background:${style.wrap};border-color:${style.border};"><div class="rate-track"><div class="rate-fill" style="width:${width}%;background:linear-gradient(90deg, ${style.bar1}, ${style.bar2});"></div></div><div class="rate-text" style="color:${style.text};">${escapeHtml(value)}%</div></div></td>`;
+        };
         const bodyRows = rows.length ? rows.map((row) => `
           <tr>
             <td>${escapeHtml(row.school)}</td>
@@ -1748,27 +1761,28 @@
             <td>${escapeHtml(row.subject)}</td>
             <td>${escapeHtml(row.count)}명</td>
             <td class="avg">${escapeHtml(row.avg)}점</td>
-            <td>${escapeHtml(row.rate1)}%</td>
-            <td>${escapeHtml(row.rate2)}%</td>
-            <td>${escapeHtml(row.rate3)}%</td>
-            <td>${escapeHtml(row.rate4)}%</td>
-            <td>${escapeHtml(row.rate5)}%</td>
+            ${[1,2,3,4,5].map((tier) => renderRateCell(row[`rate${tier}`], tier)).join('')}
           </tr>`).join('') : '<tr><td colspan="10" class="empty">데이터가 없습니다.</td></tr>';
         const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8" /><title>학교별 성적분석 인쇄</title><style>
           @page { size:A4 landscape; margin:10mm; }
-          body{font-family:Arial,"Noto Sans KR",sans-serif; margin:0; color:#0f172a;}
+          * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+          body{font-family:Arial,"Noto Sans KR",sans-serif; margin:0; color:#0f172a; background:#fff;}
           .wrap{padding:10mm;}
-          .summary{border:1px solid #dbe2ea;border-radius:18px;padding:14px 18px;margin-bottom:14px;}
+          .summary{border:1px solid #dbe2ea;border-radius:18px;padding:14px 18px;margin-bottom:14px;background:#fff;}
           .eyebrow{font-size:12px;font-weight:800;color:#7c3aed;}
           h1{margin:4px 0 6px 0;font-size:34px;}
           .sub{font-size:14px;font-weight:700;color:#64748b;}
-          table{width:100%;border-collapse:collapse;font-size:13px;text-align:center;}
+          table{width:100%;border-collapse:collapse;font-size:13px;text-align:center;table-layout:fixed;}
           thead{background:#f8fafc;color:#64748b;font-weight:800;}
-          th,td{padding:10px 8px;border-bottom:1px solid #e2e8f0;}
+          th,td{padding:10px 8px;border-bottom:1px solid #e2e8f0;vertical-align:middle;}
           .avg{font-weight:900;color:#6d28d9;}
           .empty{padding:32px 0;color:#94a3b8;}
           .rates td{white-space:nowrap;}
-        </style></head><body><div class="wrap"><div class="summary"><div class="eyebrow">열린학원 성적분석 포털</div><h1>학교별 성적분석</h1><div class="sub">${escapeHtml(summary)}</div></div><table class="rates"><thead><tr><th>학교</th><th>학년</th><th>과목</th><th>학생수</th><th>평균</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th></tr></thead><tbody>${bodyRows}</tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),120);<\/script></div></body></html>`;
+          .rate-box{min-width:92px;border:1px solid;border-radius:16px;padding:8px 10px;}
+          .rate-track{height:8px;border-radius:999px;background:rgba(255,255,255,0.9);overflow:hidden;}
+          .rate-fill{height:100%;border-radius:999px;}
+          .rate-text{margin-top:6px;font-size:12px;font-weight:900;}
+        </style></head><body><div class="wrap"><div class="summary"><div class="eyebrow">열린학원 성적분석 포털</div><h1>학교별 성적분석</h1><div class="sub">${escapeHtml(summary)}</div></div><table class="rates"><thead><tr><th>학교</th><th>학년</th><th>과목</th><th>학생수</th><th>평균</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th></tr></thead><tbody>${bodyRows}</tbody></table><script>window.onafterprint=function(){setTimeout(function(){window.close();},80);};window.onload=function(){setTimeout(function(){window.print();},120);};<\/script></div></body></html>`;
         popup.document.write(html);
         popup.document.close();
       };
@@ -2077,10 +2091,10 @@
       );
 
       // Teacher Analysis Logic
-      const teacherAnalysisTarget = teacherAnalysisTeacher || currentTeacherName;
+      const teacherAnalysisTarget = teacherAnalysisTeacher === '전체' ? '전체' : (teacherAnalysisTeacher || currentTeacherName);
       const teacherAnalysisRows = (() => {
         const rows = activeJoinedData.filter((r) =>
-          (r.createdBy === teacherAnalysisTarget || r.updatedBy === teacherAnalysisTarget) &&
+          (teacherAnalysisTarget === '전체' || r.createdBy === teacherAnalysisTarget || r.updatedBy === teacherAnalysisTarget) &&
           Number(r.year) === Number(teacherAnalysisView.year) &&
           r.exam === teacherAnalysisView.exam &&
           (teacherAnalysisView.school === '전체' || r.school === teacherAnalysisView.school) &&
@@ -2229,6 +2243,7 @@
             <div className="print-only print-summary-box">
               <div className="text-sm font-bold text-violet-700">열린학원 성적분석 포털</div>
               <div className="mt-1 text-2xl font-black text-slate-900">{titleMap[view]}</div>
+              {view === 'teacherAnalysis' ? <div className="print-teacher-focus">{getTeacherAnalysisHeading()}</div> : null}
               <div className="mt-2 text-sm font-bold text-slate-500">{buildPrintSummaryText()}</div>
             </div>
 
@@ -2668,7 +2683,7 @@
               <div className="space-y-6">
                 <Card className="print-hide">
                   <div className="flex flex-wrap gap-3 items-center">
-                    <select value={teacherAnalysisTeacher || currentTeacherName} onChange={e=>setTeacherAnalysisTeacher(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 font-bold text-violet-800 outline-none">{orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}</select>
+                    <select value={teacherAnalysisTeacher || currentTeacherName} onChange={e=>setTeacherAnalysisTeacher(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 font-bold text-violet-800 outline-none"><option value="전체">전체 선생님</option>{orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}</select>
                     <select value={teacherAnalysisView.school} onChange={e=>setTeacherAnalysisView({...teacherAnalysisView, school:e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학교</option>{SCHOOL_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select>
                     <select value={teacherAnalysisView.grade} onChange={e=>setTeacherAnalysisView({...teacherAnalysisView, grade:e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학년</option>{GRADES.map(g=><option key={g} value={g}>{g}학년</option>)}</select>
                     <div className="flex gap-2 flex-wrap">{EXAMS.map(ex => <button key={ex} onClick={()=>setTeacherAnalysisView({...teacherAnalysisView, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${teacherAnalysisView.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>)}</div>
@@ -2683,7 +2698,7 @@
                   <div className="print-metric-card bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center"><div className="print-metric-label text-sm text-slate-500 font-bold">전체 평균</div><div className="print-metric-value text-3xl font-black mt-2 text-violet-700">{sortedTeacherAnalysisRows.length ? Math.round(sortedTeacherAnalysisRows.reduce((sum,row)=>sum+Number(row.score||0),0)/sortedTeacherAnalysisRows.length) : 0}점</div></div>
                 </div>
 
-                <Card title="상세 성적 변화 리스트" right={<span className="text-xs text-slate-400">{(teacherAnalysisTeacher || currentTeacherName || "전체 선생님")} · {EXAM_SHORT_LABELS[teacherAnalysisView.exam] || teacherAnalysisView.exam}</span>}>
+                <Card title="상세 성적 변화 리스트" right={<span className="text-xs text-slate-400">{getTeacherAnalysisHeading()} · {EXAM_SHORT_LABELS[teacherAnalysisView.exam] || teacherAnalysisView.exam}</span>}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="text-xs font-bold text-amber-700">※ 6~9등급 입력값은 모두 5등급으로 통일해서 표시합니다.</div>
                     <div className="text-xs font-bold text-slate-500">
