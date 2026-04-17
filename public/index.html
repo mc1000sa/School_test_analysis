@@ -793,7 +793,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R12';
+    const APP_VERSION = 'OA-R12.1';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -1332,7 +1332,7 @@
 
         try {
           unsubs.push(onSnapshot(collection(db, getPath('teachers')), (s) => {
-            setTeachersData(s.docs.map(d => ({ teacherId: d.id, ...d.data() })).filter(t => t.isActive !== false));
+            setTeachersData(s.docs.map(d => ({ teacherId: d.id, ...d.data() })));
             markReady('teachers');
           }, (error) => {
             setInitError('teachers 데이터를 읽을 수 없습니다: ' + error.message);
@@ -1446,6 +1446,7 @@
         });
         return items;
       }, [teachersData]);
+      const activeOrderedTeachers = useMemo(() => orderedTeachers.filter((teacher) => teacher.isActive !== false), [orderedTeachers]);
       const [schoolSort, setSchoolSort] = useState({ key: 'avg', direction: 'desc' });
       const [studentSort, setStudentSort] = useState({ key: 'year', direction: 'asc' });
       const [teamExamSort, setTeamExamSort] = useState({ key: 'year', direction: 'desc' });
@@ -1474,6 +1475,34 @@
         setView('teacherAdmin');
       };
 
+      const normalizeTeacherDisplayOrders = async (teacherList, preferredTeacherId = '', preferredDisplayOrder = null) => {
+        if (!db || !window.FirebaseAPI) return;
+        const safeList = Array.isArray(teacherList) ? [...teacherList] : [];
+        const getBaseOrder = (teacher, index) => {
+          if (preferredTeacherId && teacher.teacherId === preferredTeacherId && Number.isFinite(Number(preferredDisplayOrder))) {
+            return Number(preferredDisplayOrder);
+          }
+          const value = Number(teacher?.displayOrder);
+          return Number.isFinite(value) ? value : index + 1;
+        };
+        const sorted = safeList.sort((a, b) => {
+          const orderGap = getBaseOrder(a, 0) - getBaseOrder(b, 0);
+          if (orderGap !== 0) return orderGap;
+          if ((a.name||'') === '원장쌤' && (b.name||'') !== '원장쌤') return -1;
+          if ((b.name||'') === '원장쌤' && (a.name||'') !== '원장쌤') return 1;
+          return String(a.name||'').localeCompare(String(b.name||''), 'ko');
+        });
+        const batch = window.FirebaseAPI.writeBatch(db);
+        sorted.forEach((teacher, index) => {
+          batch.update(window.FirebaseAPI.doc(db, getPath('teachers'), teacher.teacherId), {
+            displayOrder: index + 1,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentTeacher?.name || '',
+          });
+        });
+        await batch.commit();
+      };
+
       const handleSaveTeacherAdmin = async (e) => {
         e?.preventDefault?.();
         if (!db || !window.FirebaseAPI || !isAdminUser || isSavingTeacherAdmin) return;
@@ -1491,13 +1520,21 @@
           const payload = {
             name,
             pin,
-            displayOrder: displayOrderRaw === '' ? null : displayOrderValue,
-            isActive: true,
             updatedAt: new Date().toISOString(),
             updatedBy: currentTeacher?.name || '',
           };
           if (editingTeacherId) {
-            await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), editingTeacherId), payload);
+            const currentTeacherDoc = teachersData.find((teacher) => teacher.teacherId === editingTeacherId) || {};
+            await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), editingTeacherId), {
+              ...payload,
+              isActive: currentTeacherDoc.isActive === false ? false : true,
+              displayOrder: displayOrderRaw === '' ? (currentTeacherDoc.displayOrder ?? null) : displayOrderValue,
+            });
+            await normalizeTeacherDisplayOrders(
+              teachersData.map((teacher) => teacher.teacherId === editingTeacherId ? { ...teacher, ...payload, displayOrder: displayOrderRaw === '' ? (teacher.displayOrder ?? null) : displayOrderValue } : teacher),
+              editingTeacherId,
+              displayOrderRaw === '' ? null : displayOrderValue,
+            );
           } else {
             const existingOrders = teachersData
               .map((teacher, index) => {
@@ -1508,6 +1545,7 @@
             await window.FirebaseAPI.addDoc(window.FirebaseAPI.collection(db, getPath('teachers')), {
               ...payload,
               displayOrder: nextOrder,
+              isActive: true,
               createdAt: new Date().toISOString(),
               createdBy: currentTeacher?.name || '',
             });
@@ -1539,23 +1577,19 @@
         if (currentIndex === -1) return;
         const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
         if (targetIndex < 0 || targetIndex >= orderedTeachers.length) return;
-        const current = orderedTeachers[currentIndex];
-        const target = orderedTeachers[targetIndex];
-        const currentOrder = Number.isFinite(Number(current.displayOrder)) ? Number(current.displayOrder) : currentIndex + 1;
-        const targetOrder = Number.isFinite(Number(target.displayOrder)) ? Number(target.displayOrder) : targetIndex + 1;
+        const reordered = [...orderedTeachers];
+        const [moved] = reordered.splice(currentIndex, 1);
+        reordered.splice(targetIndex, 0, moved);
         try {
-          await Promise.all([
-            window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), current.teacherId), {
-              displayOrder: targetOrder,
+          const batch = window.FirebaseAPI.writeBatch(db);
+          reordered.forEach((teacher, index) => {
+            batch.update(window.FirebaseAPI.doc(db, getPath('teachers'), teacher.teacherId), {
+              displayOrder: index + 1,
               updatedAt: new Date().toISOString(),
               updatedBy: currentTeacher?.name || '',
-            }),
-            window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), target.teacherId), {
-              displayOrder: currentOrder,
-              updatedAt: new Date().toISOString(),
-              updatedBy: currentTeacher?.name || '',
-            }),
-          ]);
+            });
+          });
+          await batch.commit();
         } catch (error) {
           alert('표시 순서 변경 중 오류가 발생했습니다: ' + error.message);
         }
@@ -2612,7 +2646,7 @@
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-3">선생님 선택</label>
                     <div className="grid grid-cols-3 gap-3">
-                      {orderedTeachers.map((t, idx) => (
+                      {activeOrderedTeachers.map((t, idx) => (
                         <button type="button" key={t.teacherId} onClick={() => setSelectedTeacherName(t.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selectedTeacherName === t.name ? 'teacher-chip-selected' : ''}`}>
                           {t.name}
                         </button>
@@ -2966,11 +3000,11 @@
           return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar">{EXAMS.map((exam) => <button key={exam} type="button" onClick={() => setFilters((p) => ({ ...p, exam }))} className={`top-context-chip ${filters.exam === exam ? 'top-context-chip-active' : ''}`}>{EXAM_SHORT_LABELS[exam]}</button>)}</div>;
         }
         if (view === 'manage') {
-          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar"><span className="px-2 text-xs font-bold text-slate-500 whitespace-nowrap">선생님 빠른 선택</span><button type="button" onClick={() => setManageTeacherFilter('전체')} className={`top-context-chip ${manageTeacherFilter === '전체' ? 'top-context-chip-active' : ''}`}>전체</button>{orderedTeachers.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setManageTeacherFilter(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${manageTeacherFilter === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar"><span className="px-2 text-xs font-bold text-slate-500 whitespace-nowrap">선생님 빠른 선택</span><button type="button" onClick={() => setManageTeacherFilter('전체')} className={`top-context-chip ${manageTeacherFilter === '전체' ? 'top-context-chip-active' : ''}`}>전체</button>{activeOrderedTeachers.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setManageTeacherFilter(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${manageTeacherFilter === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
         }
         if (view === 'teacherAnalysis') {
           const activeTeacher = teacherAnalysisTeacher || currentTeacher?.name || '';
-          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setTeacherAnalysisTeacher('전체')} className={`top-context-chip ${teacherAnalysisTeacher === '전체' ? 'top-context-chip-active' : ''}`}>전체</button>{orderedTeachers.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setTeacherAnalysisTeacher(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${activeTeacher === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
+          return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setTeacherAnalysisTeacher('전체')} className={`top-context-chip ${teacherAnalysisTeacher === '전체' ? 'top-context-chip-active' : ''}`}>전체</button>{activeOrderedTeachers.map((teacher, idx) => <button key={teacher.teacherId} type="button" onClick={() => setTeacherAnalysisTeacher(teacher.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} h-11 px-5 ${activeTeacher === teacher.name ? 'teacher-chip-selected' : ''}`}>{teacher.name}</button>)}</div>;
         }
         if (view === 'schoolAnalysis') {
           return <div className="top-context-wrap hidden xl:flex flex-wrap gap-2 items-center px-4 py-4 max-w-full overflow-x-auto no-scrollbar"><button type="button" onClick={() => setSchoolView((p) => ({ ...p, school: '전체' }))} className={`top-context-chip ${schoolView.school === '전체' ? 'top-context-chip-active' : ''}`}>전체 학교</button>{SCHOOL_OPTIONS.map((school) => <button key={school} type="button" onClick={() => setSchoolView((p) => ({ ...p, school }))} className={`top-context-chip ${schoolView.school === school ? 'top-context-chip-active' : ''}`}>{school}</button>)}</div>;
@@ -3408,7 +3442,7 @@
                     <div className="space-y-3 mb-4">
                       <select value={manageTeacherFilter} onChange={e=>setManageTeacherFilter(e.target.value)} className="w-full border border-slate-200 p-2.5 rounded-xl">
                         <option value="전체">전체 선생님</option>
-                        {orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}
+                        {activeOrderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}
                       </select>
                       <select value={manageListFilters.school} onChange={e=>setManageListFilters((p)=>({...p, school:e.target.value}))} className="w-full border border-slate-200 p-2.5 rounded-xl">
                         <option value="전체">전체 학교</option>
@@ -3476,7 +3510,7 @@
               <div className="space-y-6">
                 <Card className="print-hide">
                   <div className="flex flex-wrap gap-3 items-center">
-                    <select value={teacherAnalysisTeacher || currentTeacherName} onChange={e=>setTeacherAnalysisTeacher(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 font-bold text-violet-800 outline-none"><option value="전체">전체</option>{orderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}</select>
+                    <select value={teacherAnalysisTeacher || currentTeacherName} onChange={e=>setTeacherAnalysisTeacher(e.target.value)} className="border border-slate-300 rounded-xl p-2.5 font-bold text-violet-800 outline-none"><option value="전체">전체</option>{activeOrderedTeachers.map(t=><option key={t.teacherId} value={t.name}>{t.name}</option>)}</select>
                     <select value={teacherAnalysisView.school} onChange={e=>setTeacherAnalysisView({...teacherAnalysisView, school:e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학교</option>{SCHOOL_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select>
                     <select value={teacherAnalysisView.grade} onChange={e=>setTeacherAnalysisView({...teacherAnalysisView, grade:e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학년</option>{GRADES.map(g=><option key={g} value={g}>{g}학년</option>)}</select>
                     <div className="flex gap-2 flex-wrap">{EXAMS.map(ex => <button key={ex} onClick={()=>setTeacherAnalysisView({...teacherAnalysisView, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${teacherAnalysisView.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>)}</div>
@@ -3722,7 +3756,7 @@
                                 <td>{normalizeTeacherAnalysisTier(r.tier)}등급</td>
                                 <td>
                                   <select value={r.updatedBy || r.createdBy || ''} onChange={(e)=>handleScoreOwnerChange(r.docId, e.target.value)} className="border border-slate-300 rounded-xl px-2 py-1.5 text-xs bg-white">
-                                    {orderedTeachers.map((teacher)=><option key={teacher.teacherId} value={teacher.name}>{teacher.name}</option>)}
+                                    {activeOrderedTeachers.map((teacher)=><option key={teacher.teacherId} value={teacher.name}>{teacher.name}</option>)}
                                   </select>
                                 </td>
                               </tr>)}
