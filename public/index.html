@@ -756,7 +756,7 @@
       <div class="instant-boot-title">시스템 가동 준비중입니다.
 잠시만 기다려주세요.</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R10.4</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R10.5</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -792,7 +792,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R10.4';
+    const APP_VERSION = 'OA-R10.5';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -3448,17 +3448,42 @@
                         <option value="전체">전체 과목</option>
                         {subjectOptions.map(subject => <option key={subject} value={subject}>{subject}</option>)}
                       </select>
-                      <input value={studentAnalysisFilters.keyword} onChange={e => setStudentAnalysisFilters((p) => ({ ...p, keyword: e.target.value }))} placeholder="학생 이름 검색" className="border border-slate-300 rounded-xl p-2.5 outline-none min-w-[220px]" />
-                      <div className="text-sm text-slate-500">학교와 학년을 고른 뒤 학생 버튼을 눌러 바로 분석합니다.</div>
+                      <div className="flex items-center gap-2 min-w-[260px]">
+                        <input
+                          value={studentAnalysisFilters.keyword}
+                          onChange={e => setStudentAnalysisFilters((p) => ({ ...p, keyword: e.target.value }))}
+                          placeholder="학생 이름 검색"
+                          className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none min-w-[220px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const first = filteredStudentAnalysisStudents[0];
+                            if (first) {
+                              setStudentAnalysisStudentId(first.studentId);
+                              setStudentSubjectFilter(studentAnalysisFilters.subject === '전체' ? '전체' : studentAnalysisFilters.subject);
+                            }
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-violet-600 text-white font-black hover:bg-violet-700 transition whitespace-nowrap"
+                        >
+                          검색
+                        </button>
+                      </div>
+                      <div className="text-sm text-slate-500">학교·학년 선택 후 버튼으로 찾거나, 이름을 입력하면 바로 후보가 뜹니다.</div>
                     </div>
-                    {studentAnalysisFilters.school && studentAnalysisFilters.grade ? (
-                      <div className="flex flex-wrap gap-2">
-                        {filteredStudentAnalysisStudents.length ? filteredStudentAnalysisStudents.map((student) => (
-                          <button key={student.studentId} type="button" onClick={() => { setStudentAnalysisStudentId(student.studentId); setStudentSubjectFilter(studentAnalysisFilters.subject === '전체' ? '전체' : studentAnalysisFilters.subject); }} className={`px-4 py-2 rounded-full border text-sm font-black transition ${studentAnalysisStudentId === student.studentId ? 'bg-violet-600 text-white border-violet-600 shadow-lg shadow-violet-200' : 'bg-white text-slate-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50'}`}>{student.name}</button>
-                        )) : <div className="text-sm text-slate-400">조건에 맞는 학생이 없습니다.</div>}
+                    {(studentAnalysisFilters.school && studentAnalysisFilters.grade) || String(studentAnalysisFilters.keyword || '').trim() ? (
+                      <div className="space-y-2">
+                        {!!String(studentAnalysisFilters.keyword || '').trim() && (
+                          <div className="text-sm text-violet-700 font-bold">이름 검색 결과 {filteredStudentAnalysisStudents.length}명</div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {filteredStudentAnalysisStudents.length ? filteredStudentAnalysisStudents.map((student) => (
+                            <button key={student.studentId} type="button" onClick={() => { setStudentAnalysisStudentId(student.studentId); setStudentSubjectFilter(studentAnalysisFilters.subject === '전체' ? '전체' : studentAnalysisFilters.subject); }} className={`px-4 py-2 rounded-full border text-sm font-black transition ${studentAnalysisStudentId === student.studentId ? 'bg-violet-600 text-white border-violet-600 shadow-lg shadow-violet-200' : 'bg-white text-slate-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50'}`}>{student.name}</button>
+                          )) : <div className="text-sm text-slate-400">조건에 맞는 학생이 없습니다.</div>}
+                        </div>
                       </div>
                     ) : (
-                      <div className="text-sm text-slate-400">학교와 학년을 먼저 선택해주세요.</div>
+                      <div className="text-sm text-slate-400">학교와 학년을 먼저 선택하거나, 학생 이름을 입력해 검색해주세요.</div>
                     )}
                   </div>
                 </Card>
