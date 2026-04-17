@@ -757,7 +757,7 @@
 잠시만 기다려주세요.</div>
       <div class="instant-boot-version" aria-label="브랜드"><span class="version-label">OASIS</span><span>Score Insight System</span></div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R10.5</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R12</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -793,7 +793,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R11.2';
+    const APP_VERSION = 'OA-R12';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -1175,6 +1175,9 @@
       const [editingTeamExamId, setEditingTeamExamId] = useState('');
       const [subjectAdminForm, setSubjectAdminForm] = useState({ subjectName: '', selectedSubject: '', detailName: '' });
       const [isSavingSubjectAdmin, setIsSavingSubjectAdmin] = useState(false);
+      const [teacherAdminForm, setTeacherAdminForm] = useState({ name: '', pin: '', displayOrder: '' });
+      const [editingTeacherId, setEditingTeacherId] = useState('');
+      const [isSavingTeacherAdmin, setIsSavingTeacherAdmin] = useState(false);
 
       const getPath = (name) => typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/${name}` : `openacademy/data/${name}`;
 
@@ -1430,7 +1433,13 @@
       const isTeamExamCustomDetail = teamExamForm.detailSubject === '__custom__';
 
       const orderedTeachers = useMemo(() => {
+        const getDisplayOrder = (item) => {
+          const value = Number(item?.displayOrder);
+          return Number.isFinite(value) ? value : 9999;
+        };
         const items = [...teachersData].sort((a,b) => {
+          const orderGap = getDisplayOrder(a) - getDisplayOrder(b);
+          if (orderGap !== 0) return orderGap;
           if ((a.name||'') === '원장쌤' && (b.name||'') !== '원장쌤') return -1;
           if ((b.name||'') === '원장쌤' && (a.name||'') !== '원장쌤') return 1;
           return String(a.name||'').localeCompare(String(b.name||''), 'ko');
@@ -1444,6 +1453,113 @@
       const isLoggedIn = !!currentTeacher;
       const currentTeacherName = currentTeacher?.name || '';
       const isAdminUser = currentTeacherName === ADMIN_TEACHER_NAME;
+
+      const allMenuItems = useMemo(() => {
+        if (!isAdminUser) return MENU_ITEMS;
+        return [...MENU_ITEMS, { key: 'teacherAdmin', label: '선생님 관리', icon: 'fa-user-gear' }];
+      }, [isAdminUser]);
+
+      const resetTeacherAdminForm = () => {
+        setEditingTeacherId('');
+        setTeacherAdminForm({ name: '', pin: '', displayOrder: '' });
+      };
+
+      const handleEditTeacherAdmin = (teacher) => {
+        setEditingTeacherId(teacher.teacherId);
+        setTeacherAdminForm({
+          name: String(teacher.name || ''),
+          pin: String(teacher.pin || ''),
+          displayOrder: teacher.displayOrder ?? '',
+        });
+        setView('teacherAdmin');
+      };
+
+      const handleSaveTeacherAdmin = async (e) => {
+        e?.preventDefault?.();
+        if (!db || !window.FirebaseAPI || !isAdminUser || isSavingTeacherAdmin) return;
+        const name = String(teacherAdminForm.name || '').trim();
+        const pin = String(teacherAdminForm.pin || '').replace(/\D/g, '').slice(0, 4);
+        const displayOrderRaw = teacherAdminForm.displayOrder;
+        const displayOrderValue = displayOrderRaw === '' ? null : Number(displayOrderRaw);
+        if (!name) return alert('선생님 이름을 입력해주세요.');
+        if (pin.length !== 4) return alert('PIN 번호는 숫자 4자리로 입력해주세요.');
+        if (displayOrderRaw !== '' && !Number.isFinite(displayOrderValue)) return alert('표시 순서는 숫자로 입력해주세요.');
+        const duplicateName = teachersData.some((teacher) => !teacher.deleted && teacher.teacherId !== editingTeacherId && String(teacher.name || '').trim() === name);
+        if (duplicateName) return alert('같은 이름의 선생님이 이미 있습니다.');
+        setIsSavingTeacherAdmin(true);
+        try {
+          const payload = {
+            name,
+            pin,
+            displayOrder: displayOrderRaw === '' ? null : displayOrderValue,
+            isActive: true,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentTeacher?.name || '',
+          };
+          if (editingTeacherId) {
+            await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), editingTeacherId), payload);
+          } else {
+            const existingOrders = teachersData
+              .map((teacher, index) => {
+                const value = Number(teacher.displayOrder);
+                return Number.isFinite(value) ? value : index + 1;
+              });
+            const nextOrder = displayOrderRaw === '' ? ((existingOrders.length ? Math.max(...existingOrders) : 0) + 1) : displayOrderValue;
+            await window.FirebaseAPI.addDoc(window.FirebaseAPI.collection(db, getPath('teachers')), {
+              ...payload,
+              displayOrder: nextOrder,
+              createdAt: new Date().toISOString(),
+              createdBy: currentTeacher?.name || '',
+            });
+          }
+          resetTeacherAdminForm();
+        } catch (error) {
+          alert('선생님 저장 중 오류가 발생했습니다: ' + error.message);
+        } finally {
+          setIsSavingTeacherAdmin(false);
+        }
+      };
+
+      const handleToggleTeacherActive = async (teacher) => {
+        if (!db || !window.FirebaseAPI || !isAdminUser) return;
+        try {
+          await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), teacher.teacherId), {
+            isActive: teacher.isActive === false ? true : false,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentTeacher?.name || '',
+          });
+        } catch (error) {
+          alert('사용 여부 변경 중 오류가 발생했습니다: ' + error.message);
+        }
+      };
+
+      const handleMoveTeacherOrder = async (teacherId, direction) => {
+        if (!db || !window.FirebaseAPI || !isAdminUser) return;
+        const currentIndex = orderedTeachers.findIndex((teacher) => teacher.teacherId === teacherId);
+        if (currentIndex === -1) return;
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (targetIndex < 0 || targetIndex >= orderedTeachers.length) return;
+        const current = orderedTeachers[currentIndex];
+        const target = orderedTeachers[targetIndex];
+        const currentOrder = Number.isFinite(Number(current.displayOrder)) ? Number(current.displayOrder) : currentIndex + 1;
+        const targetOrder = Number.isFinite(Number(target.displayOrder)) ? Number(target.displayOrder) : targetIndex + 1;
+        try {
+          await Promise.all([
+            window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), current.teacherId), {
+              displayOrder: targetOrder,
+              updatedAt: new Date().toISOString(),
+              updatedBy: currentTeacher?.name || '',
+            }),
+            window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), target.teacherId), {
+              displayOrder: currentOrder,
+              updatedAt: new Date().toISOString(),
+              updatedBy: currentTeacher?.name || '',
+            }),
+          ]);
+        } catch (error) {
+          alert('표시 순서 변경 중 오류가 발생했습니다: ' + error.message);
+        }
+      };
 
       useEffect(() => {
         setSubjectAdminForm((prev) => {
@@ -2460,8 +2576,10 @@
             <div className="w-full max-w-5xl grid md:grid-cols-[1.1fr_0.9fr] gap-6">
               <div className="hidden md:flex rounded-[36px] hero-panel p-10 flex-col justify-end relative overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.18),transparent_28%)]"></div>
+                <div className="absolute top-8 right-8 z-10 w-[190px]">
+                  <img src="./logo.png" alt="열린학원 로고" className="w-full h-auto object-contain" onError={(e)=>{e.currentTarget.style.display='none';}} />
+                </div>
                 <div className="relative z-10">
-                  <div className="max-w-[270px]"><img src="./logo.png" alt="열린학원 로고" className="w-full h-auto object-contain" onError={(e)=>{e.currentTarget.style.display='none';}} /></div>
                   <div className="mt-9 text-[13px] font-black tracking-[0.24em] text-slate-500">OPEN ACADEMY SCORE INSIGHT SYSTEM</div>
                   <h1 className="login-main-title mt-4 text-[38px] md:text-[46px] leading-[1.24]">
                     <span className="block text-slate-900">열린학원 성적 Insight</span>
@@ -2469,10 +2587,12 @@
                   <p className="mt-7 text-[19px] md:text-[22px] font-semibold italic leading-[1.95] text-slate-600">
                     성적을 입력하는 곳이 아니라,<br/>성적을 해석하는 시스템입니다.
                   </p>
-                  <div className="mt-10 inline-flex items-center rounded-full border border-slate-300/80 bg-white/70 px-5 py-3 text-sm font-semibold italic text-slate-400 shadow-sm">
+                  <div className="mt-10 text-sm font-semibold italic text-slate-400">
                     Created by mOOn_math
                   </div>
-                  <div className="login-version-badge" aria-label="배포 버전"><span className="version-label">ver.</span><span>{APP_VERSION}</span></div>
+                  <div className="mt-4 text-[12px] font-black text-violet-700">
+                    ver. {APP_VERSION}
+                  </div>
                 </div>
               </div>
               <div className="glass rounded-[36px] panel-shadow soft-border p-8">
@@ -2839,7 +2959,7 @@
           }));
       })();
 
-      const titleMap = Object.fromEntries(MENU_ITEMS.map((item) => [item.key, item.label]));
+      const titleMap = Object.fromEntries(allMenuItems.map((item) => [item.key, item.label]));
       const adminPill = isAdminUser ? <span className="admin-badge px-3 py-1.5 text-xs">관리자</span> : null;
       const topContextBar = (() => {
         if (view === 'dashboard') {
@@ -2863,7 +2983,7 @@
           <aside className="desktop-sidebar hidden xl:flex fixed left-5 top-5 bottom-5 w-[260px] rounded-[30px] glass soft-border sidebar-shadow p-5 flex-col">
             <div className="logo-shell pb-6 border-b border-slate-100"><img src="./logo.png" alt="열린학원 로고" onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentNode.innerHTML='<div class=\"font-black text-2xl text-violet-800 tracking-tight\">열린학원</div>';}} /></div>
             <div className="mt-6 space-y-2 flex-1">
-              {MENU_ITEMS.map(i => (
+              {allMenuItems.map(i => (
                 <button key={i.key} onClick={() => setView(i.key)} className={`w-full flex items-center gap-3 px-4 py-3 font-bold text-sm ${view === i.key ? 'nav-pill-active' : 'nav-pill'}`}>
                   <i className={`fas ${i.icon} w-5`}></i>{i.label}
                 </button>
@@ -2891,7 +3011,7 @@
               <div className="mt-4">{topContextBar}</div>
               <div className="xl:hidden mt-4 top-nav-scroll">
                 <div className="flex gap-2 min-w-max pb-1">
-                  {MENU_ITEMS.map((item) => (
+                  {allMenuItems.map((item) => (
                     <button key={item.key} onClick={() => setView(item.key)} className={`rounded-full px-4 py-2.5 text-sm font-bold border transition-all whitespace-nowrap ${view === item.key ? 'text-white border-transparent bg-gradient-to-r from-violet-700 to-indigo-600 shadow-md shadow-violet-200' : 'text-slate-600 border-slate-200 bg-white hover:bg-slate-50'}`}>
                       {item.label}
                     </button>
@@ -3613,6 +3733,87 @@
                     </div>;
                   })()}
                 </Card>
+              </div>
+            )}
+
+
+            {view === 'teacherAdmin' && isAdminUser && (
+              <div className="space-y-6">
+                <div className="grid xl:grid-cols-[0.95fr_1.05fr] gap-6">
+                  <Card title="선생님 추가 / 수정" right={editingTeacherId ? <button type="button" onClick={resetTeacherAdminForm} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600">새로 입력</button> : <span className="text-xs font-black text-violet-700">관리자 전용</span>}>
+                    <form onSubmit={handleSaveTeacherAdmin} className="space-y-4">
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-black text-slate-500 mb-2">선생님 이름</label>
+                          <input value={teacherAdminForm.name} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, name:e.target.value}))} placeholder="예: 수방" className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-black text-slate-500 mb-2">PIN 번호</label>
+                          <input value={teacherAdminForm.pin} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, pin:e.target.value.replace(/\D/g,'').slice(0,4)}))} inputMode="numeric" maxLength="4" placeholder="4자리 숫자" className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none tracking-[0.3em]" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-black text-slate-500 mb-2">표시 순서</label>
+                          <input value={teacherAdminForm.displayOrder} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, displayOrder:e.target.value.replace(/[^\d-]/g,'')}))} inputMode="numeric" placeholder="비우면 맨 뒤 추가" className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none" />
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 leading-6">
+                        이름 변경, PIN 재설정, 신규 선생님 추가를 여기서 한 번에 처리합니다. 표시 순서는 숫자가 작을수록 먼저 보입니다.
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <button type="submit" disabled={isSavingTeacherAdmin} className={`rounded-2xl px-5 py-3 text-sm font-black text-white ${isSavingTeacherAdmin ? 'bg-slate-400' : 'bg-violet-700 hover:bg-violet-800'}`}>
+                          {isSavingTeacherAdmin ? '저장 중...' : (editingTeacherId ? '선생님 정보 저장' : '신규 선생님 추가')}
+                        </button>
+                        {editingTeacherId ? <button type="button" onClick={resetTeacherAdminForm} className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-black text-slate-700">수정 취소</button> : null}
+                      </div>
+                    </form>
+                  </Card>
+
+                  <Card title="선생님 목록 보기" right={<span className="text-xs text-slate-400">로그인 버튼과 PIN 관리용</span>}>
+                    <div className="overflow-x-auto mini-scroll">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                          <tr>
+                            <th className="py-3 px-2 text-left">순서</th>
+                            <th className="py-3 px-2 text-left">이름</th>
+                            <th className="py-3 px-2 text-left">PIN</th>
+                            <th className="py-3 px-2 text-left">사용</th>
+                            <th className="py-3 px-2 text-left">관리</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {orderedTeachers.map((teacher, idx) => (
+                            <tr key={teacher.teacherId}>
+                              <td className="py-3 px-2">
+                                <div className="inline-flex items-center gap-2">
+                                  <span className="min-w-[26px] text-center font-black text-slate-700">{Number.isFinite(Number(teacher.displayOrder)) ? Number(teacher.displayOrder) : idx + 1}</span>
+                                  <div className="flex flex-col gap-1">
+                                    <button type="button" onClick={()=>handleMoveTeacherOrder(teacher.teacherId, 'up')} className="rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-black text-slate-500">▲</button>
+                                    <button type="button" onClick={()=>handleMoveTeacherOrder(teacher.teacherId, 'down')} className="rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-black text-slate-500">▼</button>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-2 font-black text-slate-900">{teacher.name}</td>
+                              <td className="py-3 px-2 font-mono font-black text-violet-700">{teacher.pin || '----'}</td>
+                              <td className="py-3 px-2">
+                                <button type="button" onClick={()=>handleToggleTeacherActive(teacher)} className={`rounded-full px-3 py-1 text-xs font-black ${teacher.isActive === false ? 'border border-slate-300 bg-slate-100 text-slate-500' : 'border border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                                  {teacher.isActive === false ? 'OFF' : 'ON'}
+                                </button>
+                              </td>
+                              <td className="py-3 px-2">
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" onClick={()=>handleEditTeacherAdmin(teacher)} className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">수정</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-700">
+                      사용 OFF로 바꾸면 로그인 버튼과 내부 목록에서 숨겨집니다. 기존 데이터는 그대로 유지됩니다.
+                    </div>
+                  </Card>
+                </div>
               </div>
             )}
 
