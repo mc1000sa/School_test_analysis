@@ -708,7 +708,7 @@
       <div class="instant-boot-title">시스템 가동 준비중입니다.
 잠시만 기다려주세요.</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R10</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R10.1</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -744,7 +744,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R10';
+    const APP_VERSION = 'OA-R10.1';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -2680,7 +2680,7 @@
         }
       };
 
-      const filteredStudentAnalysisStudents = useMemo(() => {
+      const filteredStudentAnalysisStudents = (() => {
         const { school, grade, subject, keyword } = studentAnalysisFilters;
         const normalizedKeyword = String(keyword || '').trim().toLowerCase();
         let base = activeStudents.filter((student) =>
@@ -2705,7 +2705,7 @@
             Number(a.grade || 0) - Number(b.grade || 0)
           )
           .slice(0, 120);
-      }, [activeStudents, activeJoinedData, studentAnalysisFilters]);
+      })();
 
       const teacherManagedStudents = (() => {
         const target = manageTeacherFilter;
