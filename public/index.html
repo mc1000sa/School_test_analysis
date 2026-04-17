@@ -2884,13 +2884,11 @@
             <header className="sticky top-0 z-20 section-hero rounded-[28px] p-4 sm:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] sm:text-xs font-black tracking-[0.22em] text-[#2F4EA2]">OPEN ACADEMY SCORE INSIGHT SYSTEM</div>
-                  <h1 className="mt-1 text-[22px] sm:text-[28px] font-black text-slate-900 leading-[1.25]">열린학원 성적 Insight</h1>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center rounded-full border border-[#2F4EA2]/15 bg-[#2F4EA2]/5 px-3 py-1 text-[11px] sm:text-xs font-black tracking-[0.18em] text-[#2F4EA2]">OASIS</span>
-                    <span className="text-[11px] sm:text-xs font-bold text-slate-500">성적을 입력하는 곳이 아니라, 성적을 해석하는 시스템입니다.</span>
+                  <h1 className="text-2xl sm:text-3xl font-black text-slate-900 leading-[1.25]">{titleMap[view]}</h1>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-[11px] sm:text-xs font-black tracking-[0.18em] text-[#2F4EA2]">OASIS</span>
+                    <span className="text-[10px] sm:text-[11px] font-semibold tracking-[0.08em] text-slate-400">Open Academy Score Insight System</span>
                   </div>
-                  <h2 className="mt-3 text-2xl sm:text-3xl font-black text-slate-900">{titleMap[view]}</h2>
                 </div>
                 <div className="flex items-center gap-2 print-hide">
                   {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : null}
