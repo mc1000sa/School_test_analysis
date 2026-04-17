@@ -220,7 +220,7 @@
       border: 1px solid rgba(226,232,240,0.9);
       border-radius: 28px;
       box-shadow: 0 18px 40px rgba(15,23,42,0.08);
-      padding: 20px;
+      padding: 8px;
     }
     .teamprint-page-label {
       font-size: 12px;
@@ -235,13 +235,13 @@
     }
     .teamprint-card {
       min-height: 360px;
-      border-radius: 24px;
-      border: 1px solid rgba(221,214,254,0.95);
+      border-radius: 26px;
+      border: 1px solid rgba(196,181,253,0.78);
       background:
-        radial-gradient(circle at top right, rgba(196,181,253,0.18), transparent 28%),
-        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 14px 24px rgba(15,23,42,0.05);
-      padding: 22px;
+        radial-gradient(circle at top right, rgba(196,181,253,0.16), transparent 28%),
+        linear-gradient(180deg, rgba(255,255,255,0.99), rgba(249,250,255,0.97));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 16px 28px rgba(15,23,42,0.05);
+      padding: 24px;
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -254,63 +254,61 @@
       justify-content: space-between;
       gap: 10px;
     }
+    .teamprint-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
     .teamprint-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 8px 12px;
+      justify-content: center;
+      min-width: 88px;
+      padding: 9px 14px;
       border-radius: 999px;
-      border: 1px solid rgba(196,181,253,0.9);
-      background: rgba(245,243,255,0.9);
+      border: 1px solid rgba(196,181,253,0.95);
+      background: linear-gradient(135deg, rgba(124,58,237,0.14), rgba(109,40,217,0.06));
       color: #6d28d9;
       font-size: 12px;
       font-weight: 900;
       white-space: nowrap;
     }
-    .teamprint-title {
+    .teamprint-year-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 88px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(191,219,254,0.95);
+      background: linear-gradient(135deg, rgba(239,246,255,0.98), rgba(219,234,254,0.92));
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .teamprint-title-line {
+      margin-top: 8px;
       font-size: 28px;
       font-weight: 900;
       letter-spacing: -0.03em;
       color: #111827;
-      line-height: 1.1;
+      line-height: 1.15;
     }
     .teamprint-subtitle {
-      font-size: 14px;
-      font-weight: 700;
-      color: #64748b;
-      margin-top: 6px;
-    }
-    .teamprint-subtitle-strong {
-      color: #334155;
-      font-size: 17px;
-      font-weight: 900;
-      letter-spacing: -0.01em;
-    }
-    .teamprint-side-mark {
-      min-width: 108px;
-      padding: 12px 14px;
-      border-radius: 18px;
-      border: 1px solid rgba(196,181,253,0.7);
-      background: linear-gradient(135deg, rgba(109,40,217,0.12), rgba(79,70,229,0.06));
-      text-align: right;
-    }
-    .teamprint-side-mark-label {
-      font-size: 10px;
-      font-weight: 900;
-      color: #8b5cf6;
-      letter-spacing: 0.08em;
-    }
-    .teamprint-side-mark-value {
-      margin-top: 4px;
       font-size: 18px;
       font-weight: 900;
-      color: #312e81;
-      letter-spacing: -0.02em;
+      color: #111827;
+      margin-top: 6px;
+      letter-spacing: -0.01em;
+      line-height: 1.35;
     }
     .teamprint-highlight-bar {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
+      align-items: stretch;
     }
     .teamprint-highlight-item {
       border-radius: 18px;
@@ -318,6 +316,7 @@
       background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,243,255,0.92));
       padding: 14px 16px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.95);
+      min-height: 110px;
     }
     .teamprint-highlight-label {
       font-size: 11px;
@@ -327,47 +326,39 @@
     }
     .teamprint-highlight-value {
       margin-top: 8px;
-      font-size: 19px;
+      font-size: 17px;
       font-weight: 900;
       color: #111827;
-      line-height: 1.45;
+      line-height: 1.55;
       white-space: pre-line;
       word-break: keep-all;
     }
-    .teamprint-meta {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+    .teamprint-highlight-value.compact {
+      font-size: 16px;
+      line-height: 1.6;
     }
-    .teamprint-meta-box {
-      border-radius: 18px;
-      border: 1px solid rgba(226,232,240,0.95);
-      background: rgba(248,250,252,0.92);
-      padding: 12px 14px;
-    }
-    .teamprint-meta-label {
-      font-size: 11px;
+    .teamprint-difficulty-stars {
+      font-size: 26px;
+      line-height: 1;
+      letter-spacing: 0.08em;
+      color: #7c3aed;
       font-weight: 900;
-      color: #94a3b8;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
     }
-    .teamprint-meta-value {
-      margin-top: 6px;
-      font-size: 17px;
-      font-weight: 900;
-      color: #0f172a;
-      line-height: 1.35;
-      white-space: pre-line;
+    .teamprint-difficulty-text {
+      margin-top: 10px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #334155;
     }
     .teamprint-note-box {
       border-radius: 20px;
       border: 1px solid rgba(226,232,240,0.95);
-      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+      background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(248,250,252,0.96));
       padding: 14px 16px;
       flex: 1;
       display: flex;
       flex-direction: column;
+      min-height: 150px;
     }
     .teamprint-note-title {
       font-size: 12px;
@@ -378,7 +369,7 @@
     }
     .teamprint-note-text {
       font-size: 14px;
-      line-height: 1.75;
+      line-height: 1.8;
       color: #334155;
       white-space: pre-line;
       word-break: keep-all;
@@ -762,7 +753,7 @@
       <div class="instant-boot-title">시스템 가동 준비중입니다.
 잠시만 기다려주세요.</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R10.2</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R10.3</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -798,7 +789,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R10.2';
+    const APP_VERSION = 'OA-R10.3';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -884,18 +875,38 @@
       return result;
     }
 
+    function normalizeDifficulty(value) {
+      const raw = Number(value || 0);
+      if (!raw) return 0;
+      if (raw <= 1) return 1;
+      if (raw === 2 || raw === 3) return 2;
+      if (raw === 4 || raw === 5) return 3;
+      if (raw === 6) return 4;
+      return 5;
+    }
+
     function difficultyLabel(value) {
-      const n = Number(value || 0);
+      const n = normalizeDifficulty(value);
       const map = {
-        1: '최사',
-        2: '하',
-        3: '중하',
-        4: '중',
-        5: '중상',
-        6: '상',
-        7: '최상',
+        1: '하',
+        2: '중하',
+        3: '중상',
+        4: '상',
+        5: '최상',
       };
       return map[n] || '-';
+    }
+
+    function difficultyStars(value) {
+      const n = normalizeDifficulty(value);
+      if (!n) return '-';
+      return '★'.repeat(n) + '☆'.repeat(5 - n);
+    }
+
+    function difficultyDisplayText(value) {
+      const n = normalizeDifficulty(value);
+      if (!n) return '-';
+      return `${difficultyStars(n)} · ${difficultyLabel(n)}`;
     }
 
     function getDashboardCardMeta(key) {
@@ -2175,7 +2186,9 @@
           .map((item) => ({
             ...item,
             questionInfo: buildQuestionInfo(item),
-            difficultyText: `${item.difficulty || '-'} · ${difficultyLabel(item.difficulty)}`,
+            difficultyText: difficultyDisplayText(item.difficulty),
+            difficultyStars: difficultyStars(item.difficulty),
+            difficultyLabelText: difficultyLabel(item.difficulty),
             noteText: [item.review, item.specialNote].filter(Boolean).join('\n\n') || '총평 및 특이사항이 아직 입력되지 않았습니다.',
           }));
       }, [teamExamData, teamExamPublicFilters]);
@@ -2317,13 +2330,6 @@
         const summary = [teamExamPublicFilters.year === '전체' ? '전체 연도' : `${teamExamPublicFilters.year}년`, teamExamPublicFilters.exam === '전체' ? '전체 시험' : (EXAM_SHORT_LABELS[teamExamPublicFilters.exam] || teamExamPublicFilters.exam), teamExamPublicFilters.school === '전체' ? '전체 학교' : teamExamPublicFilters.school, teamExamPublicFilters.grade === '전체' ? '전체 학년' : `${teamExamPublicFilters.grade}학년`, teamExamPublicFilters.subject === '전체' ? '전체 과목' : teamExamPublicFilters.subject].join(' · ');
         const pageHtml = pages.map((page, pageIndex) => `
           <section class="print-page">
-            <div class="page-head">
-              <div>
-                <div class="eyebrow">학부모 공개용 시험 분석 카드뉴스</div>
-                <h1>${escapeHtml(summary)}</h1>
-              </div>
-              <div class="page-no">PAGE ${pageIndex + 1} / ${pages.length}</div>
-            </div>
             <div class="grid">${page.map((item) => `
               <article class="card">
                 <div class="card-top">
@@ -2332,14 +2338,13 @@
                       <div class="badge">${escapeHtml(EXAM_SHORT_LABELS[item.exam] || item.exam)}</div>
                       <div class="year-chip">${escapeHtml(item.year)}년</div>
                     </div>
-                    <div class="school">${escapeHtml(item.school || '-')}</div>
-                    <div class="meta-line strong">${escapeHtml(item.grade ? `${item.grade}학년` : '-')} · ${escapeHtml(item.subject || '-')}${item.detailSubject ? ` (${escapeHtml(item.detailSubject)})` : ''}</div>
+                    <div class="school">${escapeHtml(item.school || '-')} · ${escapeHtml(item.grade ? `${item.grade}학년` : '-')}</div>
+                    <div class="meta-line strong">${escapeHtml(item.subject || '-')}${item.detailSubject ? ` (${escapeHtml(item.detailSubject)})` : ''}</div>
                   </div>
-                  <div class="side-mark"><div class="side-mark-label">OPEN ACADEMY</div><div class="side-mark-value">시험 분석</div></div>
                 </div>
                 <div class="meta-grid emphasis">
                   <div class="meta-box"><div class="label note">문항구성</div><div class="value compact">${escapeHtml(String(item.questionInfo || '').replace(/\n/g, '\n'))}</div></div>
-                  <div class="meta-box"><div class="label note">시험 난이도</div><div class="value">${escapeHtml(item.difficultyText || '-')}</div></div>
+                  <div class="meta-box"><div class="label note">시험 난이도</div><div class="difficulty-stars">${escapeHtml(item.difficultyStars || '-')}</div><div class="difficulty-text">${escapeHtml(item.difficultyLabelText || '-')}</div></div>
                 </div>
                 <div class="note-box"><div class="label note">총평 및 특이사항</div><div class="note-text">${escapeHtml(String(item.noteText || '').replace(/\n/g, ' '))}</div></div>
                 <div class="foot"><span>${escapeHtml(item.school || '-')} ${escapeHtml(item.grade ? `${item.grade}학년` : '')} 분석 리포트</span><span>열린학원 시험 분석</span></div>
@@ -2353,32 +2358,24 @@
           html, body { margin:0; padding:0; background:#fff; color:#111827; font-family:'SUIT','Pretendard',sans-serif; }
           .print-page { page-break-after: always; break-after: page; }
           .print-page:last-child { page-break-after: auto; break-after: auto; }
-          .page-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6mm; }
-          .eyebrow { font-size:11px; font-weight:900; color:#7c3aed; margin-bottom:4px; }
-          h1 { margin:0; font-size:18px; line-height:1.25; }
-          .page-no { font-size:11px; font-weight:800; color:#94a3b8; }
-          .grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:6mm; }
-          .card { min-height:88mm; border:1px solid #ddd6fe; border-radius:18px; padding:12px 14px; display:flex; flex-direction:column; gap:10px; background:radial-gradient(circle at top right, rgba(196,181,253,0.18), transparent 28%), linear-gradient(180deg, #fff, #faf7ff); box-shadow: inset 0 1px 0 rgba(255,255,255,0.95); }
-          .card-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-          .hero-stack { display:flex; flex-direction:column; gap:5px; }
-          .tag-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-          .school { font-size:26px; font-weight:900; line-height:1; }
-          .meta-line { margin-top:2px; font-size:14px; font-weight:700; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-          .meta-line.strong { color:#334155; font-size:16px; font-weight:900; }
-          .badge { white-space:nowrap; border:1px solid #c4b5fd; background:#f5f3ff; color:#6d28d9; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:900; }
-          .year-chip { white-space:nowrap; border:1px solid #e2e8f0; background:#fff; color:#64748b; border-radius:999px; padding:6px 10px; font-size:11px; font-weight:900; }
-          .side-mark { min-width:92px; padding:9px 11px; border-radius:14px; border:1px solid rgba(196,181,253,0.7); background:linear-gradient(135deg, rgba(109,40,217,0.12), rgba(79,70,229,0.06)); text-align:right; }
-          .side-mark-label { font-size:9px; font-weight:900; color:#8b5cf6; letter-spacing:0.08em; }
-          .side-mark-value { margin-top:4px; font-size:16px; font-weight:900; color:#312e81; line-height:1.1; }
-          .meta-grid { display:grid; grid-template-columns:1.35fr .95fr; gap:8px; }
-          .meta-grid.emphasis { grid-template-columns:1.25fr .95fr; }
-          .meta-box, .note-box { border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; background:#fff; }
-          .meta-grid.emphasis .meta-box { border-color: rgba(196,181,253,0.7); background: linear-gradient(180deg, #fff, #faf7ff); }
-          .label { font-size:10px; font-weight:900; color:#94a3b8; margin-bottom:5px; }
-          .label.note { color:#7c3aed; }
-          .value { font-size:16px; font-weight:900; line-height:1.25; }
-          .value.compact { font-size:15px; line-height:1.45; white-space:pre-line; }
-          .note-text { font-size:13px; line-height:1.6; color:#334155; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+          .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:7mm; }
+          .card { min-height:132mm; border-radius:18px; border:1px solid #c4b5fd; padding:6.5mm; display:flex; flex-direction:column; gap:4mm; background:linear-gradient(180deg, #fff 0%, #fbfbff 100%); box-shadow:0 4mm 10mm rgba(15,23,42,0.05); }
+          .card-top { display:flex; justify-content:flex-start; align-items:flex-start; }
+          .hero-stack { display:flex; flex-direction:column; gap:2mm; width:100%; }
+          .tag-row { display:flex; gap:2mm; flex-wrap:wrap; }
+          .badge { min-width:25mm; text-align:center; padding:2.1mm 3.4mm; border-radius:999px; border:1px solid #c4b5fd; background:#f5f3ff; color:#6d28d9; font-size:10pt; font-weight:900; }
+          .year-chip { min-width:25mm; text-align:center; padding:2.1mm 3.4mm; border-radius:999px; border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; font-size:10pt; font-weight:900; }
+          .school { font-size:19pt; font-weight:900; line-height:1.15; color:#111827; letter-spacing:-0.03em; }
+          .meta-line.strong { font-size:15pt; font-weight:900; color:#111827; letter-spacing:-0.01em; }
+          .meta-grid { display:grid; grid-template-columns:1.25fr .95fr; gap:8px; }
+          .meta-box { border:1px solid #ddd6fe; border-radius:14px; padding:4mm 4.2mm; background:#ffffff; min-height:31mm; }
+          .label { font-size:10px; font-weight:900; color:#7c3aed; margin-bottom:5px; }
+          .value { margin-top:2.2mm; font-size:14pt; font-weight:900; line-height:1.55; white-space:pre-line; word-break:keep-all; color:#111827; }
+          .value.compact { font-size:13pt; line-height:1.6; }
+          .difficulty-stars { margin-top:2.5mm; font-size:18pt; font-weight:900; color:#7c3aed; letter-spacing:0.08em; }
+          .difficulty-text { margin-top:2mm; font-size:11.5pt; font-weight:800; color:#334155; }
+          .note-box { border:1px solid #e2e8f0; border-radius:16px; padding:4mm 4.2mm; min-height:52mm; background:#fff; flex:1; }
+          .note-text { font-size:12pt; line-height:1.7; color:#334155; white-space:pre-line; word-break:keep-all; }
           .foot { margin-top:auto; display:flex; justify-content:space-between; font-size:11px; font-weight:800; color:#94a3b8; }
         </style></head><body>${pageHtml}</body></html>`;
         printHtmlInFrame(html, '카드뉴스 인쇄를 시작할 수 없습니다.');
@@ -3592,7 +3589,7 @@
                           {isTeamExamCustomDetail ? <input value={teamExamCustomDetail} onChange={e=>setTeamExamCustomDetail(e.target.value)} placeholder="세부과목 직접 입력" className="w-full border border-slate-300 rounded-xl p-2.5" /> : null}
                         </div>
                         <select value={teamExamForm.difficulty} onChange={e=>setTeamExamForm({...teamExamForm, difficulty:Number(e.target.value)})} className="border border-slate-300 rounded-xl p-2.5">
-                          {[1,2,3,4,5,6,7].map(v => <option key={v} value={v}>{v} · {difficultyLabel(v)}</option>)}
+                          {[1,2,3,4,5].map(v => <option key={v} value={v}>{difficultyStars(v)} · {difficultyLabel(v)}</option>)}
                         </select>
                       </div>
                       <div className="grid md:grid-cols-4 gap-4">
@@ -3665,7 +3662,7 @@
                           <tr>{[['year','연도'],['exam','시험'],['school','학교'],['grade','학년'],['subject','과목'],['detailSubject','세부과목'],['difficulty','난이도'],['reviewNote','총평 및 특이사항']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => setTeamExamSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}<th className="py-3">관리</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {teamExamArchiveRows.length ? teamExamArchiveRows.map((item) => <tr key={item.docId}><td className="py-3">{item.year}</td><td>{EXAM_SHORT_LABELS[item.exam] || item.exam}</td><td>{item.school || '-'}</td><td>{item.grade ? `${item.grade}학년` : '-'}</td><td>{item.subject || '-'}</td><td>{item.detailSubject || '-'}</td><td>{item.difficulty || '-'} · {difficultyLabel(item.difficulty)}</td><td className="text-left px-3">{item.reviewNote || '-'}</td><td><div className="flex items-center justify-center gap-2"><button type="button" onClick={()=>handleEditTeamExam(item)} className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">수정</button><button type="button" onClick={()=>handleDeleteTeamExam(item.docId)} className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-600">삭제</button></div></td></tr>) : <tr><td colSpan="9" className="py-10 text-slate-400">저장된 시험 분석이 없습니다.</td></tr>}
+                          {teamExamArchiveRows.length ? teamExamArchiveRows.map((item) => <tr key={item.docId}><td className="py-3">{item.year}</td><td>{EXAM_SHORT_LABELS[item.exam] || item.exam}</td><td>{item.school || '-'}</td><td>{item.grade ? `${item.grade}학년` : '-'}</td><td>{item.subject || '-'}</td><td>{item.detailSubject || '-'}</td><td>{difficultyDisplayText(item.difficulty)}</td><td className="text-left px-3">{item.reviewNote || '-'}</td><td><div className="flex items-center justify-center gap-2"><button type="button" onClick={()=>handleEditTeamExam(item)} className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">수정</button><button type="button" onClick={()=>handleDeleteTeamExam(item.docId)} className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-600">삭제</button></div></td></tr>) : <tr><td colSpan="9" className="py-10 text-slate-400">저장된 시험 분석이 없습니다.</td></tr>}
                         </tbody>
                       </table>
                     </div>
@@ -3675,43 +3672,29 @@
                 <div className="teamprint-root space-y-6">
                   {teamExamPublicPages.length ? teamExamPublicPages.map((page, pageIndex) => (
                     <div key={`teamprint-page-${pageIndex}`} className="teamprint-page">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <div className="teamprint-page-label">학부모 공개용 시험 분석 카드뉴스</div>
-                          <div className="text-lg font-black text-slate-900 mt-1">
-                            {teamExamPublicFilters.year === '전체' ? '전체 연도' : `${teamExamPublicFilters.year}년`} · {teamExamPublicFilters.exam === '전체' ? '전체 시험' : EXAM_SHORT_LABELS[teamExamPublicFilters.exam] || teamExamPublicFilters.exam}
-                          </div>
-                        </div>
-                        <div className="text-xs font-black text-slate-400">PAGE {pageIndex + 1} / {teamExamPublicPages.length}</div>
-                      </div>
                       <div className="teamprint-grid">
                         {page.map((item) => (
                           <div key={item.docId} className="teamprint-card">
                             <div className="teamprint-card-header">
-                              <div className="space-y-3">
-                                <div className="flex flex-wrap items-center gap-2">
+                              <div className="w-full">
+                                <div className="teamprint-chip-row">
                                   <span className="teamprint-badge">{EXAM_SHORT_LABELS[item.exam] || item.exam}</span>
-                                  <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[11px] font-black text-slate-500">{item.year}년</span>
+                                  <span className="teamprint-year-badge">{item.year}년</span>
                                 </div>
-                                <div>
-                                  <div className="teamprint-title">{item.school || '-'}</div>
-                                  <div className="teamprint-subtitle teamprint-subtitle-strong">{item.grade ? `${item.grade}학년` : '-'} · {item.subject || '-'}{item.detailSubject ? ` (${item.detailSubject})` : ''}</div>
-                                </div>
-                              </div>
-                              <div className="teamprint-side-mark">
-                                <div className="teamprint-side-mark-label">OPEN ACADEMY</div>
-                                <div className="teamprint-side-mark-value">시험 분석</div>
+                                <div className="teamprint-title-line">{item.school || '-'} · {item.grade ? `${item.grade}학년` : '-'}</div>
+                                <div className="teamprint-subtitle">{item.subject || '-'}{item.detailSubject ? ` (${item.detailSubject})` : ''}</div>
                               </div>
                             </div>
 
                             <div className="teamprint-highlight-bar">
                               <div className="teamprint-highlight-item">
                                 <div className="teamprint-highlight-label">문항구성</div>
-                                <div className="teamprint-highlight-value">{item.questionInfo}</div>
+                                <div className="teamprint-highlight-value compact">{item.questionInfo}</div>
                               </div>
                               <div className="teamprint-highlight-item">
                                 <div className="teamprint-highlight-label">시험 난이도</div>
-                                <div className="teamprint-highlight-value">{item.difficultyText}</div>
+                                <div className="teamprint-difficulty-stars">{item.difficultyStars}</div>
+                                <div className="teamprint-difficulty-text">{item.difficultyLabelText}</div>
                               </div>
                             </div>
 
