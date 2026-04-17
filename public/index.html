@@ -259,6 +259,7 @@
       flex-wrap: wrap;
       align-items: center;
       gap: 8px;
+      justify-content: flex-end;
     }
     .teamprint-badge {
       display: inline-flex;
@@ -289,17 +290,17 @@
       white-space: nowrap;
     }
     .teamprint-title-line {
-      margin-top: 8px;
+      margin-top: 0;
       font-size: 28px;
       font-weight: 900;
       letter-spacing: -0.03em;
-      color: #111827;
+      color: #1f3a8a;
       line-height: 1.15;
     }
     .teamprint-subtitle {
       font-size: 18px;
       font-weight: 900;
-      color: #111827;
+      color: #6d28d9;
       margin-top: 6px;
       letter-spacing: -0.01em;
       line-height: 1.35;
@@ -316,7 +317,7 @@
       background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,243,255,0.92));
       padding: 14px 16px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.95);
-      min-height: 110px;
+      min-height: 104px;
     }
     .teamprint-highlight-label {
       font-size: 11px;
@@ -355,10 +356,11 @@
       border: 1px solid rgba(226,232,240,0.95);
       background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(248,250,252,0.96));
       padding: 14px 16px;
-      flex: 1;
       display: flex;
       flex-direction: column;
-      min-height: 150px;
+      min-height: 128px;
+      max-height: 128px;
+      overflow: hidden;
     }
     .teamprint-note-title {
       font-size: 12px;
@@ -368,12 +370,13 @@
       margin-bottom: 8px;
     }
     .teamprint-note-text {
-      font-size: 14px;
-      line-height: 1.8;
+      font-size: 13px;
+      line-height: 1.65;
       color: #334155;
       white-space: pre-line;
       word-break: keep-all;
       flex: 1;
+      overflow: hidden;
     }
     .teamprint-footer {
       display: flex;
@@ -753,7 +756,7 @@
       <div class="instant-boot-title">시스템 가동 준비중입니다.
 잠시만 기다려주세요.</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R10.3</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R10.4</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -789,7 +792,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R10.3';
+    const APP_VERSION = 'OA-R10.4';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -878,11 +881,19 @@
     function normalizeDifficulty(value) {
       const raw = Number(value || 0);
       if (!raw) return 0;
-      if (raw <= 1) return 1;
-      if (raw === 2 || raw === 3) return 2;
-      if (raw === 4 || raw === 5) return 3;
+      if (raw >= 1 && raw <= 5) return raw;
       if (raw === 6) return 4;
-      return 5;
+      if (raw >= 7) return 5;
+      return 1;
+    }
+
+    function getAdaptiveNoteFontSize(text) {
+      const len = String(text || '').replace(/\s+/g, ' ').trim().length;
+      if (len > 320) return 10;
+      if (len > 250) return 10.8;
+      if (len > 190) return 11.5;
+      if (len > 130) return 12.2;
+      return 13;
     }
 
     function difficultyLabel(value) {
@@ -2183,14 +2194,18 @@
             String(a.subject || '').localeCompare(String(b.subject || ''), 'ko') ||
             String(a.detailSubject || '').localeCompare(String(b.detailSubject || ''), 'ko')
           )
-          .map((item) => ({
-            ...item,
-            questionInfo: buildQuestionInfo(item),
-            difficultyText: difficultyDisplayText(item.difficulty),
-            difficultyStars: difficultyStars(item.difficulty),
-            difficultyLabelText: difficultyLabel(item.difficulty),
-            noteText: [item.review, item.specialNote].filter(Boolean).join('\n\n') || '총평 및 특이사항이 아직 입력되지 않았습니다.',
-          }));
+          .map((item) => {
+            const noteText = [item.review, item.specialNote].filter(Boolean).join('\n\n') || '총평 및 특이사항이 아직 입력되지 않았습니다.';
+            return {
+              ...item,
+              questionInfo: buildQuestionInfo(item),
+              difficultyText: difficultyDisplayText(item.difficulty),
+              difficultyStars: difficultyStars(item.difficulty),
+              difficultyLabelText: difficultyLabel(item.difficulty),
+              noteText,
+              noteFontSize: getAdaptiveNoteFontSize(noteText),
+            };
+          });
       }, [teamExamData, teamExamPublicFilters]);
 
       const teamExamPublicPages = useMemo(() => chunkArray(teamExamPublicCards, 4), [teamExamPublicCards]);
@@ -2328,17 +2343,19 @@
           return;
         }
         const summary = [teamExamPublicFilters.year === '전체' ? '전체 연도' : `${teamExamPublicFilters.year}년`, teamExamPublicFilters.exam === '전체' ? '전체 시험' : (EXAM_SHORT_LABELS[teamExamPublicFilters.exam] || teamExamPublicFilters.exam), teamExamPublicFilters.school === '전체' ? '전체 학교' : teamExamPublicFilters.school, teamExamPublicFilters.grade === '전체' ? '전체 학년' : `${teamExamPublicFilters.grade}학년`, teamExamPublicFilters.subject === '전체' ? '전체 과목' : teamExamPublicFilters.subject].join(' · ');
-        const pageHtml = pages.map((page, pageIndex) => `
+        const pageHtml = pages.map((page) => `
           <section class="print-page">
             <div class="grid">${page.map((item) => `
               <article class="card">
                 <div class="card-top">
                   <div class="hero-stack">
-                    <div class="tag-row">
-                      <div class="badge">${escapeHtml(EXAM_SHORT_LABELS[item.exam] || item.exam)}</div>
-                      <div class="year-chip">${escapeHtml(item.year)}년</div>
+                    <div class="hero-row">
+                      <div class="school">${escapeHtml(item.school || '-')} · ${escapeHtml(item.grade ? `${item.grade}학년` : '-')}</div>
+                      <div class="tag-row">
+                        <div class="badge">${escapeHtml(EXAM_SHORT_LABELS[item.exam] || item.exam)}</div>
+                        <div class="year-chip">${escapeHtml(item.year)}년</div>
+                      </div>
                     </div>
-                    <div class="school">${escapeHtml(item.school || '-')} · ${escapeHtml(item.grade ? `${item.grade}학년` : '-')}</div>
                     <div class="meta-line strong">${escapeHtml(item.subject || '-')}${item.detailSubject ? ` (${escapeHtml(item.detailSubject)})` : ''}</div>
                   </div>
                 </div>
@@ -2346,37 +2363,40 @@
                   <div class="meta-box"><div class="label note">문항구성</div><div class="value compact">${escapeHtml(String(item.questionInfo || '').replace(/\n/g, '\n'))}</div></div>
                   <div class="meta-box"><div class="label note">시험 난이도</div><div class="difficulty-stars">${escapeHtml(item.difficultyStars || '-')}</div><div class="difficulty-text">${escapeHtml(item.difficultyLabelText || '-')}</div></div>
                 </div>
-                <div class="note-box"><div class="label note">총평 및 특이사항</div><div class="note-text">${escapeHtml(String(item.noteText || '').replace(/\n/g, ' '))}</div></div>
+                <div class="note-box"><div class="label note">총평 및 특이사항</div><div class="note-text" style="font-size:${item.noteFontSize || 12}px">${escapeHtml(String(item.noteText || '').replace(/\n/g, ' '))}</div></div>
                 <div class="foot"><span>${escapeHtml(item.school || '-')} ${escapeHtml(item.grade ? `${item.grade}학년` : '')} 분석 리포트</span><span>열린학원 시험 분석</span></div>
               </article>
             `).join('')}</div>
           </section>
         `).join('');
         const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>카드뉴스 인쇄</title><style>
-          @page { size: A4 landscape; margin: 8mm; }
+          @page { size: A4 landscape; margin: 6mm; }
           * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
           html, body { margin:0; padding:0; background:#fff; color:#111827; font-family:'SUIT','Pretendard',sans-serif; }
-          .print-page { page-break-after: always; break-after: page; }
+          body { width:100%; }
+          .print-page { page-break-after: always; break-after: page; width:100%; height:198mm; overflow:hidden; }
           .print-page:last-child { page-break-after: auto; break-after: auto; }
-          .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:7mm; }
-          .card { min-height:132mm; border-radius:18px; border:1px solid #c4b5fd; padding:6.5mm; display:flex; flex-direction:column; gap:4mm; background:linear-gradient(180deg, #fff 0%, #fbfbff 100%); box-shadow:0 4mm 10mm rgba(15,23,42,0.05); }
+          .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); grid-template-rows:repeat(2, 1fr); gap:5mm; height:100%; }
+          .card { height:96.5mm; max-height:96.5mm; border-radius:18px; border:1px solid #c4b5fd; padding:5mm; display:flex; flex-direction:column; gap:3mm; background:linear-gradient(180deg, #fff 0%, #fbfbff 100%); overflow:hidden; }
           .card-top { display:flex; justify-content:flex-start; align-items:flex-start; }
-          .hero-stack { display:flex; flex-direction:column; gap:2mm; width:100%; }
-          .tag-row { display:flex; gap:2mm; flex-wrap:wrap; }
-          .badge { min-width:25mm; text-align:center; padding:2.1mm 3.4mm; border-radius:999px; border:1px solid #c4b5fd; background:#f5f3ff; color:#6d28d9; font-size:10pt; font-weight:900; }
-          .year-chip { min-width:25mm; text-align:center; padding:2.1mm 3.4mm; border-radius:999px; border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; font-size:10pt; font-weight:900; }
-          .school { font-size:19pt; font-weight:900; line-height:1.15; color:#111827; letter-spacing:-0.03em; }
-          .meta-line.strong { font-size:15pt; font-weight:900; color:#111827; letter-spacing:-0.01em; }
-          .meta-grid { display:grid; grid-template-columns:1.25fr .95fr; gap:8px; }
-          .meta-box { border:1px solid #ddd6fe; border-radius:14px; padding:4mm 4.2mm; background:#ffffff; min-height:31mm; }
-          .label { font-size:10px; font-weight:900; color:#7c3aed; margin-bottom:5px; }
-          .value { margin-top:2.2mm; font-size:14pt; font-weight:900; line-height:1.55; white-space:pre-line; word-break:keep-all; color:#111827; }
-          .value.compact { font-size:13pt; line-height:1.6; }
-          .difficulty-stars { margin-top:2.5mm; font-size:18pt; font-weight:900; color:#7c3aed; letter-spacing:0.08em; }
-          .difficulty-text { margin-top:2mm; font-size:11.5pt; font-weight:800; color:#334155; }
-          .note-box { border:1px solid #e2e8f0; border-radius:16px; padding:4mm 4.2mm; min-height:52mm; background:#fff; flex:1; }
-          .note-text { font-size:12pt; line-height:1.7; color:#334155; white-space:pre-line; word-break:keep-all; }
-          .foot { margin-top:auto; display:flex; justify-content:space-between; font-size:11px; font-weight:800; color:#94a3b8; }
+          .hero-stack { display:flex; flex-direction:column; gap:1.8mm; width:100%; }
+          .hero-row { display:flex; align-items:flex-start; justify-content:space-between; gap:4mm; }
+          .tag-row { display:flex; gap:2mm; flex-wrap:nowrap; justify-content:flex-end; flex-shrink:0; }
+          .badge, .year-chip { min-width:22mm; text-align:center; padding:1.8mm 3mm; border-radius:999px; font-size:9.2pt; font-weight:900; }
+          .badge { border:1px solid #c4b5fd; background:#f5f3ff; color:#6d28d9; }
+          .year-chip { border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; }
+          .school { font-size:15.5pt; font-weight:900; line-height:1.15; color:#1f3a8a; letter-spacing:-0.03em; }
+          .meta-line.strong { font-size:12.5pt; font-weight:900; color:#6d28d9; letter-spacing:-0.01em; }
+          .meta-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:6px; }
+          .meta-box { border:1px solid #ddd6fe; border-radius:14px; padding:3.2mm 3.5mm; background:#ffffff; min-height:22mm; }
+          .label { font-size:9px; font-weight:900; color:#7c3aed; margin-bottom:4px; }
+          .value { margin-top:1.2mm; font-size:10.8pt; font-weight:900; line-height:1.45; white-space:pre-line; word-break:keep-all; color:#111827; }
+          .value.compact { font-size:10.2pt; line-height:1.5; }
+          .difficulty-stars { margin-top:1.2mm; font-size:14.5pt; font-weight:900; color:#7c3aed; letter-spacing:0.06em; }
+          .difficulty-text { margin-top:1mm; font-size:9.6pt; font-weight:800; color:#334155; }
+          .note-box { border:1px solid #e2e8f0; border-radius:16px; padding:3.2mm 3.5mm; height:33mm; min-height:33mm; max-height:33mm; background:#fff; overflow:hidden; }
+          .note-text { line-height:1.45; color:#334155; white-space:pre-line; word-break:keep-all; overflow:hidden; }
+          .foot { margin-top:auto; display:flex; justify-content:space-between; font-size:9px; font-weight:800; color:#94a3b8; }
         </style></head><body>${pageHtml}</body></html>`;
         printHtmlInFrame(html, '카드뉴스 인쇄를 시작할 수 없습니다.');
       };
@@ -3589,7 +3609,13 @@
                           {isTeamExamCustomDetail ? <input value={teamExamCustomDetail} onChange={e=>setTeamExamCustomDetail(e.target.value)} placeholder="세부과목 직접 입력" className="w-full border border-slate-300 rounded-xl p-2.5" /> : null}
                         </div>
                         <select value={teamExamForm.difficulty} onChange={e=>setTeamExamForm({...teamExamForm, difficulty:Number(e.target.value)})} className="border border-slate-300 rounded-xl p-2.5">
-                          {[1,2,3,4,5].map(v => <option key={v} value={v}>{difficultyStars(v)} · {difficultyLabel(v)}</option>)}
+                          {[
+                            { value: 1, label: '★ 하' },
+                            { value: 2, label: '★★ 중하' },
+                            { value: 3, label: '★★★ 중상' },
+                            { value: 4, label: '★★★★ 상' },
+                            { value: 5, label: '★★★★★ 최상' },
+                          ].map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
                         </select>
                       </div>
                       <div className="grid md:grid-cols-4 gap-4">
@@ -3676,12 +3702,14 @@
                         {page.map((item) => (
                           <div key={item.docId} className="teamprint-card">
                             <div className="teamprint-card-header">
-                              <div className="w-full">
-                                <div className="teamprint-chip-row">
-                                  <span className="teamprint-badge">{EXAM_SHORT_LABELS[item.exam] || item.exam}</span>
-                                  <span className="teamprint-year-badge">{item.year}년</span>
+                              <div className="w-full space-y-2">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="teamprint-title-line">{item.school || '-'} · {item.grade ? `${item.grade}학년` : '-'}</div>
+                                  <div className="teamprint-chip-row shrink-0">
+                                    <span className="teamprint-badge">{EXAM_SHORT_LABELS[item.exam] || item.exam}</span>
+                                    <span className="teamprint-year-badge">{item.year}년</span>
+                                  </div>
                                 </div>
-                                <div className="teamprint-title-line">{item.school || '-'} · {item.grade ? `${item.grade}학년` : '-'}</div>
                                 <div className="teamprint-subtitle">{item.subject || '-'}{item.detailSubject ? ` (${item.detailSubject})` : ''}</div>
                               </div>
                             </div>
@@ -3700,7 +3728,7 @@
 
                             <div className="teamprint-note-box">
                               <div className="teamprint-note-title">총평 및 특이사항</div>
-                              <div className="teamprint-note-text">{item.noteText}</div>
+                              <div className="teamprint-note-text" style={{ fontSize: `${item.noteFontSize}px` }}>{item.noteText}</div>
                             </div>
 
                             <div className="teamprint-footer">
