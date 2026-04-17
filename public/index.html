@@ -793,7 +793,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R11';
+    const APP_VERSION = 'OA-R11.2';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
@@ -1739,13 +1739,7 @@
 
       const quickSearchStudents = useMemo(() => {
         const keyword = String(selectedQuickStudentId || '').trim().toLowerCase();
-        const ownedStudentIds = new Set(
-          activeJoinedData
-            .filter((r) => manageTeacherFilter !== '전체' && (r.createdBy === manageTeacherFilter || r.updatedBy === manageTeacherFilter))
-            .map((r) => r.studentId)
-        );
         const base = activeStudents
-          .filter((student) => manageTeacherFilter === '전체' || ownedStudentIds.has(student.studentId))
           .filter((student) =>
             (manageListFilters.school === '전체' || student.school === manageListFilters.school) &&
             (manageListFilters.grade === '전체' || Number(student.grade) === Number(manageListFilters.grade))
@@ -1753,7 +1747,7 @@
           .map((student) => ({ id: student.studentId, name: student.name, school: student.school, grade: student.grade, year: student.year }));
         if (!keyword) return base.slice(0, 60);
         return base.filter((student) => String(student.name || '').toLowerCase().includes(keyword)).slice(0, 20);
-      }, [selectedQuickStudentId, activeStudents, activeJoinedData, manageTeacherFilter, manageListFilters]);
+      }, [selectedQuickStudentId, activeStudents, manageListFilters]);
 
       const currentManageStudentRecord = selectedManageStudentInfo || studentsData.find((student) =>
         !student.deleted &&
@@ -2471,14 +2465,12 @@
                   <div className="mt-9 text-[13px] font-black tracking-[0.24em] text-slate-500">OPEN ACADEMY SCORE INSIGHT SYSTEM</div>
                   <h1 className="login-main-title mt-4 text-[38px] md:text-[46px] leading-[1.24]">
                     <span className="block text-slate-900">열린학원 성적 Insight</span>
-                    <span className="block mt-3 text-[34px] md:text-[42px] text-[#2F4EA2] tracking-[0.18em]">OASIS</span>
                   </h1>
-                  <p className="mt-7 text-[19px] md:text-[22px] font-extrabold leading-[1.85] text-slate-600">
+                  <p className="mt-7 text-[19px] md:text-[22px] font-semibold italic leading-[1.95] text-slate-600">
                     성적을 입력하는 곳이 아니라,<br/>성적을 해석하는 시스템입니다.
                   </p>
-                  <div className="mt-10 inline-flex items-center gap-3 rounded-full border border-[#2F4EA2]/15 bg-white/70 px-5 py-3 text-sm font-bold text-slate-600 shadow-sm">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#2F4EA2] text-white font-black tracking-[0.18em]">O</span>
-                    <span>Open Academy Score Insight System</span>
+                  <div className="mt-10 inline-flex items-center rounded-full border border-slate-300/80 bg-white/70 px-5 py-3 text-sm font-semibold italic text-slate-400 shadow-sm">
+                    Created by mOOn_math
                   </div>
                   <div className="login-version-badge" aria-label="배포 버전"><span className="version-label">ver.</span><span>{APP_VERSION}</span></div>
                 </div>
@@ -2893,7 +2885,7 @@
                 <div className="flex items-center gap-2 print-hide">
                   {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : null}
                   {isAdminUser ? <button onClick={handleExportAllData} className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full font-bold text-sm text-emerald-700 hover:bg-emerald-100"><i className="fas fa-file-export mr-2"></i>전체 엑셀</button> : null}
-                  <button onClick={handlePrintPage} className="px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200"><i className="fas fa-print mr-2"></i>인쇄</button>
+                  <button onClick={handlePrintPage} className="hidden sm:inline-flex items-center px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200 whitespace-nowrap"><i className="fas fa-print mr-2"></i>인쇄</button>
                 </div>
               </div>
               <div className="mt-4">{topContextBar}</div>
