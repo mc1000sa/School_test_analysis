@@ -839,7 +839,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R12.7.3';
+    const APP_VERSION = 'OA-R12.8';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -857,6 +857,7 @@
       { key: 'manage', label: '성적입력', icon: 'fa-pen-to-square' },
       { key: 'teacherAnalysis', label: '선생님별 성적분석', icon: 'fa-chalkboard-user' },
       { key: 'schoolAnalysis', label: '학교별 성적분석', icon: 'fa-school' },
+      { key: 'principalReport', label: '원장님 리포트', icon: 'fa-chart-pie' },
       { key: 'studentAnalysis', label: '학생별 성적분석', icon: 'fa-user-graduate' },
       { key: 'teamExam', label: '시험 분석 아카이브', icon: 'fa-clipboard-list' },
     ];
@@ -868,7 +869,7 @@
 
     function normalizeTeacherRole(value) {
       const role = String(value || '').trim().toLowerCase();
-      if (role === 'admin' || role === 'guest' || role === 'teacher') return role;
+      if (role === 'admin' || role === 'guest' || role === 'teacher' || role === 'principal') return role;
       return '';
     }
 
@@ -879,11 +880,13 @@
         const savedName = String(target.name || '').trim();
         if (savedName === ADMIN_TEACHER_NAME) return 'admin';
         if (savedName === '게스트' || savedName === '게스트') return 'guest';
+        if (savedName === '원장쌤') return 'principal';
         return 'teacher';
       }
       const name = String(target || '').trim();
       if (name === ADMIN_TEACHER_NAME) return 'admin';
       if (name === '게스트' || name === '게스트') return 'guest';
+      if (name === '원장쌤') return 'principal';
       return 'teacher';
     }
 
@@ -891,6 +894,7 @@
       const normalized = normalizeTeacherRole(role) || 'teacher';
       if (normalized === 'admin') return '관리자';
       if (normalized === 'guest') return '게스트';
+      if (normalized === 'principal') return '원장님';
       return '강사';
     }
 
@@ -1333,6 +1337,8 @@
       const [teacherAnalysisSavingId, setTeacherAnalysisSavingId] = useState('');
 
       const [schoolView, setSchoolView] = useState({ year: 2026, exam: EXAMS[0], school: '전체', grade: '전체', subject: '전체' });
+      const [annualCompareView, setAnnualCompareView] = useState({ year: 2026, school: SCHOOL_OPTIONS[0], grade: 1, subject: '수학' });
+      const [principalViewFilters, setPrincipalViewFilters] = useState({ year: 2026, school: SCHOOL_OPTIONS[0], grade: 1, subject: '수학' });
       const [subjectView, setSubjectView] = useState({ year: 2026, exam: EXAMS[0], subject: '수학', detailSubject: '전체' });
       const [subjectSort, setSubjectSort] = useState({ key: 'score', direction: 'desc' });
 
@@ -1696,6 +1702,7 @@
       const currentTeacherRole = getTeacherRole(currentTeacher);
       const isAdminUser = currentTeacherRole === 'admin';
       const isGuestUser = currentTeacherRole === 'guest';
+      const isPrincipalUser = currentTeacherRole === 'principal';
       const selectedTeacherInfo = useMemo(() => teachersData.find((teacher) => teacher.name === selectedTeacherName) || null, [teachersData, selectedTeacherName]);
       const loginPinMaxLength = selectedTeacherInfo ? getStoredPinLength(selectedTeacherInfo) : 6;
       const loginPinGuideText = selectedTeacherInfo
@@ -1704,15 +1711,17 @@
             const requiredLength = getStoredPinLength(selectedTeacherInfo);
             if (role === 'admin') return '관리자 PIN 6자리';
             if (role === 'guest') return `게스트 PIN ${requiredLength}자리`;
+            if (role === 'principal') return `원장님 PIN ${requiredLength}자리`;
             return `강사 PIN ${requiredLength}자리`;
           })()
-        : '강사/게스트 4자리 · 관리자 6자리';
+        : '강사/게스트/원장님 4자리 · 관리자 6자리';
 
       const allMenuItems = useMemo(() => {
         if (isAdminUser) return [...MENU_ITEMS, { key: 'teacherAdmin', label: 'Admin Page', icon: 'fa-user-gear' }];
+        if (isPrincipalUser) return MENU_ITEMS.filter((item) => ['dashboard', 'schoolAnalysis', 'principalReport', 'studentAnalysis', 'teamExam'].includes(item.key));
         if (isGuestUser) return MENU_ITEMS.filter((item) => ['dashboard', 'schoolAnalysis', 'studentAnalysis', 'teamExam'].includes(item.key));
-        return MENU_ITEMS;
-      }, [isAdminUser, isGuestUser]);
+        return MENU_ITEMS.filter((item) => item.key !== 'principalReport');
+      }, [isAdminUser, isPrincipalUser, isGuestUser]);
 
       const resetTeacherAdminForm = () => {
         setEditingTeacherId('');
@@ -3292,6 +3301,57 @@
         printHtmlInFrame(html, '카드뉴스 인쇄를 시작할 수 없습니다.');
       };
 
+
+      const buildAnnualDistributionRows = (filterSet) => {
+        const targetYear = Number(filterSet?.year || YEARS[0]);
+        const targetSchool = String(filterSet?.school || '');
+        const targetGrade = Number(filterSet?.grade || 0);
+        const targetSubject = String(filterSet?.subject || '');
+        return EXAMS.map((exam) => {
+          const rows = activeJoinedData.filter((r) =>
+            Number(r.year) === targetYear &&
+            r.exam === exam &&
+            r.school === targetSchool &&
+            Number(r.grade) === targetGrade &&
+            r.subject === targetSubject &&
+            isStudentIncludedForSubject(r.studentId, r.subject)
+          );
+          const count = rows.length;
+          const avg = count ? Math.round(rows.reduce((sum, row) => sum + Number(row.score || 0), 0) / count) : null;
+          const rates = [1,2,3,4,5].reduce((acc, tier) => {
+            acc[`rate${tier}`] = count ? Math.round((rows.filter((row) => normalizeTeacherAnalysisTier(row.tier) === tier).length / count) * 100) : 0;
+            return acc;
+          }, {});
+          return { exam, examShort: EXAM_SHORT_LABELS[exam], count, avg, ...rates, topRate: (rates.rate1 || 0) + (rates.rate2 || 0), riskRate: (rates.rate4 || 0) + (rates.rate5 || 0) };
+        });
+      };
+
+      const getAnnualComparisonSummary = (rows) => {
+        const validRows = (rows || []).filter((row) => Number(row.count || 0) > 0);
+        if (!validRows.length) return '선택한 조건의 데이터가 아직 없습니다.';
+        const first = validRows[0];
+        const last = validRows[validRows.length - 1];
+        const avgDiff = Number(last.avg || 0) - Number(first.avg || 0);
+        const topDiff = Number(last.topRate || 0) - Number(first.topRate || 0);
+        const riskDiff = Number(last.riskRate || 0) - Number(first.riskRate || 0);
+        const avgText = avgDiff > 0 ? `평균이 ${avgDiff}점 상승` : avgDiff < 0 ? `평균이 ${Math.abs(avgDiff)}점 하락` : '평균은 유지';
+        const topText = topDiff > 0 ? `상위권(1~2등급) 비율이 ${topDiff}%p 상승` : topDiff < 0 ? `상위권(1~2등급) 비율이 ${Math.abs(topDiff)}%p 하락` : '상위권 비율은 유지';
+        const riskText = riskDiff < 0 ? `위험권(4~5등급) 비율이 ${Math.abs(riskDiff)}%p 감소` : riskDiff > 0 ? `위험권(4~5등급) 비율이 ${riskDiff}%p 증가` : '위험권 비율은 유지';
+        return `${first.examShort} 대비 ${last.examShort} 기준, ${avgText}했고 ${topText}했습니다. ${riskText}.`;
+      };
+
+      const annualComparisonRows = buildAnnualDistributionRows(annualCompareView);
+      const annualComparisonSummary = getAnnualComparisonSummary(annualComparisonRows);
+      const principalAnnualRows = buildAnnualDistributionRows(principalViewFilters);
+      const principalAnnualSummary = getAnnualComparisonSummary(principalAnnualRows);
+      const principalLatestRow = [...principalAnnualRows].reverse().find((row) => Number(row.count || 0) > 0) || principalAnnualRows[principalAnnualRows.length - 1] || null;
+      const principalSummaryCards = principalLatestRow ? [
+        { label: '최근 반영 시험', value: principalLatestRow.examShort || '-', tone: 'violet' },
+        { label: '학생 수', value: principalLatestRow.count ? `${principalLatestRow.count}명` : '0명', tone: 'sky' },
+        { label: '평균 점수', value: principalLatestRow.avg !== null && principalLatestRow.avg !== undefined ? `${principalLatestRow.avg}점` : '-', tone: 'emerald' },
+        { label: '상위권 비율', value: `${principalLatestRow.topRate || 0}%`, tone: 'amber' },
+      ] : [];
+
       const schoolAnalysisRows = (() => {
         const rows = activeJoinedData.filter(r => Number(r.year) === Number(schoolView.year) && r.exam === schoolView.exam && (schoolView.school === '전체' || r.school === schoolView.school) && (schoolView.subject === '전체' || r.subject === schoolView.subject) && (schoolView.grade === '전체' || Number(r.grade) === Number(schoolView.grade)));
         const grouped = {};
@@ -3380,7 +3440,7 @@
                   <div>
                     <div className="text-[12px] font-black tracking-[0.22em] text-[#2F4EA2]">OASIS</div>
                     <h2 className="text-3xl font-black text-slate-900 mb-2 mt-1">빠른 PIN 로그인</h2>
-                    <p className="text-slate-500 leading-7">계정을 선택하고 PIN을 입력하세요. 일반 강사와 게스트는 4자리, 관리자는 6자리입니다. PIN 오류 5회 시 30분 동안 잠금되며, 잠금 시 수최T에게 문의하세요.</p>
+                    <p className="text-slate-500 leading-7">계정을 선택하고 PIN을 입력하세요. 일반 강사, 게스트, 원장님은 4자리, 관리자는 6자리입니다. PIN 오류 5회 시 30분 동안 잠금되며, 잠금 시 수최T에게 문의하세요.</p>
                     {bootForceReady && !dataReady && <div className="mt-3 inline-flex items-center rounded-full px-3 py-1.5 bg-amber-50 border border-amber-200 text-[12px] font-bold text-amber-700">초기 데이터 연결이 지연되어 로그인 화면을 먼저 열었습니다.</div>}
                   </div>
                   <div className="md:hidden inline-flex items-center gap-2 rounded-full px-3 py-1.5 border border-violet-200 bg-violet-50 text-[11px] font-black text-violet-700">
@@ -3786,9 +3846,9 @@
                   </div>
                 </div>
                 <div className="flex items-center gap-2 print-hide">
-                  {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : isGuestUser ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 hidden sm:inline-flex">게스트 전용 보기</span> : null}
+                  {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : isPrincipalUser ? <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 hidden sm:inline-flex">원장님 요약 보기</span> : isGuestUser ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 hidden sm:inline-flex">게스트 전용 보기</span> : null}
                   {isAdminUser ? <button onClick={handleExportAllData} className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full font-bold text-sm text-emerald-700 hover:bg-emerald-100"><i className="fas fa-file-export mr-2"></i>전체 엑셀</button> : null}
-                  {!isGuestUser ? <button onClick={handlePrintPage} className="hidden sm:inline-flex items-center px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200 whitespace-nowrap"><i className="fas fa-print mr-2"></i>인쇄</button> : null}
+                  {!(isGuestUser || isPrincipalUser) ? <button onClick={handlePrintPage} className="hidden sm:inline-flex items-center px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200 whitespace-nowrap"><i className="fas fa-print mr-2"></i>인쇄</button> : null}
                 </div>
               </div>
               <div className="mt-4">{topContextBar}</div>
@@ -4001,7 +4061,7 @@
               </Card>
             )}
 
-            {view === 'manage' && !isGuestUser && (
+            {view === 'manage' && !isGuestUser && !isPrincipalUser && (
               <div className="space-y-6">
                 <div className="xl:hidden">
                   <Card title="모바일 빠른 성적입력" right={<span className="inline-flex items-center gap-2 text-xs font-black text-sky-700"><i className="fas fa-bolt"></i>검색 후 바로 입력</span>}>
@@ -4407,8 +4467,137 @@
                     </table>
                   </div>
                 </Card>
+
+                <Card title="연간 등급 분포 비교" right={<span className="text-xs text-slate-400">한 그룹의 1년 흐름을 한 번에 확인</span>}>
+                  <div className="space-y-5">
+                    <div className="grid md:grid-cols-4 gap-4 print-hide">
+                      <select value={annualCompareView.year} onChange={e => setAnnualCompareView((p) => ({ ...p, year: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{YEARS.map(y => <option key={y} value={y}>{y}년</option>)}</select>
+                      <select value={annualCompareView.school} onChange={e => setAnnualCompareView((p) => ({ ...p, school: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <select value={annualCompareView.grade} onChange={e => setAnnualCompareView((p) => ({ ...p, grade: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}</select>
+                      <select value={annualCompareView.subject} onChange={e => setAnnualCompareView((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{subjectOptions.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    </div>
+                    <div className="rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-3 text-sm leading-7 text-violet-900">
+                      <span className="font-black">{annualCompareView.year}년 · {annualCompareView.school} · {annualCompareView.grade}학년 · {annualCompareView.subject}</span>
+                      <div className="text-slate-700 mt-1">{annualComparisonSummary}</div>
+                    </div>
+                    <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-4">
+                      {annualComparisonRows.map((row) => (
+                        <div key={row.exam} className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-[11px] font-black tracking-[0.16em] text-violet-600">EXAM</div>
+                              <div className="mt-1 text-lg font-black text-slate-900">{row.examShort}</div>
+                            </div>
+                            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-500">{row.count}명</div>
+                          </div>
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                              <div className="text-[11px] font-black text-slate-400">평균</div>
+                              <div className="mt-1 text-xl font-black text-violet-700">{row.avg !== null && row.avg !== undefined ? `${row.avg}점` : '-'}</div>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                              <div className="text-[11px] font-black text-slate-400">상위권 / 위험권</div>
+                              <div className="mt-1 text-sm font-black text-slate-700">{row.topRate || 0}% / {row.riskRate || 0}%</div>
+                            </div>
+                          </div>
+                          <div className="mt-4 space-y-2">
+                            {[1,2,3,4,5].map((tier) => {
+                              const style = getSchoolRateStyle(tier);
+                              const value = row[`rate${tier}`] || 0;
+                              return (
+                                <div key={tier} className="flex items-center gap-2">
+                                  <div className={`w-12 shrink-0 text-xs font-black ${style.text}`}>{tier}등급</div>
+                                  <div className={`flex-1 rounded-full border px-2 py-2 ${style.wrap}`}>
+                                    <div className="h-2 rounded-full bg-white/80 overflow-hidden">
+                                      <div className={`h-full rounded-full bg-gradient-to-r ${style.bar}`} style={{ width: `${Math.max(value ? 8 : 0, value)}%` }}></div>
+                                    </div>
+                                  </div>
+                                  <div className={`w-12 text-right text-xs font-black ${style.text}`}>{value}%</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
               </div>
             )}
+
+            {view === 'principalReport' && (isAdminUser || isPrincipalUser) && (
+              <div className="space-y-6">
+                <Card title="원장님 리포트" className="print-hide">
+                  <div className="grid lg:grid-cols-4 gap-4">
+                    <select value={principalViewFilters.year} onChange={e => setPrincipalViewFilters((p) => ({ ...p, year: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{YEARS.map(y => <option key={y} value={y}>{y}년</option>)}</select>
+                    <select value={principalViewFilters.school} onChange={e => setPrincipalViewFilters((p) => ({ ...p, school: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={principalViewFilters.grade} onChange={e => setPrincipalViewFilters((p) => ({ ...p, grade: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}</select>
+                    <select value={principalViewFilters.subject} onChange={e => setPrincipalViewFilters((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{subjectOptions.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-7 text-slate-700">
+                    <span className="font-black text-slate-900">{principalViewFilters.year}년 · {principalViewFilters.school} · {principalViewFilters.grade}학년 · {principalViewFilters.subject}</span> 기준으로 최근 시험 흐름과 1년치 등급 분포를 한 화면에서 봅니다.
+                  </div>
+                </Card>
+
+                <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-4">
+                  {principalSummaryCards.map((card) => (
+                    <div key={card.label} className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                      <div className="text-xs font-black tracking-[0.16em] text-slate-400">{card.label}</div>
+                      <div className="mt-2 text-2xl font-black text-slate-900">{card.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <Card title="연간 등급 분포 비교" right={<span className="text-xs text-slate-400">관리자와 원장님이 함께 보는 요약 화면</span>}>
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-3 text-sm leading-7 text-violet-900">
+                      <span className="font-black">{principalViewFilters.year}년 · {principalViewFilters.school} · {principalViewFilters.grade}학년 · {principalViewFilters.subject}</span>
+                      <div className="text-slate-700 mt-1">{principalAnnualSummary}</div>
+                    </div>
+                    <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-4">
+                      {principalAnnualRows.map((row) => (
+                        <div key={row.exam} className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-[11px] font-black tracking-[0.16em] text-violet-600">EXAM</div>
+                              <div className="mt-1 text-lg font-black text-slate-900">{row.examShort}</div>
+                            </div>
+                            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-500">{row.count}명</div>
+                          </div>
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                              <div className="text-[11px] font-black text-slate-400">평균</div>
+                              <div className="mt-1 text-xl font-black text-violet-700">{row.avg !== null && row.avg !== undefined ? `${row.avg}점` : '-'}</div>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                              <div className="text-[11px] font-black text-slate-400">상위권 / 위험권</div>
+                              <div className="mt-1 text-sm font-black text-slate-700">{row.topRate || 0}% / {row.riskRate || 0}%</div>
+                            </div>
+                          </div>
+                          <div className="mt-4 space-y-2">
+                            {[1,2,3,4,5].map((tier) => {
+                              const style = getSchoolRateStyle(tier);
+                              const value = row[`rate${tier}`] || 0;
+                              return (
+                                <div key={tier} className="flex items-center gap-2">
+                                  <div className={`w-12 shrink-0 text-xs font-black ${style.text}`}>{tier}등급</div>
+                                  <div className={`flex-1 rounded-full border px-2 py-2 ${style.wrap}`}>
+                                    <div className="h-2 rounded-full bg-white/80 overflow-hidden">
+                                      <div className={`h-full rounded-full bg-gradient-to-r ${style.bar}`} style={{ width: `${Math.max(value ? 8 : 0, value)}%` }}></div>
+                                    </div>
+                                  </div>
+                                  <div className={`w-12 text-right text-xs font-black ${style.text}`}>{value}%</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )} 
 
             {view === 'studentAnalysis' && (
               <div className="space-y-6">
@@ -4583,12 +4772,13 @@
                           <select value={teacherAdminForm.name === ADMIN_TEACHER_NAME ? 'admin' : (teacherAdminForm.teacherRole || 'teacher')} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, teacherRole:e.target.value}))} disabled={String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none bg-white">
                             <option value="teacher">강사</option>
                             <option value="guest">게스트(보기 전용)</option>
+                            <option value="principal">원장님(조회 중심)</option>
                             <option value="admin">관리자</option>
                           </select>
                         </div>
                         <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">PIN 번호</label>
-                          <input value={teacherAdminForm.pin} onChange={(e)=>setTeacherAdminForm((prev)=>{ const role = String(prev.name || teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME ? 'admin' : (prev.teacherRole || teacherAdminForm.teacherRole || 'teacher'); return ({...prev, pin:e.target.value.replace(/\D/g,'').slice(0, getRequiredPinLengthForRole(role))}); })} inputMode="numeric" maxLength={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? 6 : 4} placeholder={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? '관리자 6자리 숫자' : ((teacherAdminForm.teacherRole || 'teacher') === 'guest' ? '게스트 4자리 숫자' : '강사 4자리 숫자')} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none tracking-[0.3em]" />
+                          <input value={teacherAdminForm.pin} onChange={(e)=>setTeacherAdminForm((prev)=>{ const role = String(prev.name || teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME ? 'admin' : (prev.teacherRole || teacherAdminForm.teacherRole || 'teacher'); return ({...prev, pin:e.target.value.replace(/\D/g,'').slice(0, getRequiredPinLengthForRole(role))}); })} inputMode="numeric" maxLength={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? 6 : 4} placeholder={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? '관리자 6자리 숫자' : ((teacherAdminForm.teacherRole || 'teacher') === 'guest' ? '게스트 4자리 숫자' : ((teacherAdminForm.teacherRole || 'teacher') === 'principal' ? '원장님 4자리 숫자' : '강사 4자리 숫자'))} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none tracking-[0.3em]" />
                         </div>
                         <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">표시 순서</label>
@@ -4596,7 +4786,7 @@
                         </div>
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 leading-6">
-                        이름 변경, PIN 재설정, 신규 계정 추가를 여기서 한 번에 처리합니다. 강사/게스트 PIN은 4자리, 관리자 PIN은 6자리입니다. 게스트 계정은 보기 전용이며 입력과 인쇄가 제한됩니다. 표시 순서는 숫자가 작을수록 먼저 보입니다.
+                        이름 변경, PIN 재설정, 신규 계정 추가를 여기서 한 번에 처리합니다. 강사/게스트/원장님 PIN은 4자리, 관리자 PIN은 6자리입니다. 게스트 계정은 보기 전용이며 입력과 인쇄가 제한되고, 원장님 계정은 조회 중심 화면만 사용할 수 있습니다. 표시 순서는 숫자가 작을수록 먼저 보입니다.
                       </div>
                       <div className="flex flex-wrap gap-3">
                         <button type="submit" disabled={isSavingTeacherAdmin} className={`rounded-2xl px-5 py-3 text-sm font-black text-white ${isSavingTeacherAdmin ? 'bg-slate-400' : 'bg-violet-700 hover:bg-violet-800'}`}>
@@ -4660,7 +4850,7 @@
                       </table>
                     </div>
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-700">
-                      사용 OFF로 바꾸면 로그인 버튼과 내부 목록에서 숨겨집니다. 기존 데이터는 그대로 유지됩니다. 일반 강사와 게스트는 4자리 PIN, 관리자(수최)는 6자리 PIN으로 운영됩니다. 게스트 계정은 보기만 가능하고 성적 입력/인쇄는 제한됩니다.
+                      사용 OFF로 바꾸면 로그인 버튼과 내부 목록에서 숨겨집니다. 기존 데이터는 그대로 유지됩니다. 일반 강사와 게스트, 원장님은 4자리 PIN, 관리자(수최)는 6자리 PIN으로 운영됩니다. 게스트 계정은 보기만 가능하고 성적 입력/인쇄는 제한되며, 원장님 계정은 조회 중심으로 운영됩니다.
                     </div>
                   </Card>
                 </div>
