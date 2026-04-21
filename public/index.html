@@ -22,12 +22,12 @@
     import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import {
-      getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, orderBy, serverTimestamp, writeBatch
+      getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, getDoc, setDoc, orderBy, serverTimestamp, writeBatch
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     window.FirebaseAPI = {
       initializeApp, getApps, getApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
-      getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, orderBy, serverTimestamp, writeBatch
+      getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, getDoc, setDoc, orderBy, serverTimestamp, writeBatch
     };
   </script>
 
@@ -757,7 +757,7 @@
 잠시만 기다려주세요.</div>
       <div class="instant-boot-version" aria-label="브랜드"><span class="version-label">OASIS</span><span>Score Insight System</span></div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R12</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R12.4</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -787,14 +787,15 @@
   </script>
 
   <script type="text/babel">
-    const { useEffect, useMemo, useState } = React;
+    const { useEffect, useMemo, useRef, useState } = React;
 
     const EXAMS = ['1학기 중간고사', '1학기 기말고사', '2학기 중간고사', '2학기 기말고사'];
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R12.2';
+    const APP_VERSION = 'OA-R12.4';
     const DATA_BOOT_TIMEOUT_MS = 15000;
+    const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
     const GRADES = [1, 2, 3];
     const SCORE_BUCKETS = [
@@ -815,7 +816,29 @@
     ];
 
     const ADMIN_TEACHER_NAME = '수최';
+    const LOGIN_MAX_ATTEMPTS = 5;
+    const LOGIN_LOCK_MINUTES = 30;
     const TEST_KEYWORDS = ['테스트', 'test', 'sample', '샘플', 'demo', '임시', 'tmp', 'temp', '가짜'];
+
+    function getTeacherRoleByName(name) {
+      return String(name || '').trim() === ADMIN_TEACHER_NAME ? 'admin' : 'teacher';
+    }
+
+    function getRequiredPinLengthForName(name) {
+      return getTeacherRoleByName(name) === 'admin' ? 6 : 4;
+    }
+
+    function getStoredPinLength(teacher) {
+      const rawPin = String(teacher?.pin || '').replace(/\D/g, '');
+      if (rawPin.length) return rawPin.length;
+      return getRequiredPinLengthForName(teacher?.name || '');
+    }
+
+    function getTeacherLoginLockText(teacher) {
+      const lockUntil = teacher?.loginLockedUntil ? new Date(teacher.loginLockedUntil) : null;
+      if (!lockUntil || Number.isNaN(lockUntil.getTime()) || lockUntil.getTime() <= Date.now()) return '';
+      return `${lockUntil.getMonth() + 1}/${lockUntil.getDate()} ${String(lockUntil.getHours()).padStart(2,'0')}:${String(lockUntil.getMinutes()).padStart(2,'0')}까지 잠금`;
+    }
 
     function getTierSystem(row) {
       const year = Number(row.year || 0);
@@ -872,6 +895,26 @@
     }
 
     function safeLower(v) { return String(v || '').toLowerCase(); }
+
+
+    function sanitizeKeyPart(value) {
+      return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9가-힣_-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/-+/g, '-')
+        .replace(/^[-_]+|[-_]+$/g, '') || 'blank';
+    }
+
+    function buildStudentDocId({ year, name }) {
+      return `student__${sanitizeKeyPart(year)}__${sanitizeKeyPart(name)}`;
+    }
+
+    function buildScoreDocId({ studentId, year, exam, subject, detailSubject }) {
+      return `score__${sanitizeKeyPart(studentId)}__${sanitizeKeyPart(year)}__${sanitizeKeyPart(exam)}__${sanitizeKeyPart(subject)}__${sanitizeKeyPart(detailSubject || 'common')}`;
+    }
 
     function chunkArray(arr, size) {
       const result = [];
@@ -1122,11 +1165,13 @@
       const [teamExamData, setTeamExamData] = useState([]);
       const [subjectCatalogData, setSubjectCatalogData] = useState([]);
       const [subjectDetailCatalogData, setSubjectDetailCatalogData] = useState([]);
+      const [loginLogsData, setLoginLogsData] = useState([]);
 
       const [selectedTeacherName, setSelectedTeacherName] = useState('');
       const [loginPin, setLoginPin] = useState('');
       const [loginError, setLoginError] = useState('');
       const [currentTeacher, setCurrentTeacher] = useState(null);
+      const [currentSessionLogId, setCurrentSessionLogId] = useState('');
       const [isDeletingTestData, setIsDeletingTestData] = useState(false);
       const [authReady, setAuthReady] = useState(false);
       const [dataReady, setDataReady] = useState(false);
@@ -1188,8 +1233,13 @@
       const [subjectAdminForm, setSubjectAdminForm] = useState({ subjectName: '', selectedSubject: '', detailName: '' });
       const [isSavingSubjectAdmin, setIsSavingSubjectAdmin] = useState(false);
       const [teacherAdminForm, setTeacherAdminForm] = useState({ name: '', pin: '', displayOrder: '' });
+      const [promotionSourceYear, setPromotionSourceYear] = useState(2026);
+      const [isPromotingStudents, setIsPromotingStudents] = useState(false);
       const [editingTeacherId, setEditingTeacherId] = useState('');
       const [isSavingTeacherAdmin, setIsSavingTeacherAdmin] = useState(false);
+      const sessionStartedAtRef = useRef(0);
+      const lastActivityAtRef = useRef(Date.now());
+
 
       const getPath = (name) => typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/${name}` : `openacademy/data/${name}`;
 
@@ -1404,16 +1454,39 @@
         };
       }, [db, authReady, user]);
 
+      useEffect(() => {
+        if (!db || !window.FirebaseAPI || !authReady || !user) return;
+        const { collection, onSnapshot } = window.FirebaseAPI;
+        const unsubscribe = onSnapshot(collection(db, getPath('loginLogs')), (snapshot) => {
+          setLoginLogsData(snapshot.docs.map((docRow) => ({ docId: docRow.id, ...docRow.data() })));
+        }, (error) => {
+          console.error('loginLogs 데이터를 읽을 수 없습니다.', error);
+        });
+        return () => unsubscribe && unsubscribe();
+      }, [db, authReady, user]);
+
       const joinedData = useMemo(() => scoresData.filter(s => !s.deleted).map(score => {
 
         const student = studentsData.find(s => s.studentId === score.studentId && !s.deleted) || {};
-        return { ...score, name: student.name || '알수없음', school: student.school || '-', grade: student.grade || 0, year: student.year || score.year, isWithdrawn: student.isWithdrawn === true };
+        const studentStatus = getStudentEnrollmentStatus(student);
+        const subjectStatus = getStudentSubjectStatus(student, score.subject);
+        return {
+          ...score,
+          name: student.name || '알수없음',
+          school: student.school || '-',
+          grade: student.grade || 0,
+          year: score.year || student.year || 0,
+          isWithdrawn: studentStatus === 'withdrawn',
+          studentStatus,
+          subjectStatus,
+          subjectIncluded: isStudentIncludedForSubject(student, score.subject),
+        };
       }), [scoresData, studentsData]);
 
-      const activeJoinedData = useMemo(() => joinedData.filter(row => !row.isWithdrawn), [joinedData]);
+      const activeJoinedData = useMemo(() => joinedData.filter(row => row.subjectIncluded), [joinedData]);
       const schools = useMemo(() => ['전체', ...SCHOOL_OPTIONS, '직접입력'], []);
       const classNames = useMemo(() => ['전체', ...Array.from(new Set(scoresData.filter(d => !d.deleted).map(d => d.className).filter(Boolean))).sort()], [scoresData]);
-      const activeStudents = useMemo(() => studentsData.filter(s => !s.deleted && !s.isWithdrawn).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''), 'ko')), [studentsData]);
+      const activeStudents = useMemo(() => studentsData.filter((student) => !student.deleted && getStudentEnrollmentStatus(student) === 'active').sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''), 'ko')), [studentsData]);
       const subjectOptions = useMemo(() => {
         const fromCatalog = subjectCatalogData.map((item) => String(item.name || '').trim()).filter(Boolean);
         const fromScores = scoresData.map((item) => String(item.subject || '').trim()).filter(Boolean);
@@ -1466,6 +1539,11 @@
       const isLoggedIn = !!currentTeacher;
       const currentTeacherName = currentTeacher?.name || '';
       const isAdminUser = currentTeacherName === ADMIN_TEACHER_NAME;
+      const selectedTeacherInfo = useMemo(() => teachersData.find((teacher) => teacher.name === selectedTeacherName) || null, [teachersData, selectedTeacherName]);
+      const loginPinMaxLength = selectedTeacherInfo ? getStoredPinLength(selectedTeacherInfo) : 6;
+      const loginPinGuideText = selectedTeacherInfo
+        ? (getTeacherRoleByName(selectedTeacherInfo.name) === 'admin' ? '관리자 PIN 6자리' : `강사 PIN ${getStoredPinLength(selectedTeacherInfo)}자리`)
+        : '강사 4자리 / 관리자 6자리';
 
       const allMenuItems = useMemo(() => {
         if (!isAdminUser) return MENU_ITEMS;
@@ -1519,11 +1597,12 @@
         e?.preventDefault?.();
         if (!db || !window.FirebaseAPI || !isAdminUser || isSavingTeacherAdmin) return;
         const name = String(teacherAdminForm.name || '').trim();
-        const pin = String(teacherAdminForm.pin || '').replace(/\D/g, '').slice(0, 4);
+        const requiredPinLength = getRequiredPinLengthForName(name);
+        const pin = String(teacherAdminForm.pin || '').replace(/\D/g, '').slice(0, requiredPinLength);
         const displayOrderRaw = teacherAdminForm.displayOrder;
         const displayOrderValue = displayOrderRaw === '' ? null : Number(displayOrderRaw);
         if (!name) return alert('선생님 이름을 입력해주세요.');
-        if (pin.length !== 4) return alert('PIN 번호는 숫자 4자리로 입력해주세요.');
+        if (pin.length !== requiredPinLength) return alert(`PIN 번호는 숫자 ${requiredPinLength}자리로 입력해주세요.`);
         if (displayOrderRaw !== '' && !Number.isFinite(displayOrderValue)) return alert('표시 순서는 숫자로 입력해주세요.');
         const duplicateName = teachersData.some((teacher) => !teacher.deleted && teacher.teacherId !== editingTeacherId && String(teacher.name || '').trim() === name);
         if (duplicateName) return alert('같은 이름의 선생님이 이미 있습니다.');
@@ -1580,6 +1659,22 @@
           });
         } catch (error) {
           alert('사용 여부 변경 중 오류가 발생했습니다: ' + error.message);
+        }
+      };
+
+      const handleUnlockTeacherLogin = async (teacher) => {
+        if (!db || !window.FirebaseAPI || !isAdminUser || !teacher?.teacherId) return;
+        try {
+          await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), teacher.teacherId), {
+            loginFailCount: 0,
+            loginLockedUntil: '',
+            isLoginLocked: false,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentTeacher?.name || '',
+          });
+          alert(`${teacher.name} 선생님의 로그인 제한을 해제했습니다.`);
+        } catch (error) {
+          alert('로그인 제한 해제 중 오류가 발생했습니다: ' + error.message);
         }
       };
 
@@ -1776,23 +1871,135 @@
         }
       };
 
-      const handleLogin = (e) => {
+      const finalizeLoginLog = async (logId, options = {}) => {
+        if (!db || !window.FirebaseAPI || !logId) return;
+        try {
+          const nowMs = Date.now();
+          const sessionMs = Math.max(0, nowMs - Number(sessionStartedAtRef.current || nowMs));
+          await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('loginLogs'), logId), {
+            logoutAt: new Date(nowMs).toISOString(),
+            autoLogout: options.auto === true,
+            sessionMs,
+            sessionDurationText: getSessionDurationText(sessionMs),
+            updatedAt: new Date(nowMs).toISOString(),
+          });
+        } catch (error) {
+          console.error('로그아웃 기록 저장 실패:', error);
+        }
+      };
+
+      const handleLogin = async (e) => {
         e.preventDefault();
         if (!teachersData.length) return setLoginError('시스템 준비가 아직 완료되지 않았습니다. 잠시 후 다시 시도해주세요.');
         if (!selectedTeacherName) return setLoginError('선생님을 선택해주세요.');
-        const t = teachersData.find(t => t.name === selectedTeacherName && String(t.pin||'') === loginPin);
-        if (!t) return setLoginError('PIN이 올바르지 않습니다.');
-        setCurrentTeacher(t);
-        setLoginError('');
-        setTeacherAnalysisTeacher(t.name);
-        setManageTeacherFilter(t.name);
+        const selectedTeacher = teachersData.find((teacher) => teacher.name === selectedTeacherName);
+        if (!selectedTeacher) return setLoginError('선생님 정보를 찾을 수 없습니다.');
+        if (selectedTeacher.isActive === false) return setLoginError('비활성화된 계정입니다. 관리자에게 문의해주세요.');
+        const normalizedPin = String(loginPin || '').replace(/\D/g, '');
+        const requiredLength = getStoredPinLength(selectedTeacher);
+        if (normalizedPin.length !== requiredLength) return setLoginError(`PIN은 숫자 ${requiredLength}자리로 입력해주세요.`);
+
+        const lockedUntilMs = selectedTeacher?.loginLockedUntil ? new Date(selectedTeacher.loginLockedUntil).getTime() : 0;
+        if (selectedTeacher?.isLoginLocked && lockedUntilMs && lockedUntilMs > Date.now()) {
+          return setLoginError(`로그인 제한 중입니다. ${getTeacherLoginLockText(selectedTeacher)} 관리자에게 문의해주세요.`);
+        }
+
+        const storedPin = String(selectedTeacher.pin || '').replace(/\D/g, '');
+        if (storedPin !== normalizedPin) {
+          const nextFailCount = Number(selectedTeacher.loginFailCount || 0) + 1;
+          const shouldLock = nextFailCount >= LOGIN_MAX_ATTEMPTS;
+          try {
+            if (db && window.FirebaseAPI && selectedTeacher.teacherId) {
+              const payload = {
+                loginFailCount: nextFailCount,
+                updatedAt: new Date().toISOString(),
+                updatedBy: currentTeacher?.name || 'system',
+              };
+              if (shouldLock) {
+                payload.isLoginLocked = true;
+                payload.loginLockedUntil = new Date(Date.now() + (LOGIN_LOCK_MINUTES * 60 * 1000)).toISOString();
+              }
+              await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), selectedTeacher.teacherId), payload);
+            }
+          } catch (error) {
+            console.error('로그인 실패 횟수 저장 실패:', error);
+          }
+          if (shouldLock) {
+            return setLoginError(`PIN 오류가 ${LOGIN_MAX_ATTEMPTS}회 누적되어 로그인 제한이 걸렸습니다. 관리자에게 문의해주세요.`);
+          }
+          return setLoginError(`PIN이 올바르지 않습니다. (${nextFailCount}/${LOGIN_MAX_ATTEMPTS})`);
+        }
+
+        try {
+          const now = Date.now();
+          if (db && window.FirebaseAPI && selectedTeacher.teacherId && (selectedTeacher.loginFailCount || selectedTeacher.isLoginLocked || selectedTeacher.loginLockedUntil)) {
+            await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('teachers'), selectedTeacher.teacherId), {
+              loginFailCount: 0,
+              loginLockedUntil: '',
+              isLoginLocked: false,
+              updatedAt: new Date(now).toISOString(),
+              updatedBy: selectedTeacher.name || '',
+            });
+          }
+          setCurrentTeacher(selectedTeacher);
+          setLoginError('');
+          setTeacherAnalysisTeacher(selectedTeacher.name);
+          setManageTeacherFilter(selectedTeacher.name);
+          lastActivityAtRef.current = now;
+          sessionStartedAtRef.current = now;
+          if (db && window.FirebaseAPI) {
+            const loginLogRef = await window.FirebaseAPI.addDoc(window.FirebaseAPI.collection(db, getPath('loginLogs')), {
+              teacherName: selectedTeacher.name,
+              teacherRole: getTeacherRoleByName(selectedTeacher.name),
+              loginAt: new Date(now).toISOString(),
+              logoutAt: '',
+              autoLogout: false,
+              sessionMs: 0,
+              sessionDurationText: '',
+              userAgent: navigator.userAgent || '',
+              createdAt: new Date(now).toISOString(),
+            });
+            setCurrentSessionLogId(loginLogRef.id);
+          }
+        } catch (error) {
+          console.error('로그인 기록 저장 실패:', error);
+          setCurrentSessionLogId('');
+        }
       };
-      const handleLogout = () => {
+      const handleLogout = async (options = {}) => {
+        await finalizeLoginLog(currentSessionLogId, options);
+        setCurrentSessionLogId('');
         setCurrentTeacher(null);
         setSelectedTeacherName('');
         setLoginPin('');
         setView('dashboard');
+        if (options.auto) alert('오랫동안 활동이 없어 자동 로그아웃되었습니다.');
       };
+
+      useEffect(() => {
+        if (!isLoggedIn) return;
+        const refreshActivity = () => {
+          lastActivityAtRef.current = Date.now();
+        };
+        ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach((eventName) => {
+          window.addEventListener(eventName, refreshActivity, { passive: true });
+        });
+        return () => {
+          ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach((eventName) => {
+            window.removeEventListener(eventName, refreshActivity, { passive: true });
+          });
+        };
+      }, [isLoggedIn]);
+
+      useEffect(() => {
+        if (!isLoggedIn) return;
+        const timerId = setInterval(() => {
+          if (Date.now() - lastActivityAtRef.current >= AUTO_LOGOUT_MS) {
+            handleLogout({ auto: true });
+          }
+        }, 15000);
+        return () => clearInterval(timerId);
+      }, [isLoggedIn, currentSessionLogId]);
 
       const toggleAdminSection = (key) => {
         setAdminSectionOpen((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -1916,6 +2123,26 @@
         Number(student.year) === Number(manageStudent.year) &&
         String(student.name || '').trim() === String(manageStudent.name || '').trim()
       ) || null;
+      const currentManageStudentStatus = getStudentEnrollmentStatus(currentManageStudentRecord);
+      const promotionTargetYear = Number(promotionSourceYear || 0) + 1;
+
+      useEffect(() => {
+        const candidateYears = studentsData
+          .filter((student) => !student.deleted)
+          .map((student) => Number(student.year || 0))
+          .filter(Boolean)
+          .sort((a, b) => b - a);
+        if (candidateYears.length) {
+          const latestPromotableYear = candidateYears.find((year) => year < Math.max(...YEARS)) || candidateYears[candidateYears.length - 1];
+          setPromotionSourceYear((prev) => prev || latestPromotableYear || 2026);
+        }
+      }, [studentsData]);
+
+      const filteredLoginLogs = useMemo(() => {
+        return [...loginLogsData]
+          .sort((a, b) => new Date(b.loginAt || 0).getTime() - new Date(a.loginAt || 0).getTime())
+          .slice(0, 100);
+      }, [loginLogsData]);
 
       const resetManageSideInputs = (source) => {
         if (source !== 'new') {
@@ -1951,17 +2178,35 @@
         e.preventDefault();
         if (!db) return;
         try {
-          const { addDoc, updateDoc, doc, collection, query, where, getDocs } = window.FirebaseAPI;
+          const { updateDoc, doc, collection, query, where, getDocs, getDoc, setDoc } = window.FirebaseAPI;
+          const now = new Date().toISOString();
           let targetStudentId = null;
-          const q = query(collection(db, getPath('students')), where('name', '==', manageStudent.name), where('year', '==', manageStudent.year));
-          const snap = await getDocs(q);
-          
-          if (!snap.empty) {
-            targetStudentId = snap.docs[0].id;
-            await updateDoc(doc(db, getPath('students'), targetStudentId), { school: finalSchoolValue, grade: manageStudent.grade, updatedAt: new Date().toISOString(), deleted: false });
+          const normalizedStudentName = String(manageStudent.name || '').trim();
+          const normalizedSchool = String(finalSchoolValue || '').trim();
+          const studentQuery = query(collection(db, getPath('students')), where('name', '==', normalizedStudentName), where('year', '==', manageStudent.year));
+          const studentSnap = await getDocs(studentQuery);
+
+          if (!studentSnap.empty) {
+            targetStudentId = studentSnap.docs[0].id;
+            await updateDoc(doc(db, getPath('students'), targetStudentId), {
+              school: normalizedSchool,
+              grade: manageStudent.grade,
+              updatedAt: now,
+              deleted: false,
+            });
           } else {
-            const docRef = await addDoc(collection(db, getPath('students')), { name: manageStudent.name, year: manageStudent.year, school: finalSchoolValue, grade: manageStudent.grade, createdAt: new Date().toISOString(), deleted: false });
-            targetStudentId = docRef.id;
+            targetStudentId = buildStudentDocId({ year: manageStudent.year, name: normalizedStudentName });
+            const studentRef = doc(db, getPath('students'), targetStudentId);
+            const studentDoc = await getDoc(studentRef);
+            await setDoc(studentRef, {
+              name: normalizedStudentName,
+              year: manageStudent.year,
+              school: normalizedSchool,
+              grade: manageStudent.grade,
+              updatedAt: now,
+              deleted: false,
+              ...(studentDoc.exists() ? {} : { createdAt: now }),
+            }, { merge: true });
           }
 
           let safeTier = Number(modalForm.tier);
@@ -1977,12 +2222,73 @@
           if (normalizedDetailSubject) {
             await persistDetailCatalog(normalizedSubject, normalizedDetailSubject);
           }
-          const scoreData = { studentId: targetStudentId, year: manageStudent.year, exam: modalForm.exam, subject: normalizedSubject, detailSubject: normalizedDetailSubject, score: Number(modalForm.score), tier: safeTier, className: modalForm.className, updatedAt: new Date().toISOString(), updatedBy: currentTeacher?.name, deleted: false };
-          
+
+          const scoreData = {
+            studentId: targetStudentId,
+            year: manageStudent.year,
+            exam: modalForm.exam,
+            subject: normalizedSubject,
+            detailSubject: normalizedDetailSubject,
+            score: Number(modalForm.score),
+            tier: safeTier,
+            className: modalForm.className,
+            updatedAt: now,
+            updatedBy: currentTeacher?.name,
+            deleted: false,
+          };
+
+          const desiredScoreDocId = buildScoreDocId({
+            studentId: targetStudentId,
+            year: manageStudent.year,
+            exam: modalForm.exam,
+            subject: normalizedSubject,
+            detailSubject: normalizedDetailSubject,
+          });
+
+          const duplicateQuery = query(
+            collection(db, getPath('scores')),
+            where('studentId', '==', targetStudentId),
+            where('year', '==', manageStudent.year),
+            where('exam', '==', modalForm.exam),
+            where('subject', '==', normalizedSubject),
+            where('detailSubject', '==', normalizedDetailSubject)
+          );
+          const duplicateSnap = await getDocs(duplicateQuery);
+          const activeDuplicateDoc = duplicateSnap.docs.find((scoreDoc) => !scoreDoc.data()?.deleted);
+
           if (modal.mode === 'edit') {
-            await updateDoc(doc(db, getPath('scores'), modalForm.docId), scoreData);
+            const currentDocId = String(modalForm.docId || '');
+            if (activeDuplicateDoc && activeDuplicateDoc.id !== currentDocId) {
+              await updateDoc(doc(db, getPath('scores'), activeDuplicateDoc.id), scoreData);
+              await updateDoc(doc(db, getPath('scores'), currentDocId), {
+                deleted: true,
+                updatedAt: now,
+                updatedBy: currentTeacher?.name || '',
+              });
+            } else if (currentDocId === desiredScoreDocId) {
+              await updateDoc(doc(db, getPath('scores'), currentDocId), scoreData);
+            } else {
+              const desiredRef = doc(db, getPath('scores'), desiredScoreDocId);
+              const desiredDoc = await getDoc(desiredRef);
+              await setDoc(desiredRef, {
+                ...scoreData,
+                ...(desiredDoc.exists() ? {} : { createdAt: now, createdBy: currentTeacher?.name || '' }),
+              }, { merge: true });
+              await updateDoc(doc(db, getPath('scores'), currentDocId), {
+                deleted: true,
+                updatedAt: now,
+                updatedBy: currentTeacher?.name || '',
+              });
+            }
+          } else if (activeDuplicateDoc) {
+            await updateDoc(doc(db, getPath('scores'), activeDuplicateDoc.id), scoreData);
           } else {
-            await addDoc(collection(db, getPath('scores')), { ...scoreData, createdAt: new Date().toISOString(), createdBy: currentTeacher?.name });
+            const desiredRef = doc(db, getPath('scores'), desiredScoreDocId);
+            const desiredDoc = await getDoc(desiredRef);
+            await setDoc(desiredRef, {
+              ...scoreData,
+              ...(desiredDoc.exists() ? {} : { createdAt: now, createdBy: currentTeacher?.name || '' }),
+            }, { merge: true });
           }
           setModal({ isOpen: false, mode: 'add' });
           setModalForm({ docId: null, exam: '', subject: '', detailSubject: '', customDetailSubject: '', score: '', tier: '', className: '' });
@@ -2018,7 +2324,7 @@
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
-            const { addDoc, collection, query, where, getDocs, updateDoc, doc } = window.FirebaseAPI;
+            const { collection, query, where, getDocs, updateDoc, doc, getDoc, setDoc } = window.FirebaseAPI;
             let successCount = 0;
             let skipCount = 0;
 
@@ -2027,6 +2333,7 @@
               const school = String(row['학교'] || '').trim();
               const grade = Number(row['학년']);
               const year = Number(row['연도'] || 2026);
+              const now = new Date().toISOString();
 
               if (!name || !school || !grade || !year) {
                 skipCount++;
@@ -2040,19 +2347,22 @@
                 await updateDoc(doc(db, getPath('students'), studentId), {
                   school,
                   grade,
-                  updatedAt: new Date().toISOString(),
+                  updatedAt: now,
                   deleted: false,
                 });
               } else {
-                await addDoc(collection(db, getPath('students')), {
+                const studentId = buildStudentDocId({ year, name });
+                const studentRef = doc(db, getPath('students'), studentId);
+                const studentDoc = await getDoc(studentRef);
+                await setDoc(studentRef, {
                   name,
                   year,
                   school,
                   grade,
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
+                  updatedAt: now,
                   deleted: false,
-                });
+                  ...(studentDoc.exists() ? {} : { createdAt: now }),
+                }, { merge: true });
               }
               successCount++;
             }
@@ -2194,6 +2504,89 @@
           alert('학생 정보 수정 중 오류가 발생했습니다: ' + error.message);
         } finally {
           setIsRenamingStudent(false);
+        }
+      };
+
+      const handleSetStudentEnrollmentStatus = async (student, nextStatus) => {
+        if (!db || !window.FirebaseAPI || !student?.studentId) return;
+        try {
+          await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('students'), student.studentId), {
+            status: nextStatus,
+            isWithdrawn: nextStatus === 'withdrawn',
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentTeacher?.name || '',
+          });
+        } catch (error) {
+          alert('학생 상태 변경 중 오류가 발생했습니다: ' + error.message);
+        }
+      };
+
+      const handleSetStudentSubjectStatus = async (student, subject, nextStatus) => {
+        if (!db || !window.FirebaseAPI || !student?.studentId || !subject) return;
+        try {
+          const nextMap = { ...(student.subjectStatusMap || {}) };
+          nextMap[String(subject).trim()] = nextStatus;
+          await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('students'), student.studentId), {
+            subjectStatusMap: nextMap,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentTeacher?.name || '',
+          });
+        } catch (error) {
+          alert('과목별 수강 상태 변경 중 오류가 발생했습니다: ' + error.message);
+        }
+      };
+
+      const handlePromoteStudents = async () => {
+        if (!db || !window.FirebaseAPI || !isAdminUser || isPromotingStudents) return;
+        const sourceYear = Number(promotionSourceYear || 0);
+        const targetYear = sourceYear + 1;
+        const promotionTargets = studentsData.filter((student) =>
+          !student.deleted &&
+          Number(student.year) === sourceYear &&
+          getStudentEnrollmentStatus(student) === 'active' &&
+          Number(student.grade || 0) < 3
+        );
+        if (!promotionTargets.length) {
+          alert('선택한 연도에 승급할 재원 학생이 없습니다.');
+          return;
+        }
+        if (!window.confirm(`${sourceYear}년 재원 학생 ${promotionTargets.length}명을 ${targetYear}년으로 승급하시겠습니까?`)) return;
+        setIsPromotingStudents(true);
+        try {
+          const batch = window.FirebaseAPI.writeBatch(db);
+          const existingTargetIds = new Set(
+            studentsData
+              .filter((student) => !student.deleted && Number(student.year) === targetYear)
+              .map((student) => buildStudentDocId({ year: targetYear, name: student.name }))
+          );
+          let createdCount = 0;
+          promotionTargets.forEach((student) => {
+            const nextDocId = buildStudentDocId({ year: targetYear, name: student.name });
+            if (existingTargetIds.has(nextDocId)) return;
+            createdCount += 1;
+            batch.set(window.FirebaseAPI.doc(db, getPath('students'), nextDocId), {
+              name: student.name || '',
+              school: student.school || '',
+              grade: Math.min(3, Number(student.grade || 1) + 1),
+              year: targetYear,
+              status: 'active',
+              isWithdrawn: false,
+              subjectStatusMap: { ...(student.subjectStatusMap || {}) },
+              promotedFromStudentId: student.studentId,
+              promotedFromYear: sourceYear,
+              createdAt: new Date().toISOString(),
+              createdBy: currentTeacher?.name || '',
+              updatedAt: new Date().toISOString(),
+              updatedBy: currentTeacher?.name || '',
+              deleted: false,
+            });
+          });
+          await batch.commit();
+          alert(createdCount ? `${createdCount}명의 학생이 ${targetYear}년으로 승급 등록되었습니다.` : '이미 다음 연도 학생이 모두 준비되어 있어 새로 생성된 학생이 없습니다.');
+        } catch (error) {
+          alert('승급 처리 중 오류가 발생했습니다: ' + error.message);
+        } finally {
+          setIsPromotingStudents(false);
         }
       };
 
@@ -2666,8 +3059,11 @@
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">PIN 번호</label>
-                    <input type="password" maxLength="4" value={loginPin} onChange={e => setLoginPin(e.target.value.replace(/\D/g, ''))} className="w-full h-16 border-2 border-slate-200 rounded-2xl text-center text-3xl tracking-[1em] font-black focus:border-violet-400 outline-none" placeholder="••••" />
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <label className="block text-sm font-bold text-slate-700">PIN 번호</label>
+                      <span className="text-xs font-black text-violet-700">{loginPinGuideText}</span>
+                    </div>
+                    <input type="password" maxLength={loginPinMaxLength} value={loginPin} onChange={e => setLoginPin(e.target.value.replace(/\D/g, '').slice(0, loginPinMaxLength))} className="w-full h-16 border-2 border-slate-200 rounded-2xl text-center text-3xl tracking-[1em] font-black focus:border-violet-400 outline-none" placeholder="••••" />
                   </div>
                   {loginError && <div className="text-rose-600 text-sm font-bold">{loginError}</div>}
                   <button type="submit" className="w-full h-14 rounded-2xl bg-gradient-to-r from-violet-700 to-indigo-600 text-white font-bold text-lg shadow-lg">로그인</button>
@@ -3485,14 +3881,38 @@
                           <button key={ex} onClick={()=>setFilters({...filters, exam: ex})} className={`px-4 py-2 btn-pill text-sm ${filters.exam === ex ? 'btn-pill-active' : 'btn-pill-inactive'}`}>{EXAM_SHORT_LABELS[ex]}</button>
                         ))}
                       </div>
-                      <div className="mb-4 flex justify-between items-center border-t border-slate-100 pt-4">
-                        <span className="text-sm font-bold text-slate-500">재원 상태 관리</span>
+                      <div className="mb-4 space-y-4 border-t border-slate-100 pt-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span className="text-sm font-bold text-slate-500">학생 전체 상태</span>
+                          {currentManageStudentRecord && (
+                            <div className="flex flex-wrap gap-2">
+                              <button type="button" onClick={() => handleSetStudentEnrollmentStatus(currentManageStudentRecord, 'active')} className={`px-4 py-2 rounded-xl text-xs font-black ${currentManageStudentStatus === 'active' ? 'bg-emerald-600 text-white' : 'border border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                                재원
+                              </button>
+                              <button type="button" onClick={() => handleSetStudentEnrollmentStatus(currentManageStudentRecord, 'withdrawn')} className={`px-4 py-2 rounded-xl text-xs font-black ${currentManageStudentStatus === 'withdrawn' ? 'bg-rose-600 text-white' : 'border border-rose-200 bg-rose-50 text-rose-700'}`}>
+                                퇴원
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         {currentManageStudentRecord && (
-                          <button type="button" onClick={async () => {
-                            await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('students'), currentManageStudentRecord.studentId), { isWithdrawn: !currentManageStudentRecord.isWithdrawn });
-                          }} className={`px-4 py-2 rounded-xl text-xs font-black text-white ${currentManageStudentRecord.isWithdrawn ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                            {currentManageStudentRecord.isWithdrawn ? '복귀 처리' : '퇴원 처리'}
-                          </button>
+                          <div>
+                            <div className="text-sm font-bold text-slate-500 mb-2">과목별 수강 상태</div>
+                            <div className="flex flex-wrap gap-2">
+                              {subjectOptions.map((subject) => {
+                                const subjectStatus = getStudentSubjectStatus(currentManageStudentRecord, subject);
+                                return (
+                                  <div key={`manage-subject-status-${subject}`} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                                    <div className="text-sm font-black text-slate-800 mb-2">{subject}</div>
+                                    <div className="flex gap-2">
+                                      <button type="button" onClick={() => handleSetStudentSubjectStatus(currentManageStudentRecord, subject, 'active')} className={`px-3 py-1.5 rounded-lg text-xs font-black ${subjectStatus === 'active' ? 'bg-sky-600 text-white' : 'border border-sky-200 bg-white text-sky-700'}`}>수강</button>
+                                      <button type="button" onClick={() => handleSetStudentSubjectStatus(currentManageStudentRecord, subject, 'inactive')} className={`px-3 py-1.5 rounded-lg text-xs font-black ${subjectStatus === 'inactive' ? 'bg-slate-700 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>미수강</button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         )}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -3795,7 +4215,7 @@
                         </div>
                         <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">PIN 번호</label>
-                          <input value={teacherAdminForm.pin} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, pin:e.target.value.replace(/\D/g,'').slice(0,4)}))} inputMode="numeric" maxLength="4" placeholder="4자리 숫자" className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none tracking-[0.3em]" />
+                          <input value={teacherAdminForm.pin} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, pin:e.target.value.replace(/\D/g,'').slice(0, getRequiredPinLengthForName(prev.name || teacherAdminForm.name))}))} inputMode="numeric" maxLength={String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME ? 6 : 4} placeholder={String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME ? '관리자 6자리 숫자' : '강사 4자리 숫자'} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none tracking-[0.3em]" />
                         </div>
                         <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">표시 순서</label>
@@ -3803,7 +4223,7 @@
                         </div>
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 leading-6">
-                        이름 변경, PIN 재설정, 신규 선생님 추가를 여기서 한 번에 처리합니다. 표시 순서는 숫자가 작을수록 먼저 보입니다.
+                        이름 변경, PIN 재설정, 신규 선생님 추가를 여기서 한 번에 처리합니다. 일반 강사 PIN은 4자리, 관리자 PIN은 6자리입니다. 표시 순서는 숫자가 작을수록 먼저 보입니다.
                       </div>
                       <div className="flex flex-wrap gap-3">
                         <button type="submit" disabled={isSavingTeacherAdmin} className={`rounded-2xl px-5 py-3 text-sm font-black text-white ${isSavingTeacherAdmin ? 'bg-slate-400' : 'bg-violet-700 hover:bg-violet-800'}`}>
@@ -3823,6 +4243,7 @@
                             <th className="py-3 px-2 text-left">이름</th>
                             <th className="py-3 px-2 text-left">PIN</th>
                             <th className="py-3 px-2 text-left">사용</th>
+                            <th className="py-3 px-2 text-left">로그인 제한</th>
                             <th className="py-3 px-2 text-left">관리</th>
                           </tr>
                         </thead>
@@ -3846,6 +4267,14 @@
                                 </button>
                               </td>
                               <td className="py-3 px-2">
+                                {teacher.isLoginLocked && getTeacherLoginLockText(teacher) ? (
+                                  <div className="flex flex-col gap-2">
+                                    <span className="text-xs font-black text-rose-600">{getTeacherLoginLockText(teacher)}</span>
+                                    <button type="button" onClick={()=>handleUnlockTeacherLogin(teacher)} className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-700">제한 해제</button>
+                                  </div>
+                                ) : <span className="text-xs font-bold text-slate-400">정상</span>}
+                              </td>
+                              <td className="py-3 px-2">
                                 <div className="flex flex-wrap gap-2">
                                   <button type="button" onClick={()=>handleEditTeacherAdmin(teacher)} className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">수정</button>
                                 </div>
@@ -3856,7 +4285,65 @@
                       </table>
                     </div>
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-700">
-                      사용 OFF로 바꾸면 로그인 버튼과 내부 목록에서 숨겨집니다. 기존 데이터는 그대로 유지됩니다.
+                      사용 OFF로 바꾸면 로그인 버튼과 내부 목록에서 숨겨집니다. 기존 데이터는 그대로 유지됩니다. 일반 강사는 4자리 PIN, 관리자(수최)는 6자리 PIN으로 운영됩니다.
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="grid xl:grid-cols-[0.9fr_1.1fr] gap-6">
+                  <Card title="연도 승급 처리" right={<span className="text-xs font-black text-violet-700">관리자 전용</span>}>
+                    <div className="space-y-4">
+                      <div className="text-sm text-slate-500 leading-6">현재 연도의 재원 학생(3학년 제외)을 다음 연도 학생으로 새로 생성합니다. 기존 기록은 그대로 유지됩니다.</div>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-black text-slate-500 mb-2">기준 연도</label>
+                          <select value={promotionSourceYear} onChange={(e)=>setPromotionSourceYear(Number(e.target.value))} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none">
+                            {YEARS.filter((year) => year < Math.max(...YEARS)).map((year) => <option key={year} value={year}>{year}년</option>)}
+                          </select>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                          <div className="text-xs font-black text-slate-500">승급 결과</div>
+                          <div className="mt-2 text-lg font-black text-slate-900">{promotionTargetYear}년 학생 생성</div>
+                        </div>
+                      </div>
+                      <button type="button" onClick={handlePromoteStudents} disabled={isPromotingStudents} className={`rounded-2xl px-5 py-3 text-sm font-black text-white ${isPromotingStudents ? 'bg-slate-400' : 'bg-indigo-700 hover:bg-indigo-800'}`}>
+                        {isPromotingStudents ? '승급 처리 중...' : '전체 승급 실행'}
+                      </button>
+                      <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs leading-6 text-sky-800">
+                        승급은 기존 학생을 이동시키는 것이 아니라 다음 연도 학생을 새로 만들어 두는 방식입니다. 기존 시험 기록과 과거 연도 데이터는 유지됩니다.
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card title="로그인 기록" right={<span className="text-xs text-slate-400">관리자만 열람</span>}>
+                    <div className="overflow-x-auto mini-scroll">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                          <tr>
+                            <th className="py-3 px-2 text-left">선생님</th>
+                            <th className="py-3 px-2 text-left">역할</th>
+                            <th className="py-3 px-2 text-left">로그인</th>
+                            <th className="py-3 px-2 text-left">로그아웃</th>
+                            <th className="py-3 px-2 text-left">접속 시간</th>
+                            <th className="py-3 px-2 text-left">비고</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredLoginLogs.length ? filteredLoginLogs.map((row) => (
+                            <tr key={row.docId}>
+                              <td className="py-3 px-2 font-black text-slate-900">{row.teacherName || '-'}</td>
+                              <td className="py-3 px-2">{row.teacherRole === 'admin' ? '관리자' : '강사'}</td>
+                              <td className="py-3 px-2">{formatDateText(row.loginAt)}</td>
+                              <td className="py-3 px-2">{row.logoutAt ? formatDateText(row.logoutAt) : '-'}</td>
+                              <td className="py-3 px-2 font-bold text-violet-700">{row.sessionDurationText || (row.logoutAt ? getSessionDurationText(row.sessionMs) : '-')}</td>
+                              <td className="py-3 px-2">{row.autoLogout ? '자동 로그아웃' : (row.logoutAt ? '정상 로그아웃' : '접속 중')}</td>
+                            </tr>
+                          )) : <tr><td colSpan="6" className="py-8 text-center text-slate-400">로그인 기록이 없습니다.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs leading-6 text-violet-800">
+                      로그인 기록은 접속 시간과 로그아웃 시간을 함께 남기며, 활동이 없으면 자동 로그아웃됩니다.
                     </div>
                   </Card>
                 </div>
