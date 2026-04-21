@@ -839,7 +839,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R12.5';
+    const APP_VERSION = 'OA-R12.7';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -878,12 +878,12 @@
         if (savedRole) return savedRole;
         const savedName = String(target.name || '').trim();
         if (savedName === ADMIN_TEACHER_NAME) return 'admin';
-        if (savedName === '손님' || savedName === '게스트') return 'guest';
+        if (savedName === '게스트' || savedName === '게스트') return 'guest';
         return 'teacher';
       }
       const name = String(target || '').trim();
       if (name === ADMIN_TEACHER_NAME) return 'admin';
-      if (name === '손님' || name === '게스트') return 'guest';
+      if (name === '게스트' || name === '게스트') return 'guest';
       return 'teacher';
     }
 
@@ -969,6 +969,12 @@
       const d = new Date(v);
       if (Number.isNaN(d.getTime())) return String(v);
       return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+
+    function getComparableValue(value, type = 'text') {
+      if (type === 'date') return value ? new Date(value).getTime() || 0 : 0;
+      if (type === 'number') return Number(value || 0);
+      return String(value || '').toLowerCase();
     }
 
     function formatScoreDelta(curr, prev) {
@@ -1686,7 +1692,7 @@
         : '강사/게스트 4자리 · 관리자 6자리';
 
       const allMenuItems = useMemo(() => {
-        if (isAdminUser) return [...MENU_ITEMS, { key: 'teacherAdmin', label: '선생님 관리', icon: 'fa-user-gear' }];
+        if (isAdminUser) return [...MENU_ITEMS, { key: 'teacherAdmin', label: 'Admin Page', icon: 'fa-user-gear' }];
         if (isGuestUser) return MENU_ITEMS.filter((item) => ['dashboard', 'schoolAnalysis', 'studentAnalysis', 'teamExam'].includes(item.key));
         return MENU_ITEMS;
       }, [isAdminUser, isGuestUser]);
@@ -2019,7 +2025,7 @@
         if (!db || !window.FirebaseAPI || !logId) return;
         try {
           const nowMs = Date.now();
-          const sessionMs = Math.max(0, nowMs - Number(sessionStartedAtRef.current || nowMs));
+          const sessionMs = Math.max(0, nowMs - Number(options.sessionStartedAt || sessionStartedAtRef.current || nowMs));
           await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('loginLogs'), logId), {
             logoutAt: new Date(nowMs).toISOString(),
             autoLogout: options.auto === true,
@@ -2029,6 +2035,69 @@
           });
         } catch (error) {
           console.error('로그아웃 기록 저장 실패:', error);
+        }
+      };
+
+      const finalizeOpenLoginLogsByTeacher = async (teacherName, options = {}) => {
+        if (!db || !window.FirebaseAPI || !teacherName) return;
+        try {
+          const snapshot = await window.FirebaseAPI.getDocs(
+            window.FirebaseAPI.query(
+              window.FirebaseAPI.collection(db, getPath('loginLogs')),
+              window.FirebaseAPI.where('teacherName', '==', teacherName),
+              window.FirebaseAPI.where('logoutAt', '==', '')
+            )
+          );
+          const updates = [];
+          snapshot.forEach((docSnap) => {
+            if (options.excludeLogId && docSnap.id === options.excludeLogId) return;
+            updates.push(finalizeLoginLog(docSnap.id, options));
+          });
+          if (updates.length) await Promise.all(updates);
+        } catch (error) {
+          console.error('열려 있는 로그인 기록 정리 실패:', error);
+        }
+      };
+
+      const handleExportArchiveData = () => {
+        if (typeof XLSX === 'undefined') return alert('엑셀 내보내기 라이브러리를 불러오지 못했습니다.');
+        const summary = archiveCleanupSummary;
+        if (!summary.studentCount && !summary.scoreCount && !summary.examCount) return alert(`${summary.cutoffYear}년 이하 보관 데이터가 없습니다.`);
+        const students = studentsData.filter((student) => summary.studentIds.has(student.studentId)).map((student) => ({ 연도: student.year || '', 학교: student.school || '', 학년: student.grade || '', 이름: student.name || '', 상태: getStudentEnrollmentStatus(student) === 'active' ? '재원' : '퇴원' }));
+        const scores = summary.scores.map((score) => ({ 연도: score.year || '', 학생ID: score.studentId || '', 시험: score.exam || '', 과목: score.subject || '', 세부과목: score.detailSubject || '', 점수: score.score || '', 등급: score.tier || '' }));
+        const exams = summary.exams.map((item) => ({ 연도: item.year || '', 학교: item.school || '', 학년: item.grade || '', 시험: item.exam || '', 과목: item.subject || '', 세부과목: item.detailSubject || '' }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(students.length ? students : [{ 안내: '학생 데이터 없음' }]), 'students');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(scores.length ? scores : [{ 안내: '성적 데이터 없음' }]), 'scores');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exams.length ? exams : [{ 안내: '시험 데이터 없음' }]), 'teamExams');
+        XLSX.writeFile(wb, `oasis_archive_${summary.cutoffYear}_export.xlsx`);
+      };
+
+      const handleDeleteArchiveData = async () => {
+        if (!db || !window.FirebaseAPI || !isAdminUser || isCleaningArchiveData) return;
+        const summary = archiveCleanupSummary;
+        if (!summary.studentCount && !summary.scoreCount && !summary.examCount) return alert(`${summary.cutoffYear}년 이하 삭제할 데이터가 없습니다.`);
+        const ok = window.confirm(`${summary.cutoffYear}년 이하 보관 데이터 삭제를 진행할까요?\n학생 ${summary.studentCount}명 / 성적 ${summary.scoreCount}건 / 시험분석 ${summary.examCount}건이 삭제됩니다.`);
+        if (!ok) return;
+        try {
+          setIsCleaningArchiveData(true);
+          const refs = [
+            ...studentsData.filter((student) => summary.studentIds.has(student.studentId)).map((student) => ({ path: getPath('students'), id: student.studentId })),
+            ...summary.scores.map((score) => ({ path: getPath('scores'), id: score.docId })),
+            ...summary.exams.map((item) => ({ path: getPath('teamExams'), id: item.docId })),
+          ];
+          for (let i = 0; i < refs.length; i += 450) {
+            const batch = window.FirebaseAPI.writeBatch(db);
+            refs.slice(i, i + 450).forEach((item) => {
+              batch.delete(window.FirebaseAPI.doc(db, item.path, item.id));
+            });
+            await batch.commit();
+          }
+          alert(`${summary.cutoffYear}년 이하 보관 데이터 삭제가 완료되었습니다.`);
+        } catch (error) {
+          alert('보관 데이터 삭제 중 오류가 발생했습니다: ' + error.message);
+        } finally {
+          setIsCleaningArchiveData(false);
         }
       };
 
@@ -2085,6 +2154,7 @@
               updatedBy: selectedTeacher.name || '',
             });
           }
+          await finalizeOpenLoginLogsByTeacher(selectedTeacher.name, { sessionStartedAt: now, auto: false });
           setCurrentTeacher(selectedTeacher);
           setLoginError('');
           setTeacherAnalysisTeacher(selectedTeacher.name);
@@ -2103,6 +2173,7 @@
               userAgent: navigator.userAgent || '',
               createdAt: new Date(now).toISOString(),
             });
+            currentSessionLogIdRef.current = loginLogRef.id;
             setCurrentSessionLogId(loginLogRef.id);
           }
         } catch (error) {
@@ -2111,7 +2182,11 @@
         }
       };
       const handleLogout = async (options = {}) => {
-        await finalizeLoginLog(currentSessionLogId, options);
+        const activeTeacherName = currentTeacher?.name || selectedTeacherName || '';
+        const activeLogId = currentSessionLogIdRef.current || currentSessionLogId;
+        await finalizeLoginLog(activeLogId, options);
+        await finalizeOpenLoginLogsByTeacher(activeTeacherName, { ...options, excludeLogId: activeLogId });
+        currentSessionLogIdRef.current = '';
         setCurrentSessionLogId('');
         setCurrentTeacher(null);
         setSelectedTeacherName('');
@@ -2144,6 +2219,18 @@
         }, 15000);
         return () => clearInterval(timerId);
       }, [isLoggedIn, currentSessionLogId]);
+
+      useEffect(() => {
+        if (!isLoggedIn) return;
+        const finalizeOnLeave = () => {
+          const activeTeacherName = currentTeacher?.name || selectedTeacherName || '';
+          const activeLogId = currentSessionLogIdRef.current || currentSessionLogId;
+          if (!db || !window.FirebaseAPI || !activeTeacherName || !activeLogId) return;
+          finalizeLoginLog(activeLogId, { auto: false });
+        };
+        window.addEventListener('pagehide', finalizeOnLeave);
+        return () => window.removeEventListener('pagehide', finalizeOnLeave);
+      }, [isLoggedIn, currentTeacher, selectedTeacherName, currentSessionLogId, db]);
 
       const toggleAdminSection = (key) => {
         setAdminSectionOpen((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -2320,10 +2407,54 @@
       }, [studentsData, enrollmentRosterFilters, subjectOptions, studentSubjectScoreMap]);
 
       const filteredLoginLogs = useMemo(() => {
+        const sortMeta = {
+          teacherName: 'text',
+          teacherRole: 'text',
+          loginAt: 'date',
+          logoutAt: 'date',
+          sessionMs: 'number',
+        };
+        const type = sortMeta[loginLogSort.key] || 'text';
+        const directionFactor = loginLogSort.direction === 'asc' ? 1 : -1;
         return [...loginLogsData]
-          .sort((a, b) => new Date(b.loginAt || 0).getTime() - new Date(a.loginAt || 0).getTime())
+          .sort((a, b) => {
+            const aValue = getComparableValue(a?.[loginLogSort.key], type);
+            const bValue = getComparableValue(b?.[loginLogSort.key], type);
+            if (aValue < bValue) return -1 * directionFactor;
+            if (aValue > bValue) return 1 * directionFactor;
+            return getComparableValue(a?.loginAt, 'date') < getComparableValue(b?.loginAt, 'date') ? 1 : -1;
+          })
           .slice(0, 100);
-      }, [loginLogsData]);
+      }, [loginLogsData, loginLogSort]);
+
+      const toggleLoginLogSort = (key) => {
+        setLoginLogSort((prev) => ({
+          key,
+          direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc',
+        }));
+      };
+
+      const archiveCutoffYear = useMemo(() => {
+        const currentYear = new Date().getFullYear();
+        const dataMaxYear = Math.max(0, ...studentsData.map((student) => Number(student.year || 0)).filter(Boolean), ...scoresData.map((score) => Number(score.year || 0)).filter(Boolean), ...teamExamData.map((item) => Number(item.year || 0)).filter(Boolean));
+        return Math.max(currentYear, dataMaxYear || currentYear) - 3;
+      }, [studentsData, scoresData, teamExamData]);
+
+      const archiveCleanupSummary = useMemo(() => {
+        const studentIds = new Set(studentsData.filter((student) => !student.deleted && Number(student.year || 0) <= archiveCutoffYear).map((student) => student.studentId));
+        const scores = scoresData.filter((score) => !score.deleted && (Number(score.year || 0) <= archiveCutoffYear || studentIds.has(score.studentId)));
+        const exams = teamExamData.filter((item) => !item.deleted && Number(item.year || 0) <= archiveCutoffYear);
+        return {
+          studentIds,
+          students: Array.from(studentIds),
+          studentCount: studentIds.size,
+          scoreCount: scores.length,
+          examCount: exams.length,
+          cutoffYear: archiveCutoffYear,
+          scores,
+          exams,
+        };
+      }, [studentsData, scoresData, teamExamData, archiveCutoffYear]);
 
       const resetManageSideInputs = (source) => {
         if (source !== 'new') {
@@ -3065,7 +3196,7 @@
 
       const handlePrintPage = () => {
         if (isGuestUser) {
-          alert('손님 계정은 인쇄 기능을 사용할 수 없습니다.');
+          alert('게스트 계정은 인쇄 기능을 사용할 수 없습니다.');
           return;
         }
         if (view === 'teamExam') {
@@ -3232,7 +3363,7 @@
                   <div>
                     <div className="text-[12px] font-black tracking-[0.22em] text-[#2F4EA2]">OASIS</div>
                     <h2 className="text-3xl font-black text-slate-900 mb-2 mt-1">빠른 PIN 로그인</h2>
-                    <p className="text-slate-500 leading-7">계정을 선택하고 PIN을 입력하세요. 일반 강사와 게스트는 4자리, 관리자는 6자리입니다.</p>
+                    <p className="text-slate-500 leading-7">계정을 선택하고 PIN을 입력하세요. 일반 강사와 게스트는 4자리, 관리자는 6자리입니다. PIN 오류 5회 시 30분 동안 잠금되며, 잠금 시 수최T에게 문의하세요.</p>
                     {bootForceReady && !dataReady && <div className="mt-3 inline-flex items-center rounded-full px-3 py-1.5 bg-amber-50 border border-amber-200 text-[12px] font-bold text-amber-700">초기 데이터 연결이 지연되어 로그인 화면을 먼저 열었습니다.</div>}
                   </div>
                   <div className="md:hidden inline-flex items-center gap-2 rounded-full px-3 py-1.5 border border-violet-200 bg-violet-50 text-[11px] font-black text-violet-700">
@@ -3638,7 +3769,7 @@
                   </div>
                 </div>
                 <div className="flex items-center gap-2 print-hide">
-                  {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : isGuestUser ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 hidden sm:inline-flex">손님 전용 보기</span> : null}
+                  {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : isGuestUser ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 hidden sm:inline-flex">게스트 전용 보기</span> : null}
                   {isAdminUser ? <button onClick={handleExportAllData} className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full font-bold text-sm text-emerald-700 hover:bg-emerald-100"><i className="fas fa-file-export mr-2"></i>전체 엑셀</button> : null}
                   {!isGuestUser ? <button onClick={handlePrintPage} className="hidden sm:inline-flex items-center px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200 whitespace-nowrap"><i className="fas fa-print mr-2"></i>인쇄</button> : null}
                 </div>
@@ -4422,8 +4553,8 @@
 
             {view === 'teacherAdmin' && isAdminUser && (
               <div className="space-y-6">
-                <div className="grid xl:grid-cols-[0.95fr_1.05fr] gap-6">
-                  <Card title="선생님 추가 / 수정" right={editingTeacherId ? <button type="button" onClick={resetTeacherAdminForm} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600">새로 입력</button> : <span className="text-xs font-black text-violet-700">관리자 전용</span>}>
+                <div className="grid xl:grid-cols-2 gap-6 items-stretch">
+                  <Card title="Admin Page" right={editingTeacherId ? <button type="button" onClick={resetTeacherAdminForm} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600">새로 입력</button> : <span className="text-xs font-black text-violet-700">관리자 전용</span>}>
                     <form onSubmit={handleSaveTeacherAdmin} className="space-y-4">
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div className="sm:col-span-2">
@@ -4434,13 +4565,13 @@
                           <label className="block text-xs font-black text-slate-500 mb-2">권한</label>
                           <select value={teacherAdminForm.name === ADMIN_TEACHER_NAME ? 'admin' : (teacherAdminForm.teacherRole || 'teacher')} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, teacherRole:e.target.value}))} disabled={String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none bg-white">
                             <option value="teacher">강사</option>
-                            <option value="guest">손님(보기 전용)</option>
+                            <option value="guest">게스트(보기 전용)</option>
                             <option value="admin">관리자</option>
                           </select>
                         </div>
                         <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">PIN 번호</label>
-                          <input value={teacherAdminForm.pin} onChange={(e)=>setTeacherAdminForm((prev)=>{ const role = String(prev.name || teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME ? 'admin' : (prev.teacherRole || teacherAdminForm.teacherRole || 'teacher'); return ({...prev, pin:e.target.value.replace(/\D/g,'').slice(0, getRequiredPinLengthForRole(role))}); })} inputMode="numeric" maxLength={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? 6 : 4} placeholder={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? '관리자 6자리 숫자' : ((teacherAdminForm.teacherRole || 'teacher') === 'guest' ? '손님 4자리 숫자' : '강사 4자리 숫자')} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none tracking-[0.3em]" />
+                          <input value={teacherAdminForm.pin} onChange={(e)=>setTeacherAdminForm((prev)=>{ const role = String(prev.name || teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME ? 'admin' : (prev.teacherRole || teacherAdminForm.teacherRole || 'teacher'); return ({...prev, pin:e.target.value.replace(/\D/g,'').slice(0, getRequiredPinLengthForRole(role))}); })} inputMode="numeric" maxLength={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? 6 : 4} placeholder={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? '관리자 6자리 숫자' : ((teacherAdminForm.teacherRole || 'teacher') === 'guest' ? '게스트 4자리 숫자' : '강사 4자리 숫자')} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none tracking-[0.3em]" />
                         </div>
                         <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">표시 순서</label>
@@ -4517,21 +4648,19 @@
                   </Card>
                 </div>
 
-                <div className="grid xl:grid-cols-[0.9fr_1.1fr] gap-6">
+                <div className="grid xl:grid-cols-2 gap-6 items-stretch">
                   <Card title="연도 승급 처리" right={<span className="text-xs font-black text-violet-700">관리자 전용</span>}>
                     <div className="space-y-4">
                       <div className="text-sm text-slate-500 leading-6">현재 연도의 재원 학생(3학년 제외)을 다음 연도 학생으로 새로 생성합니다. 기존 기록은 그대로 유지됩니다.</div>
-                      <div className="grid sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-black text-slate-500 mb-2">기준 연도</label>
-                          <select value={promotionSourceYear} onChange={(e)=>setPromotionSourceYear(Number(e.target.value))} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none">
-                            {YEARS.filter((year) => year < Math.max(...YEARS)).map((year) => <option key={year} value={year}>{year}년</option>)}
-                          </select>
-                        </div>
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <div className="text-xs font-black text-slate-500">승급 결과</div>
-                          <div className="mt-2 text-lg font-black text-slate-900">{promotionTargetYear}년 학생 생성</div>
-                        </div>
+                      <div>
+                        <label className="block text-xs font-black text-slate-500 mb-2">기준 연도</label>
+                        <select value={promotionSourceYear} onChange={(e)=>setPromotionSourceYear(Number(e.target.value))} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none">
+                          {YEARS.filter((year) => year < Math.max(...YEARS)).map((year) => <option key={year} value={year}>{year}년</option>)}
+                        </select>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="text-xs font-black text-slate-500">승급 결과</div>
+                        <div className="mt-2 text-lg font-black text-slate-900">{promotionTargetYear}년 학생 생성</div>
                       </div>
                       <button type="button" onClick={handlePromoteStudents} disabled={isPromotingStudents} className={`rounded-2xl px-5 py-3 text-sm font-black text-white ${isPromotingStudents ? 'bg-slate-400' : 'bg-indigo-700 hover:bg-indigo-800'}`}>
                         {isPromotingStudents ? '승급 처리 중...' : '전체 승급 실행'}
@@ -4539,20 +4668,31 @@
                       <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs leading-6 text-sky-800">
                         승급은 기존 학생을 이동시키는 것이 아니라 다음 연도 학생을 새로 만들어 두는 방식입니다. 기존 시험 기록과 과거 연도 데이터는 유지됩니다.
                       </div>
+                      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-800 space-y-3">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="text-xs font-black text-rose-500">3년 전 보관 데이터 정리</div>
+                            <div className="mt-1 font-black">{archiveCleanupSummary.cutoffYear}년 이하 학생 {archiveCleanupSummary.studentCount}명 / 성적 {archiveCleanupSummary.scoreCount}건 / 시험분석 {archiveCleanupSummary.examCount}건</div>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          <button type="button" onClick={handleExportArchiveData} className="rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-700 hover:bg-emerald-50">{archiveCleanupSummary.cutoffYear}년 데이터 내보내기</button>
+                          <button type="button" onClick={handleDeleteArchiveData} disabled={isCleaningArchiveData} className={`rounded-2xl px-4 py-2.5 text-sm font-black text-white ${isCleaningArchiveData ? 'bg-slate-400' : 'bg-rose-600 hover:bg-rose-700'}`}>{isCleaningArchiveData ? '삭제 중...' : `${archiveCleanupSummary.cutoffYear}년 데이터 일괄 삭제`}</button>
+                        </div>
+                      </div>
                     </div>
                   </Card>
 
-                  <Card title="로그인 기록" right={<span className="text-xs text-slate-400">관리자만 열람</span>}>
+                  <Card title="로그인 기록" right={<span className="text-xs text-slate-400">관리자만 열람 · 30분 미활동 시 자동 로그아웃</span>}>
                     <div className="overflow-x-auto mini-scroll">
                       <table className="w-full text-sm">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
                           <tr>
-                            <th className="py-3 px-2 text-left">선생님</th>
-                            <th className="py-3 px-2 text-left">역할</th>
-                            <th className="py-3 px-2 text-left">로그인</th>
-                            <th className="py-3 px-2 text-left">로그아웃</th>
-                            <th className="py-3 px-2 text-left">접속 시간</th>
-                            <th className="py-3 px-2 text-left">비고</th>
+                            <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('teacherName')}>선생님</th>
+                            <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('teacherRole')}>역할</th>
+                            <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('loginAt')}>로그인</th>
+                            <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('logoutAt')}>로그아웃</th>
+                            <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('sessionMs')}>접속 시간</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -4562,15 +4702,14 @@
                               <td className="py-3 px-2">{getTeacherRoleLabel(row.teacherRole)}</td>
                               <td className="py-3 px-2">{formatDateText(row.loginAt)}</td>
                               <td className="py-3 px-2">{row.logoutAt ? formatDateText(row.logoutAt) : '-'}</td>
-                              <td className="py-3 px-2 font-bold text-violet-700">{row.sessionDurationText || (row.logoutAt ? getSessionDurationText(row.sessionMs) : '-')}</td>
-                              <td className="py-3 px-2">{row.autoLogout ? '자동 로그아웃' : (row.logoutAt ? '정상 로그아웃' : '접속 중')}</td>
+                              <td className="py-3 px-2 font-bold text-violet-700">{row.sessionDurationText || getSessionDurationText(row.sessionMs)}</td>
                             </tr>
-                          )) : <tr><td colSpan="6" className="py-8 text-center text-slate-400">로그인 기록이 없습니다.</td></tr>}
+                          )) : <tr><td colSpan="5" className="py-8 text-center text-slate-400">로그인 기록이 없습니다.</td></tr>}
                         </tbody>
                       </table>
                     </div>
                     <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs leading-6 text-violet-800">
-                      로그인 기록은 접속 시간과 로그아웃 시간을 함께 남기며, 활동이 없으면 자동 로그아웃됩니다.
+                      로그인 기록은 접속 시간과 로그아웃 시간을 함께 남기며, 활동이 없으면 30분 후 자동 로그아웃됩니다. 헤더를 누르면 정렬됩니다. PIN 오류 5회 누적 시 30분 잠금이 적용되며, 잠금 해제는 관리자 페이지에서 할 수 있습니다.
                     </div>
                   </Card>
                 </div>
