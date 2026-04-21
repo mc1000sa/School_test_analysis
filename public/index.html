@@ -812,7 +812,7 @@
 잠시만 기다려주세요.</div>
       <div class="instant-boot-brand-text" aria-label="브랜드">OASIS : Open Academy Score Insight System</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R13.3</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R13.4</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -853,7 +853,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R13.3';
+    const APP_VERSION = 'OA-R13.4';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -1038,13 +1038,20 @@
 
     function getTeacherNameBadgeTheme(name) {
       const key = String(name || '').trim();
-      let hash = 0;
-      for (const ch of key) hash = ((hash * 33) + ch.charCodeAt(0)) % 360;
-      const hue = (hash + (key.length * 17)) % 360;
+      let hashA = 0;
+      let hashB = 7;
+      for (const ch of key) {
+        const code = ch.charCodeAt(0);
+        hashA = ((hashA * 33) + code) % 360;
+        hashB = ((hashB * 37) + code) % 1000;
+      }
+      const hue = (hashA + (key.length * 29)) % 360;
+      const saturation = 58 + (hashB % 18);
+      const lightness = 32 + (hashB % 10);
       return {
-        borderColor: `hsl(${hue} 70% 74%)`,
-        backgroundColor: `hsl(${hue} 88% 96%)`,
-        color: `hsl(${hue} 72% 34%)`,
+        borderColor: `hsl(${hue} ${Math.min(82, saturation + 8)}% 74%)`,
+        backgroundColor: `hsl(${hue} ${Math.min(90, saturation + 18)}% 96%)`,
+        color: `hsl(${hue} ${saturation}% ${lightness}%)`,
       };
     }
 
@@ -1068,6 +1075,12 @@
     function getLoginLogSessionText(row) {
       const ms = getLoginLogSessionMs(row);
       return ms > 0 ? getSessionDurationText(ms) : '-';
+    }
+
+    function getMonthKeyFromDate(value) {
+      const date = value ? new Date(value) : new Date();
+      if (Number.isNaN(date.getTime())) return '';
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2,'0')}`;
     }
 
     function sanitizeKeyPart(value) {
@@ -2298,6 +2311,12 @@
         }
       };
 
+      const performLogout = (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+        handleLogout();
+      };
+
       useEffect(() => {
         if (!isLoggedIn) return;
         const refreshActivity = () => {
@@ -2509,20 +2528,33 @@
         return rows;
       }, [studentsData, enrollmentRosterFilters, subjectOptions, studentSubjectScoreMap]);
 
+      const currentMonthLabel = `${new Date().getMonth() + 1}월 접속횟수`;
+      const monthlyLoginCountByTeacher = useMemo(() => {
+        const activeMonthKey = getMonthKeyFromDate();
+        return loginLogsData.reduce((acc, row) => {
+          const teacherName = String(row?.teacherName || '').trim();
+          if (!teacherName) return acc;
+          const loginMonthKey = getMonthKeyFromDate(row?.loginAt);
+          if (!loginMonthKey || loginMonthKey !== activeMonthKey) return acc;
+          acc[teacherName] = (acc[teacherName] || 0) + 1;
+          return acc;
+        }, {});
+      }, [loginLogsData]);
+
       const filteredLoginLogs = useMemo(() => {
         const sortMeta = {
           teacherName: 'text',
           teacherRole: 'text',
           loginAt: 'date',
           logoutAt: 'date',
-          sessionMs: 'number',
+          monthlyCount: 'number',
         };
         const type = sortMeta[loginLogSort.key] || 'text';
         const directionFactor = loginLogSort.direction === 'asc' ? 1 : -1;
         return [...loginLogsData]
           .sort((a, b) => {
-            const aTarget = loginLogSort.key === 'sessionMs' ? getLoginLogSessionMs(a) : a?.[loginLogSort.key];
-            const bTarget = loginLogSort.key === 'sessionMs' ? getLoginLogSessionMs(b) : b?.[loginLogSort.key];
+            const aTarget = loginLogSort.key === 'monthlyCount' ? Number(monthlyLoginCountByTeacher[a?.teacherName] || 0) : a?.[loginLogSort.key];
+            const bTarget = loginLogSort.key === 'monthlyCount' ? Number(monthlyLoginCountByTeacher[b?.teacherName] || 0) : b?.[loginLogSort.key];
             const aValue = getComparableValue(aTarget, type);
             const bValue = getComparableValue(bTarget, type);
             if (aValue < bValue) return -1 * directionFactor;
@@ -2530,7 +2562,7 @@
             return getComparableValue(a?.loginAt, 'date') < getComparableValue(b?.loginAt, 'date') ? 1 : -1;
           })
           .slice(0, 100);
-      }, [loginLogsData, loginLogSort]);
+      }, [loginLogsData, loginLogSort, monthlyLoginCountByTeacher]);
 
       const toggleLoginLogSort = (key) => {
         setLoginLogSort((prev) => ({
@@ -3961,7 +3993,7 @@
                 </button>
               ))}
             </div>
-            <div className="mt-auto space-y-3"><div className="bg-slate-50 p-4 rounded-2xl border border-slate-200"><div className="text-xs text-slate-500 font-bold mb-1">로그인</div><div className="flex items-center justify-between gap-2"><div className="font-black text-slate-900">{currentTeacherName} 선생님</div>{adminPill}</div></div><button type="button" onClick={() => handleLogout()} className="w-full rounded-2xl bg-gradient-to-r from-slate-700 to-slate-900 text-white font-bold py-3 shadow-sm">로그아웃</button></div>
+            <div className="mt-auto space-y-3"><div className="bg-slate-50 p-4 rounded-2xl border border-slate-200"><div className="text-xs text-slate-500 font-bold mb-1">로그인</div><div className="flex items-center justify-between gap-2"><div className="font-black text-slate-900">{currentTeacherName} 선생님</div>{adminPill}</div></div><button type="button" onClick={performLogout} onTouchStart={performLogout} onKeyDown={(e)=>{ if (e.key === "Enter" || e.key === " ") performLogout(e); }} className="relative z-30 pointer-events-auto cursor-pointer w-full rounded-2xl bg-gradient-to-r from-slate-700 to-slate-900 text-white font-bold py-3 shadow-sm">로그아웃</button></div>
           </aside>
 
           <main className="content-wrap xl:pl-[290px] p-4 sm:p-6 space-y-6 mobile-safe-bottom">
