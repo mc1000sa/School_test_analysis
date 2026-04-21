@@ -812,7 +812,7 @@
 잠시만 기다려주세요.</div>
       <div class="instant-boot-brand-text" aria-label="브랜드">OASIS : Open Academy Score Insight System</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R13.0</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R13.1</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -853,7 +853,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R13.0';
+    const APP_VERSION = 'OA-R13.1';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -910,6 +910,27 @@
       if (normalized === 'guest') return '게스트';
       if (normalized === 'principal') return '원장님';
       return '강사';
+    }
+
+    const TEACHER_ACCENT_PALETTE = [
+      { bg: '#f5f3ff', text: '#6d28d9', border: '#c4b5fd' },
+      { bg: '#eff6ff', text: '#1d4ed8', border: '#93c5fd' },
+      { bg: '#ecfeff', text: '#0f766e', border: '#67e8f9' },
+      { bg: '#f0fdf4', text: '#15803d', border: '#86efac' },
+      { bg: '#fff7ed', text: '#c2410c', border: '#fdba74' },
+      { bg: '#fff1f2', text: '#be185d', border: '#f9a8d4' },
+      { bg: '#fefce8', text: '#a16207', border: '#fde68a' },
+      { bg: '#eef2ff', text: '#4338ca', border: '#a5b4fc' },
+    ];
+
+    function getTeacherAccentMeta(name) {
+      const safeName = String(name || '').trim() || '-';
+      const role = getTeacherRole(safeName);
+      if (role === 'admin') return { bg: '#fef3c7', text: '#92400e', border: '#fbbf24' };
+      if (role === 'principal') return { bg: '#ede9fe', text: '#6d28d9', border: '#c4b5fd' };
+      if (role === 'guest') return { bg: '#e0f2fe', text: '#0369a1', border: '#7dd3fc' };
+      const hash = Array.from(safeName).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+      return TEACHER_ACCENT_PALETTE[hash % TEACHER_ACCENT_PALETTE.length];
     }
 
     function getRequiredPinLengthForRole(role) {
@@ -1365,10 +1386,10 @@
         teacherInputStatus: false,
         testData: false,
         subjectAdmin: false,
-        teacherAdminMain: true,
-        teacherAdminPromotion: true,
-        teacherAdminList: true,
-        teacherAdminLogs: true,
+        teacherAdminMain: false,
+        teacherAdminPromotion: false,
+        teacherAdminList: false,
+        teacherAdminLogs: false,
       });
       const [isRenamingStudent, setIsRenamingStudent] = useState(false);
       const [teamExamForm, setTeamExamForm] = useState({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', cut1: '', cut2: '', cut3: '', cut4: '', difficulty: 3, review: '', specialNote: '' });
@@ -1754,6 +1775,7 @@
           displayOrder: teacher.displayOrder ?? '',
           teacherRole: getTeacherRole(teacher),
         });
+        setAdminSectionOpen((prev) => ({ ...prev, teacherAdminMain: true }));
         setView('teacherAdmin');
       };
 
@@ -2095,7 +2117,9 @@
           const updates = [];
           snapshot.forEach((docSnap) => {
             if (options.excludeLogId && docSnap.id === options.excludeLogId) return;
-            updates.push(finalizeLoginLog(docSnap.id, options));
+            const row = docSnap.data() || {};
+            const loginAtMs = row.loginAt ? new Date(row.loginAt).getTime() : 0;
+            updates.push(finalizeLoginLog(docSnap.id, { ...options, sessionStartedAt: Number.isFinite(loginAtMs) && loginAtMs > 0 ? loginAtMs : options.sessionStartedAt }));
           });
           if (updates.length) await Promise.all(updates);
         } catch (error) {
@@ -3124,6 +3148,16 @@
 
       const teamExamPublicPages = useMemo(() => chunkArray(teamExamPublicCards, 4), [teamExamPublicCards]);
 
+      const teamExamPublicHeaderText = useMemo(() => {
+        const tokens = [];
+        if (teamExamPublicFilters.year !== '전체') tokens.push(`${teamExamPublicFilters.year}년`);
+        if (teamExamPublicFilters.exam !== '전체') tokens.push(EXAM_SHORT_LABELS[teamExamPublicFilters.exam] || teamExamPublicFilters.exam);
+        if (teamExamPublicFilters.school !== '전체') tokens.push(teamExamPublicFilters.school);
+        if (teamExamPublicFilters.grade !== '전체') tokens.push(`${teamExamPublicFilters.grade}학년`);
+        if (teamExamPublicFilters.subject !== '전체') tokens.push(teamExamPublicFilters.subject);
+        return tokens.length ? tokens.join(' · ') : '시험 분석 카드뉴스';
+      }, [teamExamPublicFilters]);
+
       const buildPrintSummaryText = () => {
         if (view === 'dashboard') {
           return [String(filters.year) + '년', EXAM_SHORT_LABELS[filters.exam] || filters.exam, filters.school === '전체' ? '전체 학교' : filters.school, filters.grade === '전체' ? '전체 학년' : `${filters.grade}학년`, activeSubject === '전체' ? '전체 과목' : activeSubject].join(' · ');
@@ -3260,9 +3294,10 @@
           alert('출력할 카드뉴스 데이터가 없습니다.');
           return;
         }
-        const summary = [teamExamPublicFilters.year === '전체' ? '전체 연도' : `${teamExamPublicFilters.year}년`, teamExamPublicFilters.exam === '전체' ? '전체 시험' : (EXAM_SHORT_LABELS[teamExamPublicFilters.exam] || teamExamPublicFilters.exam), teamExamPublicFilters.school === '전체' ? '전체 학교' : teamExamPublicFilters.school, teamExamPublicFilters.grade === '전체' ? '전체 학년' : `${teamExamPublicFilters.grade}학년`, teamExamPublicFilters.subject === '전체' ? '전체 과목' : teamExamPublicFilters.subject].join(' · ');
+        const headerText = teamExamPublicHeaderText;
         const pageHtml = pages.map((page) => `
           <section class="print-page">
+            <div class="page-head">${escapeHtml(headerText)}</div>
             <div class="grid">${page.map((item) => { const theme = getSubjectPastelTheme(item.subject); return `
               <article class="card" style="--subject-soft:${theme.soft}; --subject-border:${theme.border}; --subject-strong:${theme.strong}; --subject-tint:${theme.tint};">
                 <div class="card-top">
@@ -3278,11 +3313,13 @@
                   </div>
                 </div>
                 <div class="meta-grid emphasis">
-                  <div class="meta-box"><div class="label note">문항구성</div><div class="value compact">${escapeHtml(String(item.questionInfo || '').replace(/\n/g, '\n'))}</div></div>
+                  <div class="meta-box"><div class="label note">문항구성</div><div class="value compact">${escapeHtml(String(item.questionInfo || '').replace(/
+/g, '
+'))}</div></div>
                   <div class="meta-box"><div class="label note">시험 난이도</div><div class="difficulty-stars">${escapeHtml(item.difficultyStars || '-')}</div><div class="difficulty-text">${escapeHtml(item.difficultyLabelText || '-')}</div></div>
                 </div>
-                <div class="note-box"><div class="label note">총평 및 특이사항</div><div class="note-text" style="font-size:${item.noteFontSize || 12}px">${escapeHtml(String(item.noteText || '').replace(/\n/g, ' '))}</div></div>
-                <div class="foot"><span>${escapeHtml(item.school || '-')} ${escapeHtml(item.grade ? `${item.grade}학년` : '')} (${escapeHtml(item.subject || '-')})</span><span>OASIS | Open Academy Score Insight System</span></div>
+                <div class="note-box"><div class="label note">총평 및 특이사항</div><div class="note-text" style="font-size:${item.noteFontSize || 12}px">${escapeHtml(String(item.noteText || '').replace(/
+/g, ' '))}</div></div>
               </article>
             `; }).join('')}</div>
           </section>
@@ -3292,10 +3329,11 @@
           * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
           html, body { margin:0; padding:0; background:#fff; color:#111827; font-family:'SUIT','Pretendard',sans-serif; }
           body { width:100%; }
-          .print-page { page-break-after: always; break-after: page; width:100%; height:198mm; overflow:hidden; }
+          .print-page { page-break-after: always; break-after: page; width:100%; height:198mm; overflow:hidden; display:flex; flex-direction:column; gap:4mm; }
           .print-page:last-child { page-break-after: auto; break-after: auto; }
-          .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); grid-template-rows:repeat(2, 1fr); gap:5mm; height:100%; }
-          .card { height:96.5mm; max-height:96.5mm; border-radius:18px; border:1px solid var(--subject-border, #c4b5fd); padding:5mm; display:flex; flex-direction:column; gap:3mm; background:linear-gradient(180deg, #fff 0%, var(--subject-soft, #fbfbff) 100%); overflow:hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.65); }
+          .page-head { flex:0 0 auto; border-radius:18px; border:1px solid #c4b5fd; background:linear-gradient(135deg, #ede9fe 0%, #eef2ff 100%); color:#5b21b6; padding:3.8mm 5mm; font-size:18pt; font-weight:900; letter-spacing:-0.03em; line-height:1.15; }
+          .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); grid-template-rows:repeat(2, 1fr); gap:5mm; flex:1 1 auto; min-height:0; }
+          .card { height:100%; border-radius:18px; border:1px solid var(--subject-border, #c4b5fd); padding:5mm; display:flex; flex-direction:column; gap:3mm; background:linear-gradient(180deg, #fff 0%, var(--subject-soft, #fbfbff) 100%); overflow:hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.65); }
           .card-top { display:flex; justify-content:flex-start; align-items:flex-start; }
           .hero-stack { display:flex; flex-direction:column; gap:1.8mm; width:100%; }
           .hero-row { display:flex; align-items:flex-start; justify-content:space-between; gap:4mm; }
@@ -3314,7 +3352,6 @@
           .difficulty-text { margin-top:1mm; font-size:9.6pt; font-weight:800; color:#334155; }
           .note-box { border:1px solid var(--subject-border, #e2e8f0); border-radius:16px; padding:3.2mm 3.5mm; height:33mm; min-height:33mm; max-height:33mm; background:linear-gradient(180deg, rgba(255,255,255,0.96), var(--subject-tint, #fff)); overflow:hidden; }
           .note-text { line-height:1.45; color:#334155; white-space:pre-line; word-break:keep-all; overflow:hidden; }
-          .foot { margin-top:auto; display:flex; justify-content:space-between; font-size:9px; font-weight:800; color:#94a3b8; }
         </style></head><body>${pageHtml}</body></html>`;
         printHtmlInFrame(html, '카드뉴스 인쇄를 시작할 수 없습니다.');
       };
@@ -3331,8 +3368,7 @@
             r.exam === exam &&
             r.school === targetSchool &&
             Number(r.grade) === targetGrade &&
-            r.subject === targetSubject &&
-            isStudentIncludedForSubject(r.studentId, r.subject)
+            r.subject === targetSubject
           );
           const count = rows.length;
           const avg = count ? Math.round(rows.reduce((sum, row) => sum + Number(row.score || 0), 0) / count) : null;
@@ -3347,6 +3383,10 @@
       const getAnnualComparisonSummary = (rows) => {
         const validRows = (rows || []).filter((row) => Number(row.count || 0) > 0);
         if (!validRows.length) return '선택한 조건의 데이터가 아직 없습니다.';
+        if (validRows.length === 1) {
+          const first = validRows[0];
+          return `${first.examShort} 데이터가 먼저 채워졌습니다. 현재 평균 ${first.avg ?? '-'}점, 상위권 ${first.topRate || 0}%, 위험권 ${first.riskRate || 0}%입니다.`;
+        }
         const first = validRows[0];
         const last = validRows[validRows.length - 1];
         const avgDiff = Number(last.avg || 0) - Number(first.avg || 0);
@@ -4927,11 +4967,18 @@
                           <tbody className="divide-y divide-slate-100">
                             {filteredLoginLogs.length ? filteredLoginLogs.map((row) => (
                               <tr key={row.docId}>
-                                <td className="py-3 px-2 font-black text-slate-900">{row.teacherName || '-'}</td>
+                                <td className="py-3 px-2 font-black text-slate-900">
+                                  <span
+                                    className="inline-flex items-center rounded-full border px-3 py-1"
+                                    style={(() => { const accent = getTeacherAccentMeta(row.teacherName); return { backgroundColor: accent.bg, color: accent.text, borderColor: accent.border }; })()}
+                                  >
+                                    {row.teacherName || '-'}
+                                  </span>
+                                </td>
                                 <td className="py-3 px-2">{getTeacherRoleLabel(row.teacherRole)}</td>
                                 <td className="py-3 px-2">{formatDateText(row.loginAt)}</td>
                                 <td className="py-3 px-2">{row.logoutAt ? formatDateText(row.logoutAt) : '-'}</td>
-                                <td className="py-3 px-2 font-bold text-violet-700">{row.sessionDurationText || getSessionDurationText(row.sessionMs)}</td>
+                                <td className="py-3 px-2 font-bold text-violet-700">{row.sessionDurationText || getSessionDurationText(row.sessionMs || ((row.logoutAt ? new Date(row.logoutAt).getTime() : Date.now()) - (row.loginAt ? new Date(row.loginAt).getTime() : Date.now())))}</td>
                               </tr>
                             )) : <tr><td colSpan="5" className="py-8 text-center text-slate-400">로그인 기록이 없습니다.</td></tr>}
                           </tbody>
@@ -5081,6 +5128,7 @@
                 <div className="teamprint-root space-y-6">
                   {teamExamPublicPages.length ? teamExamPublicPages.map((page, pageIndex) => (
                     <div key={`teamprint-page-${pageIndex}`} className="teamprint-page">
+                      <div className="mb-4 rounded-[22px] border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 px-5 py-4 text-[28px] font-black leading-tight text-violet-800">{teamExamPublicHeaderText}</div>
                       <div className="teamprint-grid">
                         {page.map((item) => (
                           <div key={item.docId} className="teamprint-card">
@@ -5115,8 +5163,8 @@
                             </div>
 
                             <div className="teamprint-footer">
-                              <span>{item.school || '-'} {item.grade ? `${item.grade}학년` : ''} 분석 리포트</span>
-                              <span>열린학원 시험 분석</span>
+                              <span>{EXAM_SHORT_LABELS[item.exam] || item.exam}</span>
+                              <span>{item.year}년</span>
                             </div>
                           </div>
                         ))}
