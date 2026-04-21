@@ -874,10 +874,33 @@
       return getRequiredPinLengthForRole(getTeacherRole(teacher));
     }
 
+
     function getTeacherLoginLockText(teacher) {
       const lockUntil = teacher?.loginLockedUntil ? new Date(teacher.loginLockedUntil) : null;
       if (!lockUntil || Number.isNaN(lockUntil.getTime()) || lockUntil.getTime() <= Date.now()) return '';
       return `${lockUntil.getMonth() + 1}/${lockUntil.getDate()} ${String(lockUntil.getHours()).padStart(2,'0')}:${String(lockUntil.getMinutes()).padStart(2,'0')}까지 잠금`;
+    }
+
+    function getStudentEnrollmentStatus(student) {
+      const raw = String(student?.status || '').trim().toLowerCase();
+      if (raw === 'withdrawn') return 'withdrawn';
+      if (student?.isWithdrawn === true) return 'withdrawn';
+      return 'active';
+    }
+
+    function getStudentSubjectStatus(student, subject) {
+      const subjectKey = String(subject || '').trim();
+      if (!subjectKey) return 'inactive';
+      if (getStudentEnrollmentStatus(student) !== 'active') return 'inactive';
+      const statusMap = student?.subjectStatusMap && typeof student.subjectStatusMap === 'object' ? student.subjectStatusMap : {};
+      const raw = String(statusMap[subjectKey] || '').trim().toLowerCase();
+      if (!raw) return 'active';
+      if (raw === 'inactive' || raw === 'withdrawn' || raw === 'off' || raw === 'false' || raw === '미수강') return 'inactive';
+      return 'active';
+    }
+
+    function isStudentIncludedForSubject(student, subject) {
+      return getStudentEnrollmentStatus(student) === 'active' && getStudentSubjectStatus(student, subject) === 'active';
     }
 
     function getTierSystem(row) {
