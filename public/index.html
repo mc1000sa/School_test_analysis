@@ -580,6 +580,20 @@
       font-weight: 900;
       color: #6d28d9;
     }
+    .admin-page-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    .admin-page-grid > * {
+      min-width: 0;
+    }
+    @media (min-width: 1280px) {
+      .admin-page-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
     .delta-up { color: #059669; font-weight: 900; }
     .delta-down { color: #dc2626; font-weight: 900; }
     .delta-same { color: #64748b; font-weight: 900; }
@@ -798,7 +812,7 @@
 잠시만 기다려주세요.</div>
       <div class="instant-boot-brand-text" aria-label="브랜드">OASIS : Open Academy Score Insight System</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R12.9</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R13.0</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -839,7 +853,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R12.9';
+    const APP_VERSION = 'OA-R13.0';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -4740,7 +4754,7 @@
 
 
             {view === 'teacherAdmin' && isAdminUser && (
-              <div className="space-y-6">
+              <div className="admin-page-grid">
                 <Card
                   title="Admin Page"
                   right={
