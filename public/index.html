@@ -668,6 +668,13 @@
       backdrop-filter: blur(8px);
     }
     .instant-boot-version .version-label { color:#7c8698; }
+    .instant-boot-brand-text {
+      margin-top: 8px;
+      font-size: 14px;
+      font-weight: 900;
+      color: #5b21b6;
+      letter-spacing: 0.01em;
+    }
     .boot-splash-wrap {
       min-height: 100vh;
       display: flex;
@@ -755,9 +762,9 @@
       <img src="./logo.png" alt="열린학원 로고" class="instant-boot-logo" onerror="this.style.display='none'">
       <div class="instant-boot-title">시스템 가동 준비중입니다.
 잠시만 기다려주세요.</div>
-      <div class="instant-boot-version" aria-label="브랜드"><span class="version-label">OASIS</span><span>Score Insight System</span></div>
+      <div class="instant-boot-brand-text" aria-label="브랜드">OASIS : Open Academy Score Insight System</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R12.4</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R12.5</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -783,6 +790,11 @@
         splash.classList.add('hidden');
         setTimeout(function(){ if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 450);
       };
+      setTimeout(function(){
+        if (splash && !splash.classList.contains('hidden')) {
+          window.__hideInstantBootSplash();
+        }
+      }, 12000);
     })();
   </script>
 
@@ -793,7 +805,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R12.4';
+    const APP_VERSION = 'OA-R12.5';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -820,18 +832,46 @@
     const LOGIN_LOCK_MINUTES = 30;
     const TEST_KEYWORDS = ['테스트', 'test', 'sample', '샘플', 'demo', '임시', 'tmp', 'temp', '가짜'];
 
-    function getTeacherRoleByName(name) {
-      return String(name || '').trim() === ADMIN_TEACHER_NAME ? 'admin' : 'teacher';
+    function normalizeTeacherRole(value) {
+      const role = String(value || '').trim().toLowerCase();
+      if (role === 'admin' || role === 'guest' || role === 'teacher') return role;
+      return '';
+    }
+
+    function getTeacherRole(target) {
+      if (target && typeof target === 'object') {
+        const savedRole = normalizeTeacherRole(target.teacherRole);
+        if (savedRole) return savedRole;
+        const savedName = String(target.name || '').trim();
+        if (savedName === ADMIN_TEACHER_NAME) return 'admin';
+        if (savedName === '손님') return 'guest';
+        return 'teacher';
+      }
+      const name = String(target || '').trim();
+      if (name === ADMIN_TEACHER_NAME) return 'admin';
+      if (name === '손님') return 'guest';
+      return 'teacher';
+    }
+
+    function getTeacherRoleLabel(role) {
+      const normalized = normalizeTeacherRole(role) || 'teacher';
+      if (normalized === 'admin') return '관리자';
+      if (normalized === 'guest') return '손님';
+      return '강사';
+    }
+
+    function getRequiredPinLengthForRole(role) {
+      return role === 'admin' ? 6 : 4;
     }
 
     function getRequiredPinLengthForName(name) {
-      return getTeacherRoleByName(name) === 'admin' ? 6 : 4;
+      return getRequiredPinLengthForRole(getTeacherRole(name));
     }
 
     function getStoredPinLength(teacher) {
       const rawPin = String(teacher?.pin || '').replace(/\D/g, '');
       if (rawPin.length) return rawPin.length;
-      return getRequiredPinLengthForName(teacher?.name || '');
+      return getRequiredPinLengthForRole(getTeacherRole(teacher));
     }
 
     function getTeacherLoginLockText(teacher) {
@@ -1232,7 +1272,7 @@
       const [editingTeamExamId, setEditingTeamExamId] = useState('');
       const [subjectAdminForm, setSubjectAdminForm] = useState({ subjectName: '', selectedSubject: '', detailName: '' });
       const [isSavingSubjectAdmin, setIsSavingSubjectAdmin] = useState(false);
-      const [teacherAdminForm, setTeacherAdminForm] = useState({ name: '', pin: '', displayOrder: '' });
+      const [teacherAdminForm, setTeacherAdminForm] = useState({ name: '', pin: '', displayOrder: '', teacherRole: 'teacher' });
       const [promotionSourceYear, setPromotionSourceYear] = useState(2026);
       const [isPromotingStudents, setIsPromotingStudents] = useState(false);
       const [editingTeacherId, setEditingTeacherId] = useState('');
@@ -1538,21 +1578,30 @@
       const [studentSubjectFilter, setStudentSubjectFilter] = useState('전체');
       const isLoggedIn = !!currentTeacher;
       const currentTeacherName = currentTeacher?.name || '';
-      const isAdminUser = currentTeacherName === ADMIN_TEACHER_NAME;
+      const currentTeacherRole = getTeacherRole(currentTeacher);
+      const isAdminUser = currentTeacherRole === 'admin';
+      const isGuestUser = currentTeacherRole === 'guest';
       const selectedTeacherInfo = useMemo(() => teachersData.find((teacher) => teacher.name === selectedTeacherName) || null, [teachersData, selectedTeacherName]);
       const loginPinMaxLength = selectedTeacherInfo ? getStoredPinLength(selectedTeacherInfo) : 6;
       const loginPinGuideText = selectedTeacherInfo
-        ? (getTeacherRoleByName(selectedTeacherInfo.name) === 'admin' ? '관리자 PIN 6자리' : `강사 PIN ${getStoredPinLength(selectedTeacherInfo)}자리`)
-        : '강사 4자리 / 관리자 6자리';
+        ? (() => {
+            const role = getTeacherRole(selectedTeacherInfo);
+            const requiredLength = getStoredPinLength(selectedTeacherInfo);
+            if (role === 'admin') return '관리자 PIN 6자리';
+            if (role === 'guest') return `손님 PIN ${requiredLength}자리`;
+            return `강사 PIN ${requiredLength}자리`;
+          })()
+        : '강사/손님 4자리 · 관리자 6자리';
 
       const allMenuItems = useMemo(() => {
-        if (!isAdminUser) return MENU_ITEMS;
-        return [...MENU_ITEMS, { key: 'teacherAdmin', label: '선생님 관리', icon: 'fa-user-gear' }];
-      }, [isAdminUser]);
+        if (isAdminUser) return [...MENU_ITEMS, { key: 'teacherAdmin', label: '선생님 관리', icon: 'fa-user-gear' }];
+        if (isGuestUser) return MENU_ITEMS.filter((item) => ['dashboard', 'schoolAnalysis', 'studentAnalysis', 'teamExam'].includes(item.key));
+        return MENU_ITEMS;
+      }, [isAdminUser, isGuestUser]);
 
       const resetTeacherAdminForm = () => {
         setEditingTeacherId('');
-        setTeacherAdminForm({ name: '', pin: '', displayOrder: '' });
+        setTeacherAdminForm({ name: '', pin: '', displayOrder: '', teacherRole: 'teacher' });
       };
 
       const handleEditTeacherAdmin = (teacher) => {
@@ -1561,6 +1610,7 @@
           name: String(teacher.name || ''),
           pin: String(teacher.pin || ''),
           displayOrder: teacher.displayOrder ?? '',
+          teacherRole: getTeacherRole(teacher),
         });
         setView('teacherAdmin');
       };
@@ -1597,7 +1647,8 @@
         e?.preventDefault?.();
         if (!db || !window.FirebaseAPI || !isAdminUser || isSavingTeacherAdmin) return;
         const name = String(teacherAdminForm.name || '').trim();
-        const requiredPinLength = getRequiredPinLengthForName(name);
+        const selectedRole = name === ADMIN_TEACHER_NAME ? 'admin' : (normalizeTeacherRole(teacherAdminForm.teacherRole) || 'teacher');
+        const requiredPinLength = getRequiredPinLengthForRole(selectedRole);
         const pin = String(teacherAdminForm.pin || '').replace(/\D/g, '').slice(0, requiredPinLength);
         const displayOrderRaw = teacherAdminForm.displayOrder;
         const displayOrderValue = displayOrderRaw === '' ? null : Number(displayOrderRaw);
@@ -1611,6 +1662,7 @@
           const payload = {
             name,
             pin,
+            teacherRole: selectedRole,
             updatedAt: new Date().toISOString(),
             updatedBy: currentTeacher?.name || '',
           };
@@ -1950,7 +2002,7 @@
           if (db && window.FirebaseAPI) {
             const loginLogRef = await window.FirebaseAPI.addDoc(window.FirebaseAPI.collection(db, getPath('loginLogs')), {
               teacherName: selectedTeacher.name,
-              teacherRole: getTeacherRoleByName(selectedTeacher.name),
+              teacherRole: getTeacherRole(selectedTeacher),
               loginAt: new Date(now).toISOString(),
               logoutAt: '',
               autoLogout: false,
@@ -2875,6 +2927,10 @@
       };
 
       const handlePrintPage = () => {
+        if (isGuestUser) {
+          alert('손님 계정은 인쇄 기능을 사용할 수 없습니다.');
+          return;
+        }
         if (view === 'teamExam') {
           printTeamExamCards();
           return;
@@ -3039,7 +3095,7 @@
                   <div>
                     <div className="text-[12px] font-black tracking-[0.22em] text-[#2F4EA2]">OASIS</div>
                     <h2 className="text-3xl font-black text-slate-900 mb-2 mt-1">빠른 PIN 로그인</h2>
-                    <p className="text-slate-500 leading-7">열린학원 성적 Insight에 접속하려면 선생님을 선택하고 4자리 PIN을 입력하세요.</p>
+                    <p className="text-slate-500 leading-7">계정을 선택하고 PIN을 입력하세요. 일반 강사와 손님은 4자리, 관리자는 6자리입니다.</p>
                     {bootForceReady && !dataReady && <div className="mt-3 inline-flex items-center rounded-full px-3 py-1.5 bg-amber-50 border border-amber-200 text-[12px] font-bold text-amber-700">초기 데이터 연결이 지연되어 로그인 화면을 먼저 열었습니다.</div>}
                   </div>
                   <div className="md:hidden inline-flex items-center gap-2 rounded-full px-3 py-1.5 border border-violet-200 bg-violet-50 text-[11px] font-black text-violet-700">
@@ -3445,9 +3501,9 @@
                   </div>
                 </div>
                 <div className="flex items-center gap-2 print-hide">
-                  {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : null}
+                  {isAdminUser ? <span className="admin-badge px-3 py-2 text-xs hidden sm:inline-flex">수최 관리자</span> : isGuestUser ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 hidden sm:inline-flex">손님 전용 보기</span> : null}
                   {isAdminUser ? <button onClick={handleExportAllData} className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full font-bold text-sm text-emerald-700 hover:bg-emerald-100"><i className="fas fa-file-export mr-2"></i>전체 엑셀</button> : null}
-                  <button onClick={handlePrintPage} className="hidden sm:inline-flex items-center px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200 whitespace-nowrap"><i className="fas fa-print mr-2"></i>인쇄</button>
+                  {!isGuestUser ? <button onClick={handlePrintPage} className="hidden sm:inline-flex items-center px-4 py-2 bg-slate-100 rounded-full font-bold text-sm text-slate-700 hover:bg-slate-200 whitespace-nowrap"><i className="fas fa-print mr-2"></i>인쇄</button> : null}
                 </div>
               </div>
               <div className="mt-4">{topContextBar}</div>
@@ -3639,7 +3695,7 @@
               </div>
             )}
 
-            {view === 'manage' && (
+            {view === 'manage' && !isGuestUser && (
               <div className="space-y-6">
                 <div className="xl:hidden">
                   <Card title="모바일 빠른 성적입력" right={<span className="inline-flex items-center gap-2 text-xs font-black text-sky-700"><i className="fas fa-bolt"></i>검색 후 바로 입력</span>}>
@@ -4214,8 +4270,16 @@
                           <input value={teacherAdminForm.name} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, name:e.target.value}))} placeholder="예: 수방" className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none" />
                         </div>
                         <div>
+                          <label className="block text-xs font-black text-slate-500 mb-2">권한</label>
+                          <select value={teacherAdminForm.name === ADMIN_TEACHER_NAME ? 'admin' : (teacherAdminForm.teacherRole || 'teacher')} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, teacherRole:e.target.value}))} disabled={String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none bg-white">
+                            <option value="teacher">강사</option>
+                            <option value="guest">손님(보기 전용)</option>
+                            <option value="admin">관리자</option>
+                          </select>
+                        </div>
+                        <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">PIN 번호</label>
-                          <input value={teacherAdminForm.pin} onChange={(e)=>setTeacherAdminForm((prev)=>({...prev, pin:e.target.value.replace(/\D/g,'').slice(0, getRequiredPinLengthForName(prev.name || teacherAdminForm.name))}))} inputMode="numeric" maxLength={String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME ? 6 : 4} placeholder={String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME ? '관리자 6자리 숫자' : '강사 4자리 숫자'} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none tracking-[0.3em]" />
+                          <input value={teacherAdminForm.pin} onChange={(e)=>setTeacherAdminForm((prev)=>{ const role = String(prev.name || teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME ? 'admin' : (prev.teacherRole || teacherAdminForm.teacherRole || 'teacher'); return ({...prev, pin:e.target.value.replace(/\D/g,'').slice(0, getRequiredPinLengthForRole(role))}); })} inputMode="numeric" maxLength={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? 6 : 4} placeholder={(String(teacherAdminForm.name || '').trim() === ADMIN_TEACHER_NAME || (teacherAdminForm.teacherRole || 'teacher') === 'admin') ? '관리자 6자리 숫자' : ((teacherAdminForm.teacherRole || 'teacher') === 'guest' ? '손님 4자리 숫자' : '강사 4자리 숫자')} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none tracking-[0.3em]" />
                         </div>
                         <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">표시 순서</label>
@@ -4223,7 +4287,7 @@
                         </div>
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 leading-6">
-                        이름 변경, PIN 재설정, 신규 선생님 추가를 여기서 한 번에 처리합니다. 일반 강사 PIN은 4자리, 관리자 PIN은 6자리입니다. 표시 순서는 숫자가 작을수록 먼저 보입니다.
+                        이름 변경, PIN 재설정, 신규 계정 추가를 여기서 한 번에 처리합니다. 강사/손님 PIN은 4자리, 관리자 PIN은 6자리입니다. 손님 계정은 보기 전용이며 입력과 인쇄가 제한됩니다. 표시 순서는 숫자가 작을수록 먼저 보입니다.
                       </div>
                       <div className="flex flex-wrap gap-3">
                         <button type="submit" disabled={isSavingTeacherAdmin} className={`rounded-2xl px-5 py-3 text-sm font-black text-white ${isSavingTeacherAdmin ? 'bg-slate-400' : 'bg-violet-700 hover:bg-violet-800'}`}>
@@ -4241,6 +4305,7 @@
                           <tr>
                             <th className="py-3 px-2 text-left">순서</th>
                             <th className="py-3 px-2 text-left">이름</th>
+                            <th className="py-3 px-2 text-left">권한</th>
                             <th className="py-3 px-2 text-left">PIN</th>
                             <th className="py-3 px-2 text-left">사용</th>
                             <th className="py-3 px-2 text-left">로그인 제한</th>
@@ -4260,6 +4325,7 @@
                                 </div>
                               </td>
                               <td className="py-3 px-2 font-black text-slate-900">{teacher.name}</td>
+                              <td className="py-3 px-2"><span className={`rounded-full px-3 py-1 text-xs font-black ${getTeacherRole(teacher) === 'admin' ? 'bg-amber-50 text-amber-700 border border-amber-200' : getTeacherRole(teacher) === 'guest' ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>{getTeacherRoleLabel(getTeacherRole(teacher))}</span></td>
                               <td className="py-3 px-2 font-mono font-black text-violet-700">{teacher.pin || '----'}</td>
                               <td className="py-3 px-2">
                                 <button type="button" onClick={()=>handleToggleTeacherActive(teacher)} className={`rounded-full px-3 py-1 text-xs font-black ${teacher.isActive === false ? 'border border-slate-300 bg-slate-100 text-slate-500' : 'border border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
@@ -4285,7 +4351,7 @@
                       </table>
                     </div>
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-700">
-                      사용 OFF로 바꾸면 로그인 버튼과 내부 목록에서 숨겨집니다. 기존 데이터는 그대로 유지됩니다. 일반 강사는 4자리 PIN, 관리자(수최)는 6자리 PIN으로 운영됩니다.
+                      사용 OFF로 바꾸면 로그인 버튼과 내부 목록에서 숨겨집니다. 기존 데이터는 그대로 유지됩니다. 일반 강사와 손님은 4자리 PIN, 관리자(수최)는 6자리 PIN으로 운영됩니다. 손님 계정은 보기만 가능하고 성적 입력/인쇄는 제한됩니다.
                     </div>
                   </Card>
                 </div>
@@ -4332,7 +4398,7 @@
                           {filteredLoginLogs.length ? filteredLoginLogs.map((row) => (
                             <tr key={row.docId}>
                               <td className="py-3 px-2 font-black text-slate-900">{row.teacherName || '-'}</td>
-                              <td className="py-3 px-2">{row.teacherRole === 'admin' ? '관리자' : '강사'}</td>
+                              <td className="py-3 px-2">{getTeacherRoleLabel(row.teacherRole)}</td>
                               <td className="py-3 px-2">{formatDateText(row.loginAt)}</td>
                               <td className="py-3 px-2">{row.logoutAt ? formatDateText(row.logoutAt) : '-'}</td>
                               <td className="py-3 px-2 font-bold text-violet-700">{row.sessionDurationText || (row.logoutAt ? getSessionDurationText(row.sessionMs) : '-')}</td>
