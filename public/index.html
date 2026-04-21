@@ -1351,10 +1351,10 @@
         teacherInputStatus: false,
         testData: false,
         subjectAdmin: false,
-        adminPage: true,
-        promotionArchive: true,
-        teacherList: true,
-        loginLogs: true,
+        teacherAdminMain: true,
+        teacherAdminPromotion: true,
+        teacherAdminList: true,
+        teacherAdminLogs: true,
       });
       const [isRenamingStudent, setIsRenamingStudent] = useState(false);
       const [teamExamForm, setTeamExamForm] = useState({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', cut1: '', cut2: '', cut3: '', cut4: '', difficulty: 3, review: '', specialNote: '' });
@@ -3349,7 +3349,11 @@
       const principalAnnualRows = buildAnnualDistributionRows(principalViewFilters);
       const principalAnnualSummary = getAnnualComparisonSummary(principalAnnualRows);
       const principalLatestRow = [...principalAnnualRows].reverse().find((row) => Number(row.count || 0) > 0) || principalAnnualRows[principalAnnualRows.length - 1] || null;
-      const principalSummaryCards = [];
+      const principalSummaryCards = principalLatestRow ? [
+        { label: '학생 수', value: principalLatestRow.count ? `${principalLatestRow.count}명` : '0명', tone: 'sky' },
+        { label: '평균 점수', value: principalLatestRow.avg !== null && principalLatestRow.avg !== undefined ? `${principalLatestRow.avg}점` : '-', tone: 'emerald' },
+        { label: '상위권 비율', value: `${principalLatestRow.topRate || 0}%`, tone: 'amber' },
+      ] : [];
 
       const schoolAnalysisRows = (() => {
         const rows = activeJoinedData.filter(r => Number(r.year) === Number(schoolView.year) && r.exam === schoolView.exam && (schoolView.school === '전체' || r.school === schoolView.school) && (schoolView.subject === '전체' || r.subject === schoolView.subject) && (schoolView.grade === '전체' || Number(r.grade) === Number(schoolView.grade)));
@@ -4513,9 +4517,16 @@
                     <select value={principalViewFilters.subject} onChange={e => setPrincipalViewFilters((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{subjectOptions.map(s => <option key={s} value={s}>{s}</option>)}</select>
                   </div>
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-7 text-slate-700">
-                    <span className="font-black text-slate-900">{principalViewFilters.year}년 · {principalViewFilters.school} · {principalViewFilters.grade}학년 · {principalViewFilters.subject}</span> 기준으로 1년치 등급 분포와 변화 흐름을 한 화면에서 봅니다.
+                    <span className="font-black text-slate-900">{principalViewFilters.year}년 · {principalViewFilters.school} · {principalViewFilters.grade}학년 · {principalViewFilters.subject}</span> 기준으로 최근 시험 흐름과 1년치 등급 분포를 한 화면에서 봅니다.
                   </div>
                 </Card>
+
+                <div className="grid lg:grid-cols-3 md:grid-cols-3 gap-4">
+                  {principalSummaryCards.map((card) => (
+                    <div key={card.label} className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                      <div className="text-xs font-black tracking-[0.16em] text-slate-400">{card.label}</div>
+                      <div className="mt-2 text-2xl font-black text-slate-900">{card.value}</div>
+                    </div>
                   ))}
                 </div>
 
@@ -4727,23 +4738,19 @@
               </div>
             )}
 
+
             {view === 'teacherAdmin' && isAdminUser && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <Card
                   title="Admin Page"
                   right={
                     <div className="flex items-center gap-2">
-                      {adminSectionOpen.adminPage && editingTeacherId ? (
-                        <button type="button" onClick={resetTeacherAdminForm} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600">새로 입력</button>
-                      ) : null}
-                      <button type="button" onClick={() => toggleAdminSection('adminPage')} className="admin-collapse-button">
-                        {adminSectionOpen.adminPage ? '접기' : '펼치기'}
-                        <i className={`fas ${adminSectionOpen.adminPage ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
-                      </button>
+                      {editingTeacherId ? <button type="button" onClick={resetTeacherAdminForm} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600">새로 입력</button> : <span className="text-xs font-black text-violet-700">관리자 전용</span>}
+                      <button type="button" onClick={() => toggleAdminSection('teacherAdminMain')} className="admin-collapse-button">{adminSectionOpen.teacherAdminMain ? '접기' : '펼치기'}<i className={`fas ${adminSectionOpen.teacherAdminMain ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></button>
                     </div>
                   }
                 >
-                  {adminSectionOpen.adminPage ? (
+                  {adminSectionOpen.teacherAdminMain ? (
                     <form onSubmit={handleSaveTeacherAdmin} className="space-y-4">
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div className="sm:col-span-2">
@@ -4783,26 +4790,21 @@
 
                 <Card
                   title="승급 처리 및 3년이상 자료 삭제 처리"
-                  right={
-                    <button type="button" onClick={() => toggleAdminSection('promotionArchive')} className="admin-collapse-button">
-                      {adminSectionOpen.promotionArchive ? '접기' : '펼치기'}
-                      <i className={`fas ${adminSectionOpen.promotionArchive ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
-                    </button>
-                  }
+                  right={<button type="button" onClick={() => toggleAdminSection('teacherAdminPromotion')} className="admin-collapse-button">{adminSectionOpen.teacherAdminPromotion ? '접기' : '펼치기'}<i className={`fas ${adminSectionOpen.teacherAdminPromotion ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></button>}
                 >
-                  {adminSectionOpen.promotionArchive ? (
+                  {adminSectionOpen.teacherAdminPromotion ? (
                     <div className="space-y-4">
                       <div className="text-sm text-slate-500 leading-6">현재 연도의 재원 학생(3학년 제외)을 다음 연도 학생으로 새로 생성합니다. 기존 기록은 그대로 유지됩니다.</div>
-                      <div className="grid lg:grid-cols-[1fr_320px] gap-4 items-start">
+                      <div className="grid sm:grid-cols-[1fr_1fr] gap-4 items-end">
                         <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">기준 연도</label>
                           <select value={promotionSourceYear} onChange={(e)=>setPromotionSourceYear(Number(e.target.value))} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none">
                             {YEARS.filter((year) => year < Math.max(...YEARS)).map((year) => <option key={year} value={year}>{year}년</option>)}
                           </select>
                         </div>
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 min-h-[78px] flex flex-col justify-center">
-                          <div className="text-xs font-black text-slate-500">승급 결과</div>
-                          <div className="mt-2 text-lg font-black text-slate-900">{promotionTargetYear}년 학생 생성</div>
+                        <div>
+                          <div className="text-xs font-black text-slate-500 mb-2">승급 결과</div>
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 h-[50px] flex items-center text-lg font-black text-slate-900">{promotionTargetYear}년 학생 생성</div>
                         </div>
                       </div>
                       <button type="button" onClick={handlePromoteStudents} disabled={isPromotingStudents} className={`rounded-2xl px-5 py-3 text-sm font-black text-white ${isPromotingStudents ? 'bg-slate-400' : 'bg-indigo-700 hover:bg-indigo-800'}`}>
@@ -4829,14 +4831,9 @@
 
                 <Card
                   title="선생님 목록 보기"
-                  right={
-                    <button type="button" onClick={() => toggleAdminSection('teacherList')} className="admin-collapse-button">
-                      {adminSectionOpen.teacherList ? '접기' : '펼치기'}
-                      <i className={`fas ${adminSectionOpen.teacherList ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
-                    </button>
-                  }
+                  right={<button type="button" onClick={() => toggleAdminSection('teacherAdminList')} className="admin-collapse-button">{adminSectionOpen.teacherAdminList ? '접기' : '펼치기'}<i className={`fas ${adminSectionOpen.teacherAdminList ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></button>}
                 >
-                  {adminSectionOpen.teacherList ? (
+                  {adminSectionOpen.teacherAdminList ? (
                     <>
                       <div className="overflow-x-auto mini-scroll">
                         <table className="w-full text-sm">
@@ -4881,7 +4878,7 @@
                                 </td>
                                 <td className="py-3 px-2">
                                   <div className="flex flex-wrap gap-2">
-                                    <button type="button" onClick={()=>{ handleEditTeacherAdmin(teacher); setAdminSectionOpen((prev)=>({ ...prev, adminPage: true })); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">수정</button>
+                                    <button type="button" onClick={()=>handleEditTeacherAdmin(teacher)} className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">수정</button>
                                   </div>
                                 </td>
                               </tr>
@@ -4898,14 +4895,9 @@
 
                 <Card
                   title="로그인 기록"
-                  right={
-                    <button type="button" onClick={() => toggleAdminSection('loginLogs')} className="admin-collapse-button">
-                      {adminSectionOpen.loginLogs ? '접기' : '펼치기'}
-                      <i className={`fas ${adminSectionOpen.loginLogs ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
-                    </button>
-                  }
+                  right={<button type="button" onClick={() => toggleAdminSection('teacherAdminLogs')} className="admin-collapse-button">{adminSectionOpen.teacherAdminLogs ? '접기' : '펼치기'}<i className={`fas ${adminSectionOpen.teacherAdminLogs ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></button>}
                 >
-                  {adminSectionOpen.loginLogs ? (
+                  {adminSectionOpen.teacherAdminLogs ? (
                     <>
                       <div className="overflow-x-auto mini-scroll">
                         <table className="w-full text-sm">
@@ -4940,7 +4932,6 @@
               </div>
             )}
 
-            {view === 'teamExam' && (
             {view === 'teamExam' && (
               <div className="space-y-6">
                 <div className="space-y-6 teamexam-screen">
