@@ -812,7 +812,7 @@
 잠시만 기다려주세요.</div>
       <div class="instant-boot-brand-text" aria-label="브랜드">OASIS : Open Academy Score Insight System</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R13.2</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R13.3</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -853,7 +853,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R13.2';
+    const APP_VERSION = 'OA-R13.3';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -1037,23 +1037,37 @@
     function safeLower(v) { return String(v || '').toLowerCase(); }
 
     function getTeacherNameBadgeTheme(name) {
-      const palettes = [
-        { wrap: 'border-violet-200 bg-violet-50', text: 'text-violet-700' },
-        { wrap: 'border-sky-200 bg-sky-50', text: 'text-sky-700' },
-        { wrap: 'border-emerald-200 bg-emerald-50', text: 'text-emerald-700' },
-        { wrap: 'border-amber-200 bg-amber-50', text: 'text-amber-700' },
-        { wrap: 'border-rose-200 bg-rose-50', text: 'text-rose-700' },
-        { wrap: 'border-indigo-200 bg-indigo-50', text: 'text-indigo-700' },
-      ];
       const key = String(name || '').trim();
-      let sum = 0;
-      for (const ch of key) sum += ch.charCodeAt(0);
-      return palettes[sum % palettes.length];
+      let hash = 0;
+      for (const ch of key) hash = ((hash * 33) + ch.charCodeAt(0)) % 360;
+      const hue = (hash + (key.length * 17)) % 360;
+      return {
+        borderColor: `hsl(${hue} 70% 74%)`,
+        backgroundColor: `hsl(${hue} 88% 96%)`,
+        color: `hsl(${hue} 72% 34%)`,
+      };
     }
 
     function renderTeacherNameBadge(name) {
       const theme = getTeacherNameBadgeTheme(name);
-      return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-black ${theme.wrap} ${theme.text}`}>{name || '-'}</span>;
+      return <span className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-black" style={theme}>{name || '-'}</span>;
+    }
+
+    function getLoginLogSessionMs(row) {
+      if (!row || typeof row !== 'object') return 0;
+      const stored = Number(row.sessionMs || 0);
+      if (stored > 0) return stored;
+      const loginAtMs = new Date(row.loginAt || '').getTime();
+      const logoutAtMs = new Date(row.logoutAt || '').getTime();
+      if (Number.isFinite(loginAtMs) && loginAtMs > 0 && Number.isFinite(logoutAtMs) && logoutAtMs > 0 && logoutAtMs >= loginAtMs) {
+        return logoutAtMs - loginAtMs;
+      }
+      return 0;
+    }
+
+    function getLoginLogSessionText(row) {
+      const ms = getLoginLogSessionMs(row);
+      return ms > 0 ? getSessionDurationText(ms) : '-';
     }
 
     function sanitizeKeyPart(value) {
@@ -1625,7 +1639,15 @@
         if (!db || !window.FirebaseAPI || !authReady || !user) return;
         const { collection, onSnapshot } = window.FirebaseAPI;
         const unsubscribe = onSnapshot(collection(db, getPath('loginLogs')), (snapshot) => {
-          setLoginLogsData(snapshot.docs.map((docRow) => ({ docId: docRow.id, ...docRow.data() })));
+          setLoginLogsData(snapshot.docs.map((docRow) => {
+            const data = { docId: docRow.id, ...docRow.data() };
+            const computedSessionMs = getLoginLogSessionMs(data);
+            return {
+              ...data,
+              sessionMs: computedSessionMs,
+              sessionDurationText: computedSessionMs > 0 ? getSessionDurationText(computedSessionMs) : '',
+            };
+          }));
         }, (error) => {
           console.error('loginLogs 데이터를 읽을 수 없습니다.', error);
         });
@@ -2257,17 +2279,23 @@
         }
       };
       const handleLogout = async (options = {}) => {
+        const safeOptions = options && typeof options === 'object' && !('nativeEvent' in options) ? options : {};
         const activeTeacherName = currentTeacher?.name || selectedTeacherName || '';
         const activeLogId = currentSessionLogIdRef.current || currentSessionLogId;
-        await finalizeLoginLog(activeLogId, options);
-        await finalizeOpenLoginLogsByTeacher(activeTeacherName, { ...options, excludeLogId: activeLogId });
-        currentSessionLogIdRef.current = '';
-        setCurrentSessionLogId('');
-        setCurrentTeacher(null);
-        setSelectedTeacherName('');
-        setLoginPin('');
-        setView('dashboard');
-        if (options.auto) alert('오랫동안 활동이 없어 자동 로그아웃되었습니다.');
+        try {
+          await finalizeLoginLog(activeLogId, safeOptions);
+          await finalizeOpenLoginLogsByTeacher(activeTeacherName, { ...safeOptions, excludeLogId: activeLogId });
+        } catch (error) {
+          console.error('로그아웃 처리 중 오류:', error);
+        } finally {
+          currentSessionLogIdRef.current = '';
+          setCurrentSessionLogId('');
+          setCurrentTeacher(null);
+          setSelectedTeacherName('');
+          setLoginPin('');
+          setView('dashboard');
+          if (safeOptions.auto) alert('오랫동안 활동이 없어 자동 로그아웃되었습니다.');
+        }
       };
 
       useEffect(() => {
@@ -2493,8 +2521,10 @@
         const directionFactor = loginLogSort.direction === 'asc' ? 1 : -1;
         return [...loginLogsData]
           .sort((a, b) => {
-            const aValue = getComparableValue(a?.[loginLogSort.key], type);
-            const bValue = getComparableValue(b?.[loginLogSort.key], type);
+            const aTarget = loginLogSort.key === 'sessionMs' ? getLoginLogSessionMs(a) : a?.[loginLogSort.key];
+            const bTarget = loginLogSort.key === 'sessionMs' ? getLoginLogSessionMs(b) : b?.[loginLogSort.key];
+            const aValue = getComparableValue(aTarget, type);
+            const bValue = getComparableValue(bTarget, type);
             if (aValue < bValue) return -1 * directionFactor;
             if (aValue > bValue) return 1 * directionFactor;
             return getComparableValue(a?.loginAt, 'date') < getComparableValue(b?.loginAt, 'date') ? 1 : -1;
@@ -3406,6 +3436,51 @@
         { label: '상위권 비율', value: `${principalLatestRow.topRate || 0}%`, tone: 'amber' },
       ] : [];
 
+      const principalTeacherLoadRows = useMemo(() => {
+        const filtered = activeJoinedData.filter((row) => (
+          Number(row.year) === Number(principalViewFilters.year) &&
+          row.school === principalViewFilters.school &&
+          Number(row.grade) === Number(principalViewFilters.grade) &&
+          row.subject === principalViewFilters.subject &&
+          isStudentIncludedForSubject(row.studentId, row.subject)
+        ));
+        const grouped = new Map();
+        filtered.forEach((row) => {
+          const teacherName = String(row.updatedBy || row.createdBy || '미지정').trim() || '미지정';
+          if (!grouped.has(teacherName)) grouped.set(teacherName, []);
+          grouped.get(teacherName).push(row);
+        });
+        return Array.from(grouped.entries()).map(([teacherName, rows]) => {
+          const studentIds = Array.from(new Set(rows.map((row) => row.studentId).filter(Boolean)));
+          const count = rows.length;
+          const avg = count ? Math.round(rows.reduce((sum, row) => sum + Number(row.score || 0), 0) / count) : null;
+          const rates = [1,2,3,4,5].reduce((acc, tier) => {
+            acc[`rate${tier}`] = count ? Math.round((rows.filter((row) => normalizeTeacherAnalysisTier(row.tier) === tier).length / count) * 100) : 0;
+            return acc;
+          }, {});
+          return {
+            teacherName,
+            studentCount: studentIds.length,
+            count,
+            avg,
+            topRate: (rates.rate1 || 0) + (rates.rate2 || 0),
+            riskRate: (rates.rate4 || 0) + (rates.rate5 || 0),
+            ...rates,
+          };
+        }).sort((a, b) => (
+          Number(b.studentCount || 0) - Number(a.studentCount || 0) ||
+          Number(b.topRate || 0) - Number(a.topRate || 0) ||
+          String(a.teacherName || '').localeCompare(String(b.teacherName || ''), 'ko')
+        ));
+      }, [activeJoinedData, principalViewFilters]);
+
+      const principalTeacherLoadSummary = useMemo(() => {
+        if (!principalTeacherLoadRows.length) return '선택한 조건에서 집계된 강사 데이터가 아직 없습니다.';
+        const totalStudents = principalTeacherLoadRows.reduce((sum, row) => sum + Number(row.studentCount || 0), 0);
+        const topTeacher = principalTeacherLoadRows[0];
+        return `현재 ${principalTeacherLoadRows.length}명의 강사가 집계되었고, 담당 학생은 합계 ${totalStudents}명입니다. 가장 많이 맡은 강사는 ${topTeacher.teacherName} 선생님(${topTeacher.studentCount}명)입니다.`;
+      }, [principalTeacherLoadRows]);
+
       const schoolAnalysisRows = (() => {
         const rows = activeJoinedData.filter(r => Number(r.year) === Number(schoolView.year) && r.exam === schoolView.exam && (schoolView.school === '전체' || r.school === schoolView.school) && (schoolView.subject === '전체' || r.subject === schoolView.subject) && (schoolView.grade === '전체' || Number(r.grade) === Number(schoolView.grade)));
         const grouped = {};
@@ -3886,7 +3961,7 @@
                 </button>
               ))}
             </div>
-            <div className="mt-auto space-y-3"><div className="bg-slate-50 p-4 rounded-2xl border border-slate-200"><div className="text-xs text-slate-500 font-bold mb-1">로그인</div><div className="flex items-center justify-between gap-2"><div className="font-black text-slate-900">{currentTeacherName} 선생님</div>{adminPill}</div></div><button onClick={handleLogout} className="w-full rounded-2xl bg-gradient-to-r from-slate-700 to-slate-900 text-white font-bold py-3 shadow-sm">로그아웃</button></div>
+            <div className="mt-auto space-y-3"><div className="bg-slate-50 p-4 rounded-2xl border border-slate-200"><div className="text-xs text-slate-500 font-bold mb-1">로그인</div><div className="flex items-center justify-between gap-2"><div className="font-black text-slate-900">{currentTeacherName} 선생님</div>{adminPill}</div></div><button type="button" onClick={() => handleLogout()} className="w-full rounded-2xl bg-gradient-to-r from-slate-700 to-slate-900 text-white font-bold py-3 shadow-sm">로그아웃</button></div>
           </aside>
 
           <main className="content-wrap xl:pl-[290px] p-4 sm:p-6 space-y-6 mobile-safe-bottom">
@@ -4568,7 +4643,7 @@
                     <select value={principalViewFilters.subject} onChange={e => setPrincipalViewFilters((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{subjectOptions.map(s => <option key={s} value={s}>{s}</option>)}</select>
                   </div>
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-7 text-slate-700">
-                    <span className="font-black text-slate-900">{principalViewFilters.year}년 · {principalViewFilters.school} · {principalViewFilters.grade}학년 · {principalViewFilters.subject}</span> 기준으로 최근 시험 흐름과 1년치 등급 분포를 한 화면에서 봅니다.
+                    <span className="font-black text-slate-900">{principalViewFilters.year}년 · {principalViewFilters.school} · {principalViewFilters.grade}학년 · {principalViewFilters.subject}</span> 기준으로 최근 시험 흐름과 강사별 담당 학생 현황을 한 화면에서 봅니다.
                   </div>
                 </Card>
 
@@ -4581,52 +4656,60 @@
                   ))}
                 </div>
 
-                <Card title="연간 등급 분포 비교" right={<span className="text-xs text-slate-400">관리자와 원장님이 함께 보는 요약 화면</span>}>
+                <Card title="강사별 담당 학생 현황" right={<span className="text-xs text-slate-400">원장님이 운영 흐름을 보는 전용 화면</span>}>
                   <div className="space-y-5">
                     <div className="rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-3 text-sm leading-7 text-violet-900">
                       <span className="font-black">{principalViewFilters.year}년 · {principalViewFilters.school} · {principalViewFilters.grade}학년 · {principalViewFilters.subject}</span>
-                      <div className="text-slate-700 mt-1">{principalAnnualSummary}</div>
+                      <div className="text-slate-700 mt-1">{principalTeacherLoadSummary}</div>
                     </div>
-                    <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-4">
-                      {principalAnnualRows.map((row) => (
-                        <div key={row.exam} className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="text-[11px] font-black tracking-[0.16em] text-violet-600">EXAM</div>
-                              <div className="mt-1 text-lg font-black text-slate-900">{row.examShort}</div>
+                    {principalTeacherLoadRows.length ? (
+                      <div className="grid lg:grid-cols-2 gap-4">
+                        {principalTeacherLoadRows.map((row) => (
+                          <div key={row.teacherName} className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-[11px] font-black tracking-[0.16em] text-violet-600">TEACHER</div>
+                                <div className="mt-2">{renderTeacherNameBadge(row.teacherName)}</div>
+                              </div>
+                              <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-500">담당 {row.studentCount}명</div>
                             </div>
-                            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-500">{row.count}명</div>
-                          </div>
-                          <div className="mt-4 grid grid-cols-2 gap-3">
-                            <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                              <div className="text-[11px] font-black text-slate-400">평균</div>
-                              <div className="mt-1 text-xl font-black text-violet-700">{row.avg !== null && row.avg !== undefined ? `${row.avg}점` : '-'}</div>
+                            <div className="mt-4 grid grid-cols-3 gap-3">
+                              <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                                <div className="text-[11px] font-black text-slate-400">성적 건수</div>
+                                <div className="mt-1 text-lg font-black text-slate-900">{row.count}건</div>
+                              </div>
+                              <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                                <div className="text-[11px] font-black text-slate-400">평균</div>
+                                <div className="mt-1 text-lg font-black text-violet-700">{row.avg !== null && row.avg !== undefined ? `${row.avg}점` : '-'}</div>
+                              </div>
+                              <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                                <div className="text-[11px] font-black text-slate-400">상위권 / 위험권</div>
+                                <div className="mt-1 text-sm font-black text-slate-700">{row.topRate || 0}% / {row.riskRate || 0}%</div>
+                              </div>
                             </div>
-                            <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                              <div className="text-[11px] font-black text-slate-400">상위권 / 위험권</div>
-                              <div className="mt-1 text-sm font-black text-slate-700">{row.topRate || 0}% / {row.riskRate || 0}%</div>
-                            </div>
-                          </div>
-                          <div className="mt-4 space-y-2">
-                            {[1,2,3,4,5].map((tier) => {
-                              const style = getSchoolRateStyle(tier);
-                              const value = row[`rate${tier}`] || 0;
-                              return (
-                                <div key={tier} className="flex items-center gap-2">
-                                  <div className={`w-12 shrink-0 text-xs font-black ${style.text}`}>{tier}등급</div>
-                                  <div className={`flex-1 rounded-full border px-2 py-2 ${style.wrap}`}>
-                                    <div className="h-2 rounded-full bg-white/80 overflow-hidden">
-                                      <div className={`h-full rounded-full bg-gradient-to-r ${style.bar}`} style={{ width: `${Math.max(value ? 8 : 0, value)}%` }}></div>
+                            <div className="mt-4 space-y-2">
+                              {[1,2,3,4,5].map((tier) => {
+                                const style = getSchoolRateStyle(tier);
+                                const value = row[`rate${tier}`] || 0;
+                                return (
+                                  <div key={tier} className="flex items-center gap-2">
+                                    <div className={`w-12 shrink-0 text-xs font-black ${style.text}`}>{tier}등급</div>
+                                    <div className={`flex-1 rounded-full border px-2 py-2 ${style.wrap}`}>
+                                      <div className="h-2 rounded-full bg-white/80 overflow-hidden">
+                                        <div className={`h-full rounded-full bg-gradient-to-r ${style.bar}`} style={{ width: `${Math.max(value ? 8 : 0, value)}%` }}></div>
+                                      </div>
                                     </div>
+                                    <div className={`w-12 text-right text-xs font-black ${style.text}`}>{value}%</div>
                                   </div>
-                                  <div className={`w-12 text-right text-xs font-black ${style.text}`}>{value}%</div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">선택한 조건에서 집계된 강사 데이터가 아직 없습니다.</div>
+                    )}
                   </div>
                 </Card>
               </div>
@@ -4968,7 +5051,7 @@
                                 <td className="py-3 px-2">{getTeacherRoleLabel(row.teacherRole)}</td>
                                 <td className="py-3 px-2">{formatDateText(row.loginAt)}</td>
                                 <td className="py-3 px-2">{row.logoutAt ? formatDateText(row.logoutAt) : '-'}</td>
-                                <td className="py-3 px-2 font-bold text-violet-700">{row.sessionDurationText || getSessionDurationText(row.sessionMs)}</td>
+                                <td className="py-3 px-2 font-bold text-violet-700">{getLoginLogSessionText(row)}</td>
                               </tr>
                             )) : <tr><td colSpan="5" className="py-8 text-center text-slate-400">로그인 기록이 없습니다.</td></tr>}
                           </tbody>
