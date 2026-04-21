@@ -135,6 +135,40 @@
       border: 1px solid rgba(226,232,240,0.92);
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 12px 24px rgba(15,23,42,0.05);
     }
+
+    .manage-board-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .manage-status-card {
+      min-height: 120px;
+      border-radius: 24px;
+      border: 1px solid rgba(226,232,240,0.95);
+      background: linear-gradient(180deg, rgba(248,250,252,0.96), rgba(255,255,255,0.98));
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .enrollment-roster-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .enrollment-roster-item {
+      border-radius: 18px;
+      border: 1px solid rgba(226,232,240,0.95);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+      padding: 12px 14px;
+    }
+    @media (min-width: 1280px) {
+      .manage-board-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    @media (max-width: 480px) {
+      .manage-board-grid { gap: 12px; }
+      .manage-status-card { padding: 14px; min-height: 112px; }
+    }
     
     .mini-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
     .mini-scroll::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.45); border-radius: 999px; }
@@ -844,19 +878,19 @@
         if (savedRole) return savedRole;
         const savedName = String(target.name || '').trim();
         if (savedName === ADMIN_TEACHER_NAME) return 'admin';
-        if (savedName === '손님') return 'guest';
+        if (savedName === '손님' || savedName === '게스트') return 'guest';
         return 'teacher';
       }
       const name = String(target || '').trim();
       if (name === ADMIN_TEACHER_NAME) return 'admin';
-      if (name === '손님') return 'guest';
+      if (name === '손님' || name === '게스트') return 'guest';
       return 'teacher';
     }
 
     function getTeacherRoleLabel(role) {
       const normalized = normalizeTeacherRole(role) || 'teacher';
       if (normalized === 'admin') return '관리자';
-      if (normalized === 'guest') return '손님';
+      if (normalized === 'guest') return '게스트';
       return '강사';
     }
 
@@ -866,6 +900,10 @@
 
     function getRequiredPinLengthForName(name) {
       return getRequiredPinLengthForRole(getTeacherRole(name));
+    }
+
+    function getTeacherDisplayName(target) {
+      return getTeacherRole(target) === 'guest' ? '게스트' : String(target?.name || target || '').trim();
     }
 
     function getStoredPinLength(teacher) {
@@ -894,7 +932,7 @@
       if (getStudentEnrollmentStatus(student) !== 'active') return 'inactive';
       const statusMap = student?.subjectStatusMap && typeof student.subjectStatusMap === 'object' ? student.subjectStatusMap : {};
       const raw = String(statusMap[subjectKey] || '').trim().toLowerCase();
-      if (!raw) return 'active';
+      if (!raw) return 'inactive';
       if (raw === 'inactive' || raw === 'withdrawn' || raw === 'off' || raw === 'false' || raw === '미수강') return 'inactive';
       return 'active';
     }
@@ -1528,11 +1566,41 @@
         return () => unsubscribe && unsubscribe();
       }, [db, authReady, user]);
 
+      const studentSubjectScoreMap = useMemo(() => {
+        const map = new Map();
+        scoresData.filter((score) => !score.deleted).forEach((score) => {
+          const studentId = String(score.studentId || '').trim();
+          const subject = String(score.subject || '').trim();
+          if (!studentId || !subject) return;
+          if (!map.has(studentId)) map.set(studentId, new Set());
+          map.get(studentId).add(subject);
+        });
+        return map;
+      }, [scoresData]);
+
+      const getResolvedStudentSubjectStatus = (student, subject) => {
+        const subjectKey = String(subject || '').trim();
+        if (!subjectKey) return 'inactive';
+        if (getStudentEnrollmentStatus(student) !== 'active') return 'inactive';
+        const statusMap = student?.subjectStatusMap && typeof student.subjectStatusMap === 'object' ? student.subjectStatusMap : {};
+        const raw = String(statusMap[subjectKey] || '').trim().toLowerCase();
+        if (raw) {
+          if (raw === 'inactive' || raw === 'withdrawn' || raw === 'off' || raw === 'false' || raw === '미수강') return 'inactive';
+          if (raw === 'active' || raw === 'on' || raw === 'true' || raw === '수강') return 'active';
+        }
+        const scoredSubjects = studentSubjectScoreMap.get(String(student?.studentId || '').trim());
+        return scoredSubjects && scoredSubjects.has(subjectKey) ? 'active' : 'inactive';
+      };
+
+      const isResolvedStudentIncludedForSubject = (student, subject) => {
+        return getStudentEnrollmentStatus(student) === 'active' && getResolvedStudentSubjectStatus(student, subject) === 'active';
+      };
+
       const joinedData = useMemo(() => scoresData.filter(s => !s.deleted).map(score => {
 
         const student = studentsData.find(s => s.studentId === score.studentId && !s.deleted) || {};
         const studentStatus = getStudentEnrollmentStatus(student);
-        const subjectStatus = getStudentSubjectStatus(student, score.subject);
+        const subjectStatus = getResolvedStudentSubjectStatus(student, score.subject);
         return {
           ...score,
           name: student.name || '알수없음',
@@ -1542,12 +1610,12 @@
           isWithdrawn: studentStatus === 'withdrawn',
           studentStatus,
           subjectStatus,
-          subjectIncluded: isStudentIncludedForSubject(student, score.subject),
+          subjectIncluded: isResolvedStudentIncludedForSubject(student, score.subject),
         };
-      }), [scoresData, studentsData]);
+      }), [scoresData, studentsData, studentSubjectScoreMap]);
 
       const activeJoinedData = useMemo(() => joinedData.filter(row => row.subjectIncluded), [joinedData]);
-      const schools = useMemo(() => ['전체', ...SCHOOL_OPTIONS, '직접입력'], []);
+            const schools = useMemo(() => ['전체', ...SCHOOL_OPTIONS, '직접입력'], []);
       const classNames = useMemo(() => ['전체', ...Array.from(new Set(scoresData.filter(d => !d.deleted).map(d => d.className).filter(Boolean))).sort()], [scoresData]);
       const activeStudents = useMemo(() => studentsData.filter((student) => !student.deleted && getStudentEnrollmentStatus(student) === 'active').sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''), 'ko')), [studentsData]);
       const subjectOptions = useMemo(() => {
@@ -1599,6 +1667,7 @@
       const [studentSort, setStudentSort] = useState({ key: 'year', direction: 'asc' });
       const [teamExamSort, setTeamExamSort] = useState({ key: 'year', direction: 'desc' });
       const [studentSubjectFilter, setStudentSubjectFilter] = useState('전체');
+      const [enrollmentRosterFilters, setEnrollmentRosterFilters] = useState({ school: '전체', grade: '전체', subject: '전체' });
       const isLoggedIn = !!currentTeacher;
       const currentTeacherName = currentTeacher?.name || '';
       const currentTeacherRole = getTeacherRole(currentTeacher);
@@ -1611,10 +1680,10 @@
             const role = getTeacherRole(selectedTeacherInfo);
             const requiredLength = getStoredPinLength(selectedTeacherInfo);
             if (role === 'admin') return '관리자 PIN 6자리';
-            if (role === 'guest') return `손님 PIN ${requiredLength}자리`;
+            if (role === 'guest') return `게스트 PIN ${requiredLength}자리`;
             return `강사 PIN ${requiredLength}자리`;
           })()
-        : '강사/손님 4자리 · 관리자 6자리';
+        : '강사/게스트 4자리 · 관리자 6자리';
 
       const allMenuItems = useMemo(() => {
         if (isAdminUser) return [...MENU_ITEMS, { key: 'teacherAdmin', label: '선생님 관리', icon: 'fa-user-gear' }];
@@ -2199,6 +2268,16 @@
         String(student.name || '').trim() === String(manageStudent.name || '').trim()
       ) || null;
       const currentManageStudentStatus = getStudentEnrollmentStatus(currentManageStudentRecord);
+      const currentManageStudentSubjectCountMap = useMemo(() => {
+        const map = {};
+        if (!currentManageStudentRecord?.studentId) return map;
+        scoresData.filter((score) => !score.deleted && score.studentId === currentManageStudentRecord.studentId).forEach((score) => {
+          const key = String(score.subject || '').trim();
+          if (!key) return;
+          map[key] = (map[key] || 0) + 1;
+        });
+        return map;
+      }, [currentManageStudentRecord, scoresData]);
       const promotionTargetYear = Number(promotionSourceYear || 0) + 1;
 
       useEffect(() => {
@@ -2212,6 +2291,33 @@
           setPromotionSourceYear((prev) => prev || latestPromotableYear || 2026);
         }
       }, [studentsData]);
+
+      const enrollmentRosterRows = useMemo(() => {
+        const rows = studentsData
+          .filter((student) => !student.deleted && getStudentEnrollmentStatus(student) === 'active')
+          .filter((student) => {
+            if (enrollmentRosterFilters.school !== '전체' && student.school !== enrollmentRosterFilters.school) return false;
+            if (enrollmentRosterFilters.grade !== '전체' && Number(student.grade) !== Number(enrollmentRosterFilters.grade)) return false;
+            if (enrollmentRosterFilters.subject !== '전체' && getResolvedStudentSubjectStatus(student, enrollmentRosterFilters.subject) !== 'active') return false;
+            return true;
+          })
+          .map((student) => ({
+            studentId: student.studentId,
+            name: student.name || '-',
+            school: student.school || '-',
+            grade: student.grade || '-',
+            year: student.year || '-',
+            activeSubjects: subjectOptions.filter((subject) => getResolvedStudentSubjectStatus(student, subject) === 'active'),
+          }))
+          .sort((a, b) => {
+            const schoolGap = String(a.school || '').localeCompare(String(b.school || ''), 'ko');
+            if (schoolGap !== 0) return schoolGap;
+            const gradeGap = Number(a.grade || 0) - Number(b.grade || 0);
+            if (gradeGap !== 0) return gradeGap;
+            return String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+          });
+        return rows;
+      }, [studentsData, enrollmentRosterFilters, subjectOptions, studentSubjectScoreMap]);
 
       const filteredLoginLogs = useMemo(() => {
         return [...loginLogsData]
@@ -2293,6 +2399,14 @@
             alert('과목을 선택해주세요.');
             return;
           }
+          const existingStudentDoc = studentsData.find((student) => student.studentId === targetStudentId) || {};
+          const nextSubjectStatusMap = { ...(existingStudentDoc.subjectStatusMap || {}) };
+          nextSubjectStatusMap[normalizedSubject] = 'active';
+          await setDoc(doc(db, getPath('students'), targetStudentId), {
+            subjectStatusMap: nextSubjectStatusMap,
+            updatedAt: now,
+            updatedBy: currentTeacher?.name || '',
+          }, { merge: true });
           await persistSubjectCatalog(normalizedSubject);
           if (normalizedDetailSubject) {
             await persistDetailCatalog(normalizedSubject, normalizedDetailSubject);
@@ -3118,7 +3232,7 @@
                   <div>
                     <div className="text-[12px] font-black tracking-[0.22em] text-[#2F4EA2]">OASIS</div>
                     <h2 className="text-3xl font-black text-slate-900 mb-2 mt-1">빠른 PIN 로그인</h2>
-                    <p className="text-slate-500 leading-7">계정을 선택하고 PIN을 입력하세요. 일반 강사와 손님은 4자리, 관리자는 6자리입니다.</p>
+                    <p className="text-slate-500 leading-7">계정을 선택하고 PIN을 입력하세요. 일반 강사와 게스트는 4자리, 관리자는 6자리입니다.</p>
                     {bootForceReady && !dataReady && <div className="mt-3 inline-flex items-center rounded-full px-3 py-1.5 bg-amber-50 border border-amber-200 text-[12px] font-bold text-amber-700">초기 데이터 연결이 지연되어 로그인 화면을 먼저 열었습니다.</div>}
                   </div>
                   <div className="md:hidden inline-flex items-center gap-2 rounded-full px-3 py-1.5 border border-violet-200 bg-violet-50 text-[11px] font-black text-violet-700">
@@ -3132,7 +3246,7 @@
                     <div className="grid grid-cols-3 gap-3">
                       {activeOrderedTeachers.map((t, idx) => (
                         <button type="button" key={t.teacherId} onClick={() => setSelectedTeacherName(t.name)} className={`teacher-chip teacher-chip-${(idx % 6) + 1} ${selectedTeacherName === t.name ? 'teacher-chip-selected' : ''}`}>
-                          {t.name}
+                          {getTeacherDisplayName(t)}
                         </button>
                       ))}
                     </div>
@@ -3718,6 +3832,27 @@
               </div>
             )}
 
+            {view === 'dashboard' && (
+              <Card title="수강생 전체 명단" right={<span className="text-sm font-bold text-slate-500">총 {enrollmentRosterRows.length}명</span>}>
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <select value={enrollmentRosterFilters.school} onChange={e=>setEnrollmentRosterFilters({...enrollmentRosterFilters, school:e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학교</option>{SCHOOL_OPTIONS.map((school)=><option key={school} value={school}>{school}</option>)}</select>
+                  <select value={enrollmentRosterFilters.grade} onChange={e=>setEnrollmentRosterFilters({...enrollmentRosterFilters, grade:e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학년</option>{GRADES.map((grade)=><option key={grade} value={grade}>{grade}학년</option>)}</select>
+                  <select value={enrollmentRosterFilters.subject} onChange={e=>setEnrollmentRosterFilters({...enrollmentRosterFilters, subject:e.target.value})} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 과목</option>{subjectOptions.map((subject)=><option key={subject} value={subject}>{subject}</option>)}</select>
+                </div>
+                {enrollmentRosterRows.length ? (
+                  <div className="enrollment-roster-list">
+                    {enrollmentRosterRows.map((row) => (
+                      <div key={`enroll-roster-${row.studentId}`} className="enrollment-roster-item">
+                        <div className="text-base font-black text-slate-900">{row.name}</div>
+                        <div className="mt-1 text-xs font-bold text-slate-500">{row.school} · {row.grade}학년 · {row.year}년</div>
+                        <div className="mt-2 text-xs leading-6 text-slate-600">{row.activeSubjects.length ? row.activeSubjects.join(', ') : '수강 과목 없음'}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-500">조건에 맞는 수강생이 없습니다.</div>}
+              </Card>
+            )}
+
             {view === 'manage' && !isGuestUser && (
               <div className="space-y-6">
                 <div className="xl:hidden">
@@ -3977,16 +4112,19 @@
                         {currentManageStudentRecord && (
                           <div>
                             <div className="text-sm font-bold text-slate-500 mb-2">과목별 수강 상태</div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="manage-board-grid">
                               {subjectOptions.map((subject) => {
-                                const subjectStatus = getStudentSubjectStatus(currentManageStudentRecord, subject);
+                                const subjectStatus = getResolvedStudentSubjectStatus(currentManageStudentRecord, subject);
                                 return (
-                                  <div key={`manage-subject-status-${subject}`} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                                    <div className="text-sm font-black text-slate-800 mb-2">{subject}</div>
-                                    <div className="flex gap-2">
-                                      <button type="button" onClick={() => handleSetStudentSubjectStatus(currentManageStudentRecord, subject, 'active')} className={`px-3 py-1.5 rounded-lg text-xs font-black ${subjectStatus === 'active' ? 'bg-sky-600 text-white' : 'border border-sky-200 bg-white text-sky-700'}`}>수강</button>
-                                      <button type="button" onClick={() => handleSetStudentSubjectStatus(currentManageStudentRecord, subject, 'inactive')} className={`px-3 py-1.5 rounded-lg text-xs font-black ${subjectStatus === 'inactive' ? 'bg-slate-700 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>미수강</button>
+                                  <div key={`manage-subject-status-${subject}`} className="manage-status-card">
+                                    <div>
+                                      <div className="text-[15px] font-black text-slate-900 mb-3">{subject}</div>
+                                      <div className="flex gap-2">
+                                        <button type="button" onClick={() => handleSetStudentSubjectStatus(currentManageStudentRecord, subject, 'active')} className={`flex-1 px-3 py-2 rounded-xl text-sm font-black ${subjectStatus === 'active' ? 'bg-sky-600 text-white' : 'border border-sky-200 bg-white text-sky-700'}`}>수강</button>
+                                        <button type="button" onClick={() => handleSetStudentSubjectStatus(currentManageStudentRecord, subject, 'inactive')} className={`flex-1 px-3 py-2 rounded-xl text-sm font-black ${subjectStatus === 'inactive' ? 'bg-slate-700 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>미수강</button>
+                                      </div>
                                     </div>
+                                    <div className="mt-3 text-xs font-bold text-slate-500 leading-6">{currentManageStudentSubjectCountMap[subject] ? `${currentManageStudentSubjectCountMap[subject]}건 입력됨` : '입력 기록 없음'}</div>
                                   </div>
                                 );
                               })}
@@ -3994,7 +4132,7 @@
                           </div>
                         )}
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="manage-board-grid">
                         {subjectOptions.map(sub => {
                           const records = activeJoinedData.filter(d => d.name === manageStudent.name && d.year === manageStudent.year && d.exam === filters.exam && d.subject === sub);
                           return (
@@ -4310,7 +4448,7 @@
                         </div>
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 leading-6">
-                        이름 변경, PIN 재설정, 신규 계정 추가를 여기서 한 번에 처리합니다. 강사/손님 PIN은 4자리, 관리자 PIN은 6자리입니다. 손님 계정은 보기 전용이며 입력과 인쇄가 제한됩니다. 표시 순서는 숫자가 작을수록 먼저 보입니다.
+                        이름 변경, PIN 재설정, 신규 계정 추가를 여기서 한 번에 처리합니다. 강사/게스트 PIN은 4자리, 관리자 PIN은 6자리입니다. 게스트 계정은 보기 전용이며 입력과 인쇄가 제한됩니다. 표시 순서는 숫자가 작을수록 먼저 보입니다.
                       </div>
                       <div className="flex flex-wrap gap-3">
                         <button type="submit" disabled={isSavingTeacherAdmin} className={`rounded-2xl px-5 py-3 text-sm font-black text-white ${isSavingTeacherAdmin ? 'bg-slate-400' : 'bg-violet-700 hover:bg-violet-800'}`}>
@@ -4374,7 +4512,7 @@
                       </table>
                     </div>
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-700">
-                      사용 OFF로 바꾸면 로그인 버튼과 내부 목록에서 숨겨집니다. 기존 데이터는 그대로 유지됩니다. 일반 강사와 손님은 4자리 PIN, 관리자(수최)는 6자리 PIN으로 운영됩니다. 손님 계정은 보기만 가능하고 성적 입력/인쇄는 제한됩니다.
+                      사용 OFF로 바꾸면 로그인 버튼과 내부 목록에서 숨겨집니다. 기존 데이터는 그대로 유지됩니다. 일반 강사와 게스트는 4자리 PIN, 관리자(수최)는 6자리 PIN으로 운영됩니다. 게스트 계정은 보기만 가능하고 성적 입력/인쇄는 제한됩니다.
                     </div>
                   </Card>
                 </div>
