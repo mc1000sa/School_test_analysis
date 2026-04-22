@@ -580,20 +580,6 @@
       font-weight: 900;
       color: #6d28d9;
     }
-    .admin-page-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 24px;
-      align-items: start;
-    }
-    .admin-page-grid > * {
-      min-width: 0;
-    }
-    @media (min-width: 1280px) {
-      .admin-page-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
     .delta-up { color: #059669; font-weight: 900; }
     .delta-down { color: #dc2626; font-weight: 900; }
     .delta-same { color: #64748b; font-weight: 900; }
@@ -812,7 +798,7 @@
 잠시만 기다려주세요.</div>
       <div class="instant-boot-brand-text" aria-label="브랜드">OASIS : Open Academy Score Insight System</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R13.6</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R12.9</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -853,7 +839,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R13.6';
+    const APP_VERSION = 'OA-R12.9';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -1036,56 +1022,6 @@
 
     function safeLower(v) { return String(v || '').toLowerCase(); }
 
-    function getTeacherNameBadgeTheme(name) {
-      const key = String(name || '').trim();
-      const palette = [
-        { borderColor: '#f59e0b', backgroundColor: '#fff7ed', color: '#b45309' },
-        { borderColor: '#ef4444', backgroundColor: '#fef2f2', color: '#b91c1c' },
-        { borderColor: '#ec4899', backgroundColor: '#fdf2f8', color: '#be185d' },
-        { borderColor: '#8b5cf6', backgroundColor: '#f5f3ff', color: '#6d28d9' },
-        { borderColor: '#3b82f6', backgroundColor: '#eff6ff', color: '#1d4ed8' },
-        { borderColor: '#06b6d4', backgroundColor: '#ecfeff', color: '#0f766e' },
-        { borderColor: '#10b981', backgroundColor: '#ecfdf5', color: '#047857' },
-        { borderColor: '#84cc16', backgroundColor: '#f7fee7', color: '#4d7c0f' },
-        { borderColor: '#f97316', backgroundColor: '#fff7ed', color: '#c2410c' },
-        { borderColor: '#14b8a6', backgroundColor: '#f0fdfa', color: '#0f766e' },
-        { borderColor: '#6366f1', backgroundColor: '#eef2ff', color: '#4338ca' },
-        { borderColor: '#d946ef', backgroundColor: '#fdf4ff', color: '#a21caf' },
-      ];
-      let hash = 0;
-      for (const ch of key) {
-        hash = ((hash * 31) + ch.charCodeAt(0)) >>> 0;
-      }
-      return palette[hash % palette.length];
-    }
-
-    function renderTeacherNameBadge(name) {
-      const theme = getTeacherNameBadgeTheme(name);
-      return <span className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-black" style={theme}>{name || '-'}</span>;
-    }
-
-    function getLoginLogSessionMs(row) {
-      if (!row || typeof row !== 'object') return 0;
-      const stored = Number(row.sessionMs || 0);
-      if (stored > 0) return stored;
-      const loginAtMs = new Date(row.loginAt || '').getTime();
-      const logoutAtMs = new Date(row.logoutAt || '').getTime();
-      if (Number.isFinite(loginAtMs) && loginAtMs > 0 && Number.isFinite(logoutAtMs) && logoutAtMs > 0 && logoutAtMs >= loginAtMs) {
-        return logoutAtMs - loginAtMs;
-      }
-      return 0;
-    }
-
-    function getLoginLogSessionText(row) {
-      const ms = getLoginLogSessionMs(row);
-      return ms > 0 ? getSessionDurationText(ms) : '-';
-    }
-
-    function getMonthKeyFromDate(value) {
-      const date = value ? new Date(value) : new Date();
-      if (Number.isNaN(date.getTime())) return '';
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2,'0')}`;
-    }
 
     function sanitizeKeyPart(value) {
       return String(value || '')
@@ -1402,7 +1338,7 @@
 
       const [schoolView, setSchoolView] = useState({ year: 2026, exam: EXAMS[0], school: '전체', grade: '전체', subject: '전체' });
       const [annualCompareView, setAnnualCompareView] = useState({ year: 2026, school: SCHOOL_OPTIONS[0], grade: 1, subject: '수학' });
-      const [principalViewFilters, setPrincipalViewFilters] = useState({ year: 2026, exam: '전체', school: '전체', grade: '전체', subject: '전체' });
+      const [principalViewFilters, setPrincipalViewFilters] = useState({ year: 2026, school: SCHOOL_OPTIONS[0], grade: 1, subject: '수학' });
       const [subjectView, setSubjectView] = useState({ year: 2026, exam: EXAMS[0], subject: '수학', detailSubject: '전체' });
       const [subjectSort, setSubjectSort] = useState({ key: 'score', direction: 'desc' });
 
@@ -1415,10 +1351,10 @@
         teacherInputStatus: false,
         testData: false,
         subjectAdmin: false,
-        teacherAdminMain: false,
-        teacherAdminPromotion: false,
-        teacherAdminList: false,
-        teacherAdminLogs: false,
+        adminPage: true,
+        promotionArchive: true,
+        teacherList: true,
+        loginLogs: true,
       });
       const [isRenamingStudent, setIsRenamingStudent] = useState(false);
       const [teamExamForm, setTeamExamForm] = useState({ year: 2026, exam: EXAMS[0], school: '', grade: 1, subject: '국어', detailSubject: '', objectiveCount: '', objectivePoints: '', subjectiveCount: '', subjectivePoints: '', cut1: '', cut2: '', cut3: '', cut4: '', difficulty: 3, review: '', specialNote: '' });
@@ -1434,11 +1370,9 @@
       const [editingTeacherId, setEditingTeacherId] = useState('');
       const [isSavingTeacherAdmin, setIsSavingTeacherAdmin] = useState(false);
       const [loginLogSort, setLoginLogSort] = useState({ key: 'loginAt', direction: 'desc' });
-      const [principalTeacherTableSort, setPrincipalTeacherTableSort] = useState({ key: 'totalStudents', direction: 'desc' });
       const [isCleaningArchiveData, setIsCleaningArchiveData] = useState(false);
       const sessionStartedAtRef = useRef(0);
       const lastActivityAtRef = useRef(Date.now());
-      const logoutTriggeredRef = useRef(false);
 
 
       const getPath = (name) => typeof __app_id !== 'undefined' ? `artifacts/${__app_id}/public/data/${name}` : `openacademy/data/${name}`;
@@ -1658,15 +1592,7 @@
         if (!db || !window.FirebaseAPI || !authReady || !user) return;
         const { collection, onSnapshot } = window.FirebaseAPI;
         const unsubscribe = onSnapshot(collection(db, getPath('loginLogs')), (snapshot) => {
-          setLoginLogsData(snapshot.docs.map((docRow) => {
-            const data = { docId: docRow.id, ...docRow.data() };
-            const computedSessionMs = getLoginLogSessionMs(data);
-            return {
-              ...data,
-              sessionMs: computedSessionMs,
-              sessionDurationText: computedSessionMs > 0 ? getSessionDurationText(computedSessionMs) : '',
-            };
-          }));
+          setLoginLogsData(snapshot.docs.map((docRow) => ({ docId: docRow.id, ...docRow.data() })));
         }, (error) => {
           console.error('loginLogs 데이터를 읽을 수 없습니다.', error);
         });
@@ -1814,7 +1740,6 @@
           displayOrder: teacher.displayOrder ?? '',
           teacherRole: getTeacherRole(teacher),
         });
-        setAdminSectionOpen((prev) => ({ ...prev, teacherAdminMain: true }));
         setView('teacherAdmin');
       };
 
@@ -2130,18 +2055,7 @@
         if (!db || !window.FirebaseAPI || !logId) return;
         try {
           const nowMs = Date.now();
-          let startedAtMs = Number(options.sessionStartedAt || 0);
-          if (!startedAtMs) {
-            const logRef = window.FirebaseAPI.doc(db, getPath('loginLogs'), logId);
-            const logSnap = await window.FirebaseAPI.getDoc(logRef);
-            if (logSnap.exists()) {
-              const data = logSnap.data() || {};
-              const parsedLoginAt = new Date(data.loginAt || '').getTime();
-              if (Number.isFinite(parsedLoginAt) && parsedLoginAt > 0) startedAtMs = parsedLoginAt;
-            }
-          }
-          if (!startedAtMs) startedAtMs = Number(sessionStartedAtRef.current || nowMs);
-          const sessionMs = Math.max(0, nowMs - startedAtMs);
+          const sessionMs = Math.max(0, nowMs - Number(options.sessionStartedAt || sessionStartedAtRef.current || nowMs));
           await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('loginLogs'), logId), {
             logoutAt: new Date(nowMs).toISOString(),
             autoLogout: options.auto === true,
@@ -2298,38 +2212,17 @@
         }
       };
       const handleLogout = async (options = {}) => {
-        const safeOptions = options && typeof options === 'object' && !('nativeEvent' in options) ? options : {};
         const activeTeacherName = currentTeacher?.name || selectedTeacherName || '';
         const activeLogId = currentSessionLogIdRef.current || currentSessionLogId;
-
+        await finalizeLoginLog(activeLogId, options);
+        await finalizeOpenLoginLogsByTeacher(activeTeacherName, { ...options, excludeLogId: activeLogId });
         currentSessionLogIdRef.current = '';
         setCurrentSessionLogId('');
         setCurrentTeacher(null);
         setSelectedTeacherName('');
         setLoginPin('');
-        setLoginError('');
         setView('dashboard');
-        lastActivityAtRef.current = Date.now();
-
-        Promise.resolve().then(async () => {
-          try {
-            await finalizeLoginLog(activeLogId, safeOptions);
-            await finalizeOpenLoginLogsByTeacher(activeTeacherName, { ...safeOptions, excludeLogId: activeLogId });
-          } catch (error) {
-            console.error('로그아웃 처리 중 오류:', error);
-          } finally {
-            if (safeOptions.auto) alert('오랫동안 활동이 없어 자동 로그아웃되었습니다.');
-          }
-        });
-      };
-
-      const performLogout = (event) => {
-        if (event && typeof event.preventDefault === 'function') event.preventDefault();
-        if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
-        if (logoutTriggeredRef.current) return;
-        logoutTriggeredRef.current = true;
-        handleLogout();
-        setTimeout(() => { logoutTriggeredRef.current = false; }, 600);
+        if (options.auto) alert('오랫동안 활동이 없어 자동 로그아웃되었습니다.');
       };
 
       useEffect(() => {
@@ -2543,41 +2436,26 @@
         return rows;
       }, [studentsData, enrollmentRosterFilters, subjectOptions, studentSubjectScoreMap]);
 
-      const currentMonthLabel = `${new Date().getMonth() + 1}월 접속횟수`;
-      const monthlyLoginCountByTeacher = useMemo(() => {
-        const activeMonthKey = getMonthKeyFromDate();
-        return loginLogsData.reduce((acc, row) => {
-          const teacherName = String(row?.teacherName || '').trim();
-          if (!teacherName) return acc;
-          const loginMonthKey = getMonthKeyFromDate(row?.loginAt);
-          if (!loginMonthKey || loginMonthKey !== activeMonthKey) return acc;
-          acc[teacherName] = (acc[teacherName] || 0) + 1;
-          return acc;
-        }, {});
-      }, [loginLogsData]);
-
       const filteredLoginLogs = useMemo(() => {
         const sortMeta = {
           teacherName: 'text',
           teacherRole: 'text',
           loginAt: 'date',
           logoutAt: 'date',
-          monthlyCount: 'number',
+          sessionMs: 'number',
         };
         const type = sortMeta[loginLogSort.key] || 'text';
         const directionFactor = loginLogSort.direction === 'asc' ? 1 : -1;
         return [...loginLogsData]
           .sort((a, b) => {
-            const aTarget = loginLogSort.key === 'monthlyCount' ? Number(monthlyLoginCountByTeacher[a?.teacherName] || 0) : a?.[loginLogSort.key];
-            const bTarget = loginLogSort.key === 'monthlyCount' ? Number(monthlyLoginCountByTeacher[b?.teacherName] || 0) : b?.[loginLogSort.key];
-            const aValue = getComparableValue(aTarget, type);
-            const bValue = getComparableValue(bTarget, type);
+            const aValue = getComparableValue(a?.[loginLogSort.key], type);
+            const bValue = getComparableValue(b?.[loginLogSort.key], type);
             if (aValue < bValue) return -1 * directionFactor;
             if (aValue > bValue) return 1 * directionFactor;
             return getComparableValue(a?.loginAt, 'date') < getComparableValue(b?.loginAt, 'date') ? 1 : -1;
           })
           .slice(0, 100);
-      }, [loginLogsData, loginLogSort, monthlyLoginCountByTeacher]);
+      }, [loginLogsData, loginLogSort]);
 
       const toggleLoginLogSort = (key) => {
         setLoginLogSort((prev) => ({
@@ -3369,10 +3247,8 @@
           return;
         }
         const summary = [teamExamPublicFilters.year === '전체' ? '전체 연도' : `${teamExamPublicFilters.year}년`, teamExamPublicFilters.exam === '전체' ? '전체 시험' : (EXAM_SHORT_LABELS[teamExamPublicFilters.exam] || teamExamPublicFilters.exam), teamExamPublicFilters.school === '전체' ? '전체 학교' : teamExamPublicFilters.school, teamExamPublicFilters.grade === '전체' ? '전체 학년' : `${teamExamPublicFilters.grade}학년`, teamExamPublicFilters.subject === '전체' ? '전체 과목' : teamExamPublicFilters.subject].join(' · ');
-        const titleTheme = getSubjectPastelTheme(teamExamPublicFilters.subject === '전체' ? '' : teamExamPublicFilters.subject);
         const pageHtml = pages.map((page) => `
           <section class="print-page">
-            <div class="page-header" style="--title-border:${titleTheme.border}; --title-soft:${titleTheme.soft}; --title-strong:${titleTheme.strong};">${escapeHtml(summary)}</div>
             <div class="grid">${page.map((item) => { const theme = getSubjectPastelTheme(item.subject); return `
               <article class="card" style="--subject-soft:${theme.soft}; --subject-border:${theme.border}; --subject-strong:${theme.strong}; --subject-tint:${theme.tint};">
                 <div class="card-top">
@@ -3398,14 +3274,14 @@
           </section>
         `).join('');
         const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>카드뉴스 인쇄</title><style>
-          @page { size: A4 landscape; margin: 5mm; }
+          @page { size: A4 landscape; margin: 6mm; }
           * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
           html, body { margin:0; padding:0; background:#fff; color:#111827; font-family:'SUIT','Pretendard',sans-serif; }
           body { width:100%; }
-          .print-page { page-break-after: always; break-after: page; width:100%; height:200mm; overflow:hidden; }
+          .print-page { page-break-after: always; break-after: page; width:100%; height:198mm; overflow:hidden; }
           .print-page:last-child { page-break-after: auto; break-after: auto; }
-          .page-header { height:12mm; display:flex; align-items:center; justify-content:center; margin-bottom:3mm; border-radius:14px; border:1px solid var(--title-border, #c4b5fd); background:linear-gradient(180deg, #fff 0%, var(--title-soft, #fbfbff) 100%); color:var(--title-strong, #6d28d9); font-size:18pt; font-weight:900; letter-spacing:-0.03em; } .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); grid-template-rows:repeat(2, 1fr); gap:4mm; height:185mm; }
-          .card { height:90.5mm; max-height:90.5mm; border-radius:18px; border:1px solid var(--subject-border, #c4b5fd); padding:4.2mm; display:flex; flex-direction:column; gap:2.4mm; background:linear-gradient(180deg, #fff 0%, var(--subject-soft, #fbfbff) 100%); overflow:hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.65); }
+          .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); grid-template-rows:repeat(2, 1fr); gap:5mm; height:100%; }
+          .card { height:96.5mm; max-height:96.5mm; border-radius:18px; border:1px solid var(--subject-border, #c4b5fd); padding:5mm; display:flex; flex-direction:column; gap:3mm; background:linear-gradient(180deg, #fff 0%, var(--subject-soft, #fbfbff) 100%); overflow:hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.65); }
           .card-top { display:flex; justify-content:flex-start; align-items:flex-start; }
           .hero-stack { display:flex; flex-direction:column; gap:1.8mm; width:100%; }
           .hero-row { display:flex; align-items:flex-start; justify-content:space-between; gap:4mm; }
@@ -3413,16 +3289,16 @@
           .badge, .year-chip { min-width:22mm; text-align:center; padding:1.8mm 3mm; border-radius:999px; font-size:9.2pt; font-weight:900; }
           .badge { border:1px solid #c4b5fd; background:#f5f3ff; color:#6d28d9; }
           .year-chip { border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; }
-          .school { font-size:14pt; font-weight:900; line-height:1.12; color:#1f3a8a; letter-spacing:-0.03em; }
-          .meta-line.strong { font-size:11.6pt; font-weight:900; color:var(--subject-strong, #6d28d9); letter-spacing:-0.01em; }
+          .school { font-size:15.5pt; font-weight:900; line-height:1.15; color:#1f3a8a; letter-spacing:-0.03em; }
+          .meta-line.strong { font-size:12.5pt; font-weight:900; color:var(--subject-strong, #6d28d9); letter-spacing:-0.01em; }
           .meta-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:6px; }
-          .meta-box { border:1px solid var(--subject-border, #ddd6fe); border-radius:14px; padding:2.8mm 3.2mm; background:rgba(255,255,255,0.9); min-height:19mm; }
+          .meta-box { border:1px solid var(--subject-border, #ddd6fe); border-radius:14px; padding:3.2mm 3.5mm; background:rgba(255,255,255,0.9); min-height:22mm; }
           .label { font-size:9px; font-weight:900; color:var(--subject-strong, #7c3aed); margin-bottom:4px; }
-          .value { margin-top:1mm; font-size:10pt; font-weight:900; line-height:1.4; white-space:pre-line; word-break:keep-all; color:#111827; }
-          .value.compact { font-size:9.7pt; line-height:1.45; }
-          .difficulty-stars { margin-top:1mm; font-size:13pt; font-weight:900; color:var(--subject-strong, #7c3aed); letter-spacing:0.06em; }
-          .difficulty-text { margin-top:0.8mm; font-size:9pt; font-weight:800; color:#334155; }
-          .note-box { border:1px solid var(--subject-border, #e2e8f0); border-radius:16px; padding:2.8mm 3.2mm; height:28mm; min-height:28mm; max-height:28mm; background:linear-gradient(180deg, rgba(255,255,255,0.96), var(--subject-tint, #fff)); overflow:hidden; }
+          .value { margin-top:1.2mm; font-size:10.8pt; font-weight:900; line-height:1.45; white-space:pre-line; word-break:keep-all; color:#111827; }
+          .value.compact { font-size:10.2pt; line-height:1.5; }
+          .difficulty-stars { margin-top:1.2mm; font-size:14.5pt; font-weight:900; color:var(--subject-strong, #7c3aed); letter-spacing:0.06em; }
+          .difficulty-text { margin-top:1mm; font-size:9.6pt; font-weight:800; color:#334155; }
+          .note-box { border:1px solid var(--subject-border, #e2e8f0); border-radius:16px; padding:3.2mm 3.5mm; height:33mm; min-height:33mm; max-height:33mm; background:linear-gradient(180deg, rgba(255,255,255,0.96), var(--subject-tint, #fff)); overflow:hidden; }
           .note-text { line-height:1.45; color:#334155; white-space:pre-line; word-break:keep-all; overflow:hidden; }
           .foot { margin-top:auto; display:flex; justify-content:space-between; font-size:9px; font-weight:800; color:#94a3b8; }
         </style></head><body>${pageHtml}</body></html>`;
@@ -3457,10 +3333,6 @@
       const getAnnualComparisonSummary = (rows) => {
         const validRows = (rows || []).filter((row) => Number(row.count || 0) > 0);
         if (!validRows.length) return '선택한 조건의 데이터가 아직 없습니다.';
-        if (validRows.length === 1) {
-          const only = validRows[0];
-          return `현재는 ${only.examShort} 데이터만 있습니다. 다음 시험 데이터가 쌓이면 자동으로 같은 화면에서 이어서 비교됩니다.`;
-        }
         const first = validRows[0];
         const last = validRows[validRows.length - 1];
         const avgDiff = Number(last.avg || 0) - Number(first.avg || 0);
@@ -3474,111 +3346,10 @@
 
       const annualComparisonRows = buildAnnualDistributionRows(annualCompareView);
       const annualComparisonSummary = getAnnualComparisonSummary(annualComparisonRows);
-      const principalFilteredRows = useMemo(() => {
-        return activeJoinedData.filter((row) => (
-          Number(row.year) === Number(principalViewFilters.year) &&
-          (principalViewFilters.exam === '전체' || row.exam === principalViewFilters.exam) &&
-          (principalViewFilters.school === '전체' || row.school === principalViewFilters.school) &&
-          (principalViewFilters.grade === '전체' || Number(row.grade) === Number(principalViewFilters.grade)) &&
-          (principalViewFilters.subject === '전체' || row.subject === principalViewFilters.subject)
-        ));
-      }, [activeJoinedData, principalViewFilters]);
-
-      const principalSummaryCards = useMemo(() => {
-        const count = principalFilteredRows.length;
-        const studentCount = new Set(principalFilteredRows.map((row) => row.studentId).filter(Boolean)).size;
-        const avg = count ? Math.round(principalFilteredRows.reduce((sum, row) => sum + Number(row.score || 0), 0) / count) : null;
-        const topCount = principalFilteredRows.filter((row) => {
-          const tier = normalizeTeacherAnalysisTier(row.tier);
-          return tier && tier <= 2;
-        }).length;
-        const improveCount = principalFilteredRows.filter((row) => Number(row.scoreDelta || 0) > 0 || Number(row.tierDelta || 0) > 0).length;
-        return [
-          { label: '집계 학생 수', value: `${studentCount}명` },
-          { label: '집계 성적 건수', value: `${count}건` },
-          { label: '평균 점수', value: avg !== null ? `${avg}점` : '-' },
-          { label: '상위권 비율', value: count ? `${Math.round((topCount / count) * 100)}%` : '0%' },
-          { label: '향상 건수', value: `${improveCount}건` },
-        ];
-      }, [principalFilteredRows]);
-
-      const principalTeacherStudentTableRows = useMemo(() => {
-        const grouped = new Map();
-        principalFilteredRows.forEach((row) => {
-          const teacherName = String(row.updatedBy || row.createdBy || '미지정').trim() || '미지정';
-          if (!grouped.has(teacherName)) grouped.set(teacherName, { teacherName, studentIds: new Set(), schoolMap: {} });
-          const target = grouped.get(teacherName);
-          if (row.studentId) target.studentIds.add(row.studentId);
-          const schoolKey = row.school || '-';
-          target.schoolMap[schoolKey] = target.schoolMap[schoolKey] || new Set();
-          if (row.studentId) target.schoolMap[schoolKey].add(row.studentId);
-        });
-        const rows = Array.from(grouped.values()).map((item) => {
-          const schoolCounts = {};
-          SCHOOL_OPTIONS.forEach((school) => { schoolCounts[school] = item.schoolMap[school] ? item.schoolMap[school].size : 0; });
-          return { teacherName: item.teacherName, totalStudents: item.studentIds.size, ...schoolCounts };
-        });
-        return sortRows(rows, principalTeacherTableSort, {
-          teacherName: (r) => safeLower(r.teacherName),
-          totalStudents: (r) => Number(r.totalStudents || 0),
-          ...Object.fromEntries(SCHOOL_OPTIONS.map((school) => [school, (r) => Number(r[school] || 0)])),
-        });
-      }, [principalFilteredRows, principalTeacherTableSort]);
-
-      const principalDistributionRows = useMemo(() => {
-        const grouped = new Map();
-        principalFilteredRows.forEach((row) => {
-          const key = [row.school, row.grade, row.subject].join('__');
-          if (!grouped.has(key)) grouped.set(key, []);
-          grouped.get(key).push(row);
-        });
-        return Array.from(grouped.entries()).map(([key, rows]) => {
-          const [school, grade, subject] = key.split('__');
-          const total = rows.length || 1;
-          const teacherMap = {};
-          rows.forEach((row) => {
-            const teacherName = String(row.updatedBy || row.createdBy || '미지정').trim() || '미지정';
-            teacherMap[teacherName] = (teacherMap[teacherName] || 0) + 1;
-          });
-          const teacherSummary = Object.entries(teacherMap)
-            .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), 'ko'))
-            .map(([teacherName, count]) => `${teacherName} ${count}건 (${Math.round((count / total) * 100)}%)`)
-            .join(' / ');
-          return { school, grade: Number(grade || 0), subject, total, teacherSummary };
-        }).sort((a, b) => String(a.school).localeCompare(String(b.school), 'ko') || Number(a.grade) - Number(b.grade) || String(a.subject).localeCompare(String(b.subject), 'ko'));
-      }, [principalFilteredRows]);
-
-      const principalSubjectDistributionCards = useMemo(() => {
-        const baseRows = principalFilteredRows.filter((row) => principalViewFilters.school !== '전체' && principalViewFilters.grade !== '전체' ? (row.school === principalViewFilters.school && Number(row.grade) === Number(principalViewFilters.grade)) : true);
-        const subjects = principalViewFilters.subject === '전체' ? Array.from(new Set(baseRows.map((row) => row.subject).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ko')) : [principalViewFilters.subject];
-        return subjects.map((subject) => {
-          const rows = baseRows.filter((row) => row.subject === subject);
-          const total = rows.length;
-          const teacherMap = {};
-          rows.forEach((row) => {
-            const teacherName = String(row.updatedBy || row.createdBy || '미지정').trim() || '미지정';
-            teacherMap[teacherName] = (teacherMap[teacherName] || 0) + 1;
-          });
-          const teachers = Object.entries(teacherMap).map(([teacherName, count]) => ({ teacherName, count, rate: total ? Math.round((count / total) * 100) : 0 })).sort((a,b)=>b.count-a.count || String(a.teacherName).localeCompare(String(b.teacherName),'ko'));
-          return { subject, total, teachers };
-        }).filter((item) => item.total > 0);
-      }, [principalFilteredRows, principalViewFilters]);
-
-      const principalDeltaRows = useMemo(() => {
-        const grouped = new Map();
-        principalFilteredRows.forEach((row) => {
-          const teacherName = String(row.updatedBy || row.createdBy || '미지정').trim() || '미지정';
-          if (!grouped.has(teacherName)) grouped.set(teacherName, { teacherName, scoreUp: 0, scoreDown: 0, tierUp: 0, tierDown: 0 });
-          const target = grouped.get(teacherName);
-          const scoreDelta = Number(row.scoreDelta || 0);
-          const tierDelta = Number(row.tierDelta || 0);
-          if (scoreDelta > 0) target.scoreUp += 1;
-          if (scoreDelta < 0) target.scoreDown += 1;
-          if (tierDelta > 0) target.tierUp += 1;
-          if (tierDelta < 0) target.tierDown += 1;
-        });
-        return Array.from(grouped.values()).sort((a, b) => (b.scoreUp + b.tierUp) - (a.scoreUp + a.tierUp) || String(a.teacherName).localeCompare(String(b.teacherName), 'ko'));
-      }, [principalFilteredRows]);
+      const principalAnnualRows = buildAnnualDistributionRows(principalViewFilters);
+      const principalAnnualSummary = getAnnualComparisonSummary(principalAnnualRows);
+      const principalLatestRow = [...principalAnnualRows].reverse().find((row) => Number(row.count || 0) > 0) || principalAnnualRows[principalAnnualRows.length - 1] || null;
+      const principalSummaryCards = [];
 
       const schoolAnalysisRows = (() => {
         const rows = activeJoinedData.filter(r => Number(r.year) === Number(schoolView.year) && r.exam === schoolView.exam && (schoolView.school === '전체' || r.school === schoolView.school) && (schoolView.subject === '전체' || r.subject === schoolView.subject) && (schoolView.grade === '전체' || Number(r.grade) === Number(schoolView.grade)));
@@ -4060,7 +3831,7 @@
                 </button>
               ))}
             </div>
-            <div className="mt-auto space-y-3"><div className="bg-slate-50 p-4 rounded-2xl border border-slate-200"><div className="text-xs text-slate-500 font-bold mb-1">로그인</div><div className="flex items-center justify-between gap-2"><div className="font-black text-slate-900">{currentTeacherName} 선생님</div>{adminPill}</div></div><button type="button" onClick={performLogout} onKeyDown={(e)=>{ if (e.key === "Enter" || e.key === " ") performLogout(e); }} className="relative z-30 pointer-events-auto cursor-pointer select-none w-full rounded-2xl bg-gradient-to-r from-slate-700 to-slate-900 text-white font-bold py-3 shadow-sm active:scale-[0.99]">로그아웃</button></div>
+            <div className="mt-auto space-y-3"><div className="bg-slate-50 p-4 rounded-2xl border border-slate-200"><div className="text-xs text-slate-500 font-bold mb-1">로그인</div><div className="flex items-center justify-between gap-2"><div className="font-black text-slate-900">{currentTeacherName} 선생님</div>{adminPill}</div></div><button onClick={handleLogout} className="w-full rounded-2xl bg-gradient-to-r from-slate-700 to-slate-900 text-white font-bold py-3 shadow-sm">로그아웃</button></div>
           </aside>
 
           <main className="content-wrap xl:pl-[290px] p-4 sm:p-6 space-y-6 mobile-safe-bottom">
@@ -4735,146 +4506,244 @@
             {view === 'principalReport' && (isAdminUser || isPrincipalUser) && (
               <div className="space-y-6">
                 <Card title="원장님 리포트" className="print-hide">
-                  <div className="grid lg:grid-cols-5 gap-4">
+                  <div className="grid lg:grid-cols-4 gap-4">
                     <select value={principalViewFilters.year} onChange={e => setPrincipalViewFilters((p) => ({ ...p, year: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{YEARS.map(y => <option key={y} value={y}>{y}년</option>)}</select>
-                    <select value={principalViewFilters.exam} onChange={e => setPrincipalViewFilters((p) => ({ ...p, exam: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 시험</option>{EXAMS.map(exam => <option key={exam} value={exam}>{exam}</option>)}</select>
-                    <select value={principalViewFilters.school} onChange={e => setPrincipalViewFilters((p) => ({ ...p, school: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학교</option>{SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={principalViewFilters.grade} onChange={e => setPrincipalViewFilters((p) => ({ ...p, grade: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 학년</option>{GRADES.map(g => <option key={g} value={String(g)}>{g}학년</option>)}</select>
-                    <select value={principalViewFilters.subject} onChange={e => setPrincipalViewFilters((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none"><option value="전체">전체 과목</option>{subjectOptions.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={principalViewFilters.school} onChange={e => setPrincipalViewFilters((p) => ({ ...p, school: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={principalViewFilters.grade} onChange={e => setPrincipalViewFilters((p) => ({ ...p, grade: Number(e.target.value) }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}</select>
+                    <select value={principalViewFilters.subject} onChange={e => setPrincipalViewFilters((p) => ({ ...p, subject: e.target.value }))} className="border border-slate-300 rounded-xl p-2.5 outline-none">{subjectOptions.map(s => <option key={s} value={s}>{s}</option>)}</select>
                   </div>
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-7 text-slate-700">
-                    <span className="font-black text-slate-900">{principalViewFilters.year}년 · {principalViewFilters.exam} · {principalViewFilters.school} · {principalViewFilters.grade} · {principalViewFilters.subject}</span> 기준으로 강사별 담당 인원, 학교·학년·과목별 분포, 향상/하락 인원을 한 화면에서 봅니다.
+                    <span className="font-black text-slate-900">{principalViewFilters.year}년 · {principalViewFilters.school} · {principalViewFilters.grade}학년 · {principalViewFilters.subject}</span> 기준으로 1년치 등급 분포와 변화 흐름을 한 화면에서 봅니다.
                   </div>
                 </Card>
-
-                <div className="grid lg:grid-cols-5 md:grid-cols-3 gap-4">
-                  {principalSummaryCards.map((card) => (
-                    <div key={card.label} className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                      <div className="text-xs font-black tracking-[0.16em] text-slate-400">{card.label}</div>
-                      <div className="mt-2 text-2xl font-black text-slate-900">{card.value}</div>
-                    </div>
                   ))}
                 </div>
 
-                <Card title="1. 강사별 맡은 인원수" right={<span className="text-xs text-slate-400">헤더 클릭 정렬</span>}>
-                  <div className="overflow-x-auto mini-scroll">
-                    <table className="w-full text-sm text-center">
-                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
-                        <tr>
-                          <th className="py-3 px-2 text-left table-sort" onClick={() => setPrincipalTeacherTableSort((p) => ({ key: 'teacherName', direction: p.key === 'teacherName' && p.direction === 'desc' ? 'asc' : 'desc' }))}>강사</th>
-                          <th className="py-3 px-2 table-sort" onClick={() => setPrincipalTeacherTableSort((p) => ({ key: 'totalStudents', direction: p.key === 'totalStudents' && p.direction === 'desc' ? 'asc' : 'desc' }))}>총인원</th>
-                          {SCHOOL_OPTIONS.map((school) => <th key={school} className="py-3 px-2 table-sort" onClick={() => setPrincipalTeacherTableSort((p) => ({ key: school, direction: p.key === school && p.direction === 'desc' ? 'asc' : 'desc' }))}>{school}인원</th>)}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {principalTeacherStudentTableRows.length ? principalTeacherStudentTableRows.map((row) => (
-                          <tr key={row.teacherName}>
-                            <td className="py-3 px-2 text-left">{renderTeacherNameBadge(row.teacherName)}</td>
-                            <td className="font-black text-violet-700">{row.totalStudents}명</td>
-                            {SCHOOL_OPTIONS.map((school) => <td key={school}>{row[school] || 0}명</td>)}
-                          </tr>
-                        )) : <tr><td colSpan={2 + SCHOOL_OPTIONS.length} className="py-8 text-center text-slate-400">집계할 데이터가 없습니다.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-
-                <Card title="2. 학교별 · 학년별 강사 분포">
-                  <div className="overflow-x-auto mini-scroll max-h-[420px]">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold sticky top-0">
-                        <tr>
-                          <th className="py-3 px-2 text-left">학교</th>
-                          <th className="py-3 px-2 text-left">학년</th>
-                          <th className="py-3 px-2 text-left">과목</th>
-                          <th className="py-3 px-2 text-left">강사 분포</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {principalDistributionRows.length ? principalDistributionRows.map((row, idx) => (
-                          <tr key={`${row.school}-${row.grade}-${row.subject}-${idx}`}>
-                            <td className="py-3 px-2 font-bold text-slate-800">{row.school}</td>
-                            <td className="py-3 px-2">{row.grade}학년</td>
-                            <td className="py-3 px-2">{row.subject}</td>
-                            <td className="py-3 px-2 text-slate-700 leading-7">{row.teacherSummary}</td>
-                          </tr>
-                        )) : <tr><td colSpan="4" className="py-8 text-center text-slate-400">집계할 데이터가 없습니다.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-
-                <Card title="3. 한 학교 · 학년 · 과목 기준 강사 분포">
-                  {principalViewFilters.school === '전체' || principalViewFilters.grade === '전체' ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-7 text-amber-800">이 표는 한 학교/한 학년 기준으로 보는 화면이어서, 학교와 학년을 먼저 선택하면 더 정확하게 볼 수 있어요.</div>
-                  ) : principalSubjectDistributionCards.length ? (
-                    <div className="grid lg:grid-cols-2 gap-4">
-                      {principalSubjectDistributionCards.map((card) => (
-                        <div key={card.subject} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-                          <div className="flex items-center justify-between gap-3">
+                <Card title="연간 등급 분포 비교" right={<span className="text-xs text-slate-400">관리자와 원장님이 함께 보는 요약 화면</span>}>
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-3 text-sm leading-7 text-violet-900">
+                      <span className="font-black">{principalViewFilters.year}년 · {principalViewFilters.school} · {principalViewFilters.grade}학년 · {principalViewFilters.subject}</span>
+                      <div className="text-slate-700 mt-1">{principalAnnualSummary}</div>
+                    </div>
+                    <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-4">
+                      {principalAnnualRows.map((row) => (
+                        <div key={row.exam} className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-xs font-black tracking-[0.16em] text-slate-400">SUBJECT</div>
-                              <div className="mt-1 text-xl font-black text-slate-900">{card.subject}</div>
+                              <div className="text-[11px] font-black tracking-[0.16em] text-violet-600">EXAM</div>
+                              <div className="mt-1 text-lg font-black text-slate-900">{row.examShort}</div>
                             </div>
-                            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-500">총 {card.total}건</div>
+                            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-500">{row.count}명</div>
                           </div>
-                          <div className="mt-4 space-y-3">
-                            {card.teachers.map((teacher) => (
-                              <div key={`${card.subject}-${teacher.teacherName}`} className="flex items-center gap-3">
-                                <div className="w-24 shrink-0">{renderTeacherNameBadge(teacher.teacherName)}</div>
-                                <div className="flex-1 rounded-full bg-slate-100 h-3 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${Math.max(teacher.rate, teacher.count ? 8 : 0)}%` }}></div></div>
-                                <div className="w-20 text-right text-xs font-black text-slate-700">{teacher.count}건 · {teacher.rate}%</div>
-                              </div>
-                            ))}
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                              <div className="text-[11px] font-black text-slate-400">평균</div>
+                              <div className="mt-1 text-xl font-black text-violet-700">{row.avg !== null && row.avg !== undefined ? `${row.avg}점` : '-'}</div>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                              <div className="text-[11px] font-black text-slate-400">상위권 / 위험권</div>
+                              <div className="mt-1 text-sm font-black text-slate-700">{row.topRate || 0}% / {row.riskRate || 0}%</div>
+                            </div>
+                          </div>
+                          <div className="mt-4 space-y-2">
+                            {[1,2,3,4,5].map((tier) => {
+                              const style = getSchoolRateStyle(tier);
+                              const value = row[`rate${tier}`] || 0;
+                              return (
+                                <div key={tier} className="flex items-center gap-2">
+                                  <div className={`w-12 shrink-0 text-xs font-black ${style.text}`}>{tier}등급</div>
+                                  <div className={`flex-1 rounded-full border px-2 py-2 ${style.wrap}`}>
+                                    <div className="h-2 rounded-full bg-white/80 overflow-hidden">
+                                      <div className={`h-full rounded-full bg-gradient-to-r ${style.bar}`} style={{ width: `${Math.max(value ? 8 : 0, value)}%` }}></div>
+                                    </div>
+                                  </div>
+                                  <div className={`w-12 text-right text-xs font-black ${style.text}`}>{value}%</div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       ))}
                     </div>
-                  ) : <div className="py-10 text-center text-slate-400">집계할 데이터가 없습니다.</div>}
+                  </div>
+                </Card>
+              </div>
+            )} 
+
+            {view === 'studentAnalysis' && (
+              <div className="space-y-6">
+                <Card title="학생별 성적분석" className="print-hide">
+                  <div className="space-y-4">
+                    <div className="flex flex-col xl:flex-row gap-3 xl:items-center">
+                      <select value={studentAnalysisFilters.school} onChange={e => { setStudentAnalysisFilters((p) => ({ ...p, school: e.target.value, grade: '', keyword: '' })); setStudentAnalysisStudentId(''); setStudentSubjectFilter('전체'); }} className="border border-slate-300 rounded-xl p-2.5 outline-none">
+                        <option value="">학교 선택</option>
+                        {SCHOOL_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <select value={studentAnalysisFilters.grade} onChange={e => { setStudentAnalysisFilters((p) => ({ ...p, grade: e.target.value, keyword: '' })); setStudentAnalysisStudentId(''); setStudentSubjectFilter('전체'); }} className="border border-slate-300 rounded-xl p-2.5 outline-none">
+                        <option value="">학년 선택</option>
+                        {GRADES.map(g => <option key={g} value={g}>{g}학년</option>)}
+                      </select>
+                      <select value={studentAnalysisFilters.subject} onChange={e => { setStudentAnalysisFilters((p) => ({ ...p, subject: e.target.value })); setStudentSubjectFilter(e.target.value === '전체' ? '전체' : e.target.value); setStudentAnalysisStudentId(''); }} className="border border-slate-300 rounded-xl p-2.5 outline-none">
+                        <option value="전체">전체 과목</option>
+                        {subjectOptions.map(subject => <option key={subject} value={subject}>{subject}</option>)}
+                      </select>
+                      <div className="flex items-center gap-2 min-w-[260px]">
+                        <input
+                          value={studentAnalysisFilters.keyword}
+                          onChange={e => setStudentAnalysisFilters((p) => ({ ...p, keyword: e.target.value }))}
+                          placeholder="학생 이름 검색"
+                          className="flex-1 border border-slate-300 rounded-xl p-2.5 outline-none min-w-[220px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const first = filteredStudentAnalysisStudents[0];
+                            if (first) {
+                              setStudentAnalysisStudentId(first.studentId);
+                              setStudentSubjectFilter(studentAnalysisFilters.subject === '전체' ? '전체' : studentAnalysisFilters.subject);
+                            }
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-violet-600 text-white font-black hover:bg-violet-700 transition whitespace-nowrap"
+                        >
+                          검색
+                        </button>
+                      </div>
+                      <div className="text-sm text-slate-500">학교·학년 선택 후 버튼으로 찾거나, 이름을 입력하면 바로 후보가 뜹니다.</div>
+                    </div>
+                    {(studentAnalysisFilters.school && studentAnalysisFilters.grade) || String(studentAnalysisFilters.keyword || '').trim() ? (
+                      <div className="space-y-2">
+                        {!!String(studentAnalysisFilters.keyword || '').trim() && (
+                          <div className="text-sm text-violet-700 font-bold">이름 검색 결과 {filteredStudentAnalysisStudents.length}명</div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {filteredStudentAnalysisStudents.length ? filteredStudentAnalysisStudents.map((student) => (
+                            <button key={student.studentId} type="button" onClick={() => { setStudentAnalysisStudentId(student.studentId); setStudentSubjectFilter(studentAnalysisFilters.subject === '전체' ? '전체' : studentAnalysisFilters.subject); }} className={`px-4 py-2 rounded-full border text-sm font-black transition ${studentAnalysisStudentId === student.studentId ? 'bg-violet-600 text-white border-violet-600 shadow-lg shadow-violet-200' : 'bg-white text-slate-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50'}`}>{student.name}</button>
+                          )) : <div className="text-sm text-slate-400">조건에 맞는 학생이 없습니다.</div>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-400">학교와 학년을 먼저 선택하거나, 학생 이름을 입력해 검색해주세요.</div>
+                    )}
+                  </div>
                 </Card>
 
-                <Card title="4. 저번 시험 대비 강사별 향상 / 하락 인원">
-                  <div className="overflow-x-auto mini-scroll">
-                    <table className="w-full text-sm text-center">
-                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
-                        <tr>
-                          <th className="py-3 px-2 text-left">강사</th>
-                          <th className="py-3 px-2">원점수 향상</th>
-                          <th className="py-3 px-2">등급 향상</th>
-                          <th className="py-3 px-2">점수 하락</th>
-                          <th className="py-3 px-2">등급 하락</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {principalDeltaRows.length ? principalDeltaRows.map((row) => (
-                          <tr key={row.teacherName}>
-                            <td className="py-3 px-2 text-left">{renderTeacherNameBadge(row.teacherName)}</td>
-                            <td className="font-black text-emerald-700">{row.scoreUp}명</td>
-                            <td className="font-black text-sky-700">{row.tierUp}명</td>
-                            <td className="font-black text-rose-700">{row.scoreDown}명</td>
-                            <td className="font-black text-amber-700">{row.tierDown}명</td>
-                          </tr>
-                        )) : <tr><td colSpan="5" className="py-8 text-center text-slate-400">비교할 데이터가 없습니다.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
+                <Card title="학생 분석 결과" className="student-analysis-print-card">
+                  {(() => {
+                    const target = activeStudents.find((student) => student.studentId === studentAnalysisStudentId);
+                    if (!target) return <div className="py-10 text-center text-slate-400">학생을 선택해주세요.</div>;
+                    const records = activeJoinedData.filter((row) => row.studentId === target.studentId).sort((a, b) => Number(a.year) - Number(b.year) || examOrder(a.exam) - examOrder(b.exam) || safeLower(a.subject).localeCompare(safeLower(b.subject)));
+                    const filtered = studentSubjectFilter === '전체' ? records : records.filter(r => r.subject === studentSubjectFilter);
+                    const subjectStats = subjectOptions.map(subject => {
+                      const arr = records.filter(r => r.subject === subject);
+                      if (!arr.length) return null;
+                      const maxScore = Math.max(...arr.map(r=>Number(r.score||0)));
+                      const minScore = Math.min(...arr.map(r=>Number(r.score||0)));
+                      const bestTier = Math.min(...arr.map(r=>Number(normalizeTeacherAnalysisTier(r.tier)||0)).filter(Boolean));
+                      const worstTier = Math.max(...arr.map(r=>Number(normalizeTeacherAnalysisTier(r.tier)||0)).filter(Boolean));
+                      return {
+                        subject,
+                        avgScore: Math.round(arr.reduce((s,r)=>s+Number(r.score||0),0)/arr.length),
+                        avgTier: (arr.reduce((s,r)=>s+Number(normalizeTeacherAnalysisTier(r.tier)||0),0)/arr.length).toFixed(1),
+                        maxScore,
+                        bestTier,
+                        minScore,
+                        worstTier,
+                      };
+                    }).filter(Boolean).sort((a,b) => b.avgScore - a.avgScore);
+
+                    const canCompareSubjects = subjectStats.length >= 2;
+                    const best = canCompareSubjects ? (subjectStats[0] || null) : null;
+                    const weak = canCompareSubjects ? (subjectStats[subjectStats.length-1] || null) : null;
+                    const displayRows = sortRows(filtered, studentSort, { year:r=>Number(r.year), exam:r=>examOrder(r.exam), subject:r=>safeLower(r.subject), detailSubject:r=>safeLower(r.detailSubject||''), score:r=>Number(r.score), tier:r=>normalizeTeacherAnalysisTier(r.tier), owner:r=>safeLower(r.updatedBy || r.createdBy || '') });
+
+                    return <div className="space-y-5">
+                      <div className="text-lg font-black text-slate-900">{target.name} · {target.school} · {target.grade}학년</div>
+                      <div className="student-analysis-highlight-grid md:grid-cols-2 gap-4">
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4"><div className="text-sm text-slate-500 font-bold">강세 과목</div><div className={`mt-2 text-2xl font-black ${best ? 'text-emerald-700' : 'text-slate-400'}`}>{best ? best.subject : '-'}</div><div className="text-sm text-slate-500">{best ? `원점수평균 ${best.avgScore}점` : '한 과목만 입력되어 아직 비교할 수 없습니다.'}</div></div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4"><div className="text-sm text-slate-500 font-bold">보완 과목</div><div className={`mt-2 text-2xl font-black ${weak ? 'text-rose-600' : 'text-slate-400'}`}>{weak ? weak.subject : '-'}</div><div className="text-sm text-slate-500">{weak ? `원점수평균 ${weak.avgScore}점` : '한 과목만 입력되어 아직 비교할 수 없습니다.'}</div></div>
+                      </div>
+
+                      <div>
+                        <div className="mb-2 text-sm font-black text-slate-800">과목별 요약</div>
+                        <div className="overflow-x-auto mini-scroll">
+                          <table className="w-full text-sm text-center table-fixed">
+                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
+                              <tr>
+                                <th className="py-3">과목</th>
+                                <th>원점수평균</th>
+                                <th>등급평점</th>
+                                <th>최고점</th>
+                                <th>최고등급</th>
+                                <th>최저점</th>
+                                <th>최저등급</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {subjectStats.map((item) => (
+                                <tr key={item.subject}>
+                                  <td className="py-3 font-black">{item.subject}</td>
+                                  <td className="font-black text-violet-700">{item.avgScore}점</td>
+                                  <td>{item.avgTier}</td>
+                                  <td>{item.maxScore}점</td>
+                                  <td>{item.bestTier}등급</td>
+                                  <td>{item.minScore}점</td>
+                                  <td>{item.worstTier}등급</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="mb-2 text-sm font-black text-slate-800">시험별 상세 기록</div>
+                        <div className="text-xs text-slate-500 mb-2">아래 표는 선택한 학생의 실제 시험 기록입니다.</div>
+                        <div className="overflow-x-auto mini-scroll">
+                          <table className="w-full text-sm text-center table-fixed">
+                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b">
+                              <tr>{[['year','연도'],['exam','시험'],['subject','과목'],['detailSubject','세부과목'],['score','점수'],['tier','등급'],['owner','담당자']].map(([key,label]) => <th key={key} className="py-3 table-sort" onClick={() => key !== 'owner' && setStudentSort((p) => ({ key, direction: p.key === key && p.direction === 'desc' ? 'asc' : 'desc' }))}>{label}</th>)}</tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {displayRows.map((r) => <tr key={r.docId}>
+                                <td className="py-3">{r.year}</td>
+                                <td>{EXAM_SHORT_LABELS[r.exam] || r.exam}</td>
+                                <td>{r.subject}</td>
+                                <td>{r.detailSubject || '-'}</td>
+                                <td className="font-black text-violet-700">{r.score}점</td>
+                                <td>{normalizeTeacherAnalysisTier(r.tier)}등급</td>
+                                <td>
+                                  <select value={r.updatedBy || r.createdBy || ''} onChange={(e)=>handleScoreOwnerChange(r.docId, e.target.value)} className="border border-slate-300 rounded-xl px-2 py-1.5 text-xs bg-white">
+                                    {activeOrderedTeachers.map((teacher)=><option key={teacher.teacherId} value={teacher.name}>{teacher.name}</option>)}
+                                  </select>
+                                </td>
+                              </tr>)}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>;
+                  })()}
                 </Card>
               </div>
             )}
 
-
             {view === 'teacherAdmin' && isAdminUser && (
-              <div className="admin-page-grid">
+              <div className="space-y-4">
                 <Card
                   title="Admin Page"
                   right={
                     <div className="flex items-center gap-2">
-                      {editingTeacherId ? <button type="button" onClick={resetTeacherAdminForm} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600">새로 입력</button> : <span className="text-xs font-black text-violet-700">관리자 전용</span>}
-                      <button type="button" onClick={() => toggleAdminSection('teacherAdminMain')} className="admin-collapse-button">{adminSectionOpen.teacherAdminMain ? '접기' : '펼치기'}<i className={`fas ${adminSectionOpen.teacherAdminMain ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></button>
+                      {adminSectionOpen.adminPage && editingTeacherId ? (
+                        <button type="button" onClick={resetTeacherAdminForm} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600">새로 입력</button>
+                      ) : null}
+                      <button type="button" onClick={() => toggleAdminSection('adminPage')} className="admin-collapse-button">
+                        {adminSectionOpen.adminPage ? '접기' : '펼치기'}
+                        <i className={`fas ${adminSectionOpen.adminPage ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                      </button>
                     </div>
                   }
                 >
-                  {adminSectionOpen.teacherAdminMain ? (
+                  {adminSectionOpen.adminPage ? (
                     <form onSubmit={handleSaveTeacherAdmin} className="space-y-4">
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div className="sm:col-span-2">
@@ -4914,21 +4783,26 @@
 
                 <Card
                   title="승급 처리 및 3년이상 자료 삭제 처리"
-                  right={<button type="button" onClick={() => toggleAdminSection('teacherAdminPromotion')} className="admin-collapse-button">{adminSectionOpen.teacherAdminPromotion ? '접기' : '펼치기'}<i className={`fas ${adminSectionOpen.teacherAdminPromotion ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></button>}
+                  right={
+                    <button type="button" onClick={() => toggleAdminSection('promotionArchive')} className="admin-collapse-button">
+                      {adminSectionOpen.promotionArchive ? '접기' : '펼치기'}
+                      <i className={`fas ${adminSectionOpen.promotionArchive ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                    </button>
+                  }
                 >
-                  {adminSectionOpen.teacherAdminPromotion ? (
+                  {adminSectionOpen.promotionArchive ? (
                     <div className="space-y-4">
                       <div className="text-sm text-slate-500 leading-6">현재 연도의 재원 학생(3학년 제외)을 다음 연도 학생으로 새로 생성합니다. 기존 기록은 그대로 유지됩니다.</div>
-                      <div className="grid sm:grid-cols-[1fr_1fr] gap-4 items-end">
+                      <div className="grid lg:grid-cols-[1fr_320px] gap-4 items-start">
                         <div>
                           <label className="block text-xs font-black text-slate-500 mb-2">기준 연도</label>
                           <select value={promotionSourceYear} onChange={(e)=>setPromotionSourceYear(Number(e.target.value))} className="w-full border border-slate-300 rounded-xl p-3 font-bold outline-none">
                             {YEARS.filter((year) => year < Math.max(...YEARS)).map((year) => <option key={year} value={year}>{year}년</option>)}
                           </select>
                         </div>
-                        <div>
-                          <div className="text-xs font-black text-slate-500 mb-2">승급 결과</div>
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 h-[50px] flex items-center text-lg font-black text-slate-900">{promotionTargetYear}년 학생 생성</div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 min-h-[78px] flex flex-col justify-center">
+                          <div className="text-xs font-black text-slate-500">승급 결과</div>
+                          <div className="mt-2 text-lg font-black text-slate-900">{promotionTargetYear}년 학생 생성</div>
                         </div>
                       </div>
                       <button type="button" onClick={handlePromoteStudents} disabled={isPromotingStudents} className={`rounded-2xl px-5 py-3 text-sm font-black text-white ${isPromotingStudents ? 'bg-slate-400' : 'bg-indigo-700 hover:bg-indigo-800'}`}>
@@ -4955,11 +4829,16 @@
 
                 <Card
                   title="선생님 목록 보기"
-                  right={<button type="button" onClick={() => toggleAdminSection('teacherAdminList')} className="admin-collapse-button">{adminSectionOpen.teacherAdminList ? '접기' : '펼치기'}<i className={`fas ${adminSectionOpen.teacherAdminList ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></button>}
+                  right={
+                    <button type="button" onClick={() => toggleAdminSection('teacherList')} className="admin-collapse-button">
+                      {adminSectionOpen.teacherList ? '접기' : '펼치기'}
+                      <i className={`fas ${adminSectionOpen.teacherList ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                    </button>
+                  }
                 >
-                  {adminSectionOpen.teacherAdminList ? (
+                  {adminSectionOpen.teacherList ? (
                     <>
-                      <div className="overflow-x-auto mini-scroll max-h-[460px]">
+                      <div className="overflow-x-auto mini-scroll">
                         <table className="w-full text-sm">
                           <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
                             <tr>
@@ -4984,7 +4863,7 @@
                                     </div>
                                   </div>
                                 </td>
-                                <td className="py-3 px-2">{renderTeacherNameBadge(teacher.name)}</td>
+                                <td className="py-3 px-2 font-black text-slate-900">{teacher.name}</td>
                                 <td className="py-3 px-2"><span className={`rounded-full px-3 py-1 text-xs font-black ${getTeacherRole(teacher) === 'admin' ? 'bg-amber-50 text-amber-700 border border-amber-200' : getTeacherRole(teacher) === 'guest' ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>{getTeacherRoleLabel(getTeacherRole(teacher))}</span></td>
                                 <td className="py-3 px-2 font-mono font-black text-violet-700">{teacher.pin || '----'}</td>
                                 <td className="py-3 px-2">
@@ -5002,7 +4881,7 @@
                                 </td>
                                 <td className="py-3 px-2">
                                   <div className="flex flex-wrap gap-2">
-                                    <button type="button" onClick={()=>handleEditTeacherAdmin(teacher)} className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">수정</button>
+                                    <button type="button" onClick={()=>{ handleEditTeacherAdmin(teacher); setAdminSectionOpen((prev)=>({ ...prev, adminPage: true })); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">수정</button>
                                   </div>
                                 </td>
                               </tr>
@@ -5019,36 +4898,41 @@
 
                 <Card
                   title="로그인 기록"
-                  right={<button type="button" onClick={() => toggleAdminSection('teacherAdminLogs')} className="admin-collapse-button">{adminSectionOpen.teacherAdminLogs ? '접기' : '펼치기'}<i className={`fas ${adminSectionOpen.teacherAdminLogs ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></button>}
+                  right={
+                    <button type="button" onClick={() => toggleAdminSection('loginLogs')} className="admin-collapse-button">
+                      {adminSectionOpen.loginLogs ? '접기' : '펼치기'}
+                      <i className={`fas ${adminSectionOpen.loginLogs ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                    </button>
+                  }
                 >
-                  {adminSectionOpen.teacherAdminLogs ? (
+                  {adminSectionOpen.loginLogs ? (
                     <>
-                      <div className="overflow-x-auto mini-scroll max-h-[460px]">
+                      <div className="overflow-x-auto mini-scroll">
                         <table className="w-full text-sm">
-                          <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold sticky top-0">
+                          <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
                             <tr>
                               <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('teacherName')}>선생님</th>
                               <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('teacherRole')}>역할</th>
                               <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('loginAt')}>로그인</th>
                               <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('logoutAt')}>로그아웃</th>
-                              <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('monthlyCount')}>{currentMonthLabel}</th>
+                              <th className="py-3 px-2 text-left table-sort" onClick={()=>toggleLoginLogSort('sessionMs')}>접속 시간</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {filteredLoginLogs.length ? filteredLoginLogs.map((row) => (
                               <tr key={row.docId}>
-                                <td className="py-3 px-2">{renderTeacherNameBadge(row.teacherName || '-')}</td>
+                                <td className="py-3 px-2 font-black text-slate-900">{row.teacherName || '-'}</td>
                                 <td className="py-3 px-2">{getTeacherRoleLabel(row.teacherRole)}</td>
                                 <td className="py-3 px-2">{formatDateText(row.loginAt)}</td>
                                 <td className="py-3 px-2">{row.logoutAt ? formatDateText(row.logoutAt) : '-'}</td>
-                                <td className="py-3 px-2 font-bold text-violet-700">{monthlyLoginCountByTeacher[row.teacherName] || 0}회</td>
+                                <td className="py-3 px-2 font-bold text-violet-700">{row.sessionDurationText || getSessionDurationText(row.sessionMs)}</td>
                               </tr>
                             )) : <tr><td colSpan="5" className="py-8 text-center text-slate-400">로그인 기록이 없습니다.</td></tr>}
                           </tbody>
                         </table>
                       </div>
                       <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs leading-6 text-violet-800">
-                        로그인 기록은 로그인/로그아웃 시각과 이번 달 접속횟수를 함께 보여줍니다. 표 높이는 고정되어 스크롤로 확인할 수 있고, 헤더를 누르면 정렬됩니다. PIN 오류 5회 누적 시 30분 잠금이 적용되며, 잠금 해제는 관리자 페이지에서 할 수 있습니다.
+                        로그인 기록은 접속 시간과 로그아웃 시간을 함께 남기며, 활동이 없으면 30분 후 자동 로그아웃됩니다. 헤더를 누르면 정렬됩니다. PIN 오류 5회 누적 시 30분 잠금이 적용되며, 잠금 해제는 관리자 페이지에서 할 수 있습니다.
                       </div>
                     </>
                   ) : null}
@@ -5056,6 +4940,7 @@
               </div>
             )}
 
+            {view === 'teamExam' && (
             {view === 'teamExam' && (
               <div className="space-y-6">
                 <div className="space-y-6 teamexam-screen">
