@@ -1437,6 +1437,7 @@
       const [principalTeacherTableSort, setPrincipalTeacherTableSort] = useState({ key: 'totalStudents', direction: 'desc' });
       const [isCleaningArchiveData, setIsCleaningArchiveData] = useState(false);
       const sessionStartedAtRef = useRef(0);
+      const currentSessionLogIdRef = useRef('');
       const lastActivityAtRef = useRef(Date.now());
       const logoutTriggeredRef = useRef(false);
 
