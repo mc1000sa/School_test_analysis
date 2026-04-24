@@ -873,7 +873,7 @@
 잠시만 기다려주세요.</div>
       <div class="instant-boot-brand-text" aria-label="브랜드">OASIS : Open Academy Score Insight System</div>
       <div id="instantBootDesc" class="instant-boot-desc">데이터를 안전하게 불러오는 중입니다.</div>
-      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R13.9</span></div>
+      <div class="instant-boot-version" aria-label="배포 버전"><span class="version-label">ver.</span><span>OA-R14.0</span></div>
     </div>
   </div>
   <div id="root"></div>
@@ -914,7 +914,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R13.9';
+    const APP_VERSION = 'OA-R14.0';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -1803,18 +1803,11 @@
           map[subject] = map[subject] || [];
           map[subject].push(detail);
         });
-        scoresData.forEach((item) => {
-          const subject = String(item.subject || '').trim();
-          const detail = String(item.detailSubject || '').trim();
-          if (!subject || !detail) return;
-          map[subject] = map[subject] || [];
-          map[subject].push(detail);
-        });
         Object.keys(map).forEach((subject) => {
           map[subject] = Array.from(new Set(map[subject])).sort((a,b)=>a.localeCompare(b, 'ko'));
         });
         return map;
-      }, [subjectOptions, subjectDetailCatalogData, scoresData]);
+      }, [subjectOptions, subjectDetailCatalogData]);
       const teamExamDetailOptions = subjectDetailMap[teamExamForm.subject] || [];
       const isTeamExamCustomDetail = teamExamForm.detailSubject === '__custom__';
 
@@ -2759,6 +2752,25 @@
             alert('과목을 선택해주세요.');
             return;
           }
+          const desiredScoreDocId = buildScoreDocId({
+            studentId: targetStudentId,
+            year: manageStudent.year,
+            exam: modalForm.exam,
+            subject: normalizedSubject,
+            detailSubject: normalizedDetailSubject,
+          });
+
+          const duplicateQuery = query(
+            collection(db, getPath('scores')),
+            where('studentId', '==', targetStudentId),
+            where('year', '==', manageStudent.year),
+            where('exam', '==', modalForm.exam),
+            where('subject', '==', normalizedSubject),
+            where('detailSubject', '==', normalizedDetailSubject)
+          );
+          const duplicateSnap = await getDocs(duplicateQuery);
+          const activeDuplicateDoc = duplicateSnap.docs.find((scoreDoc) => !scoreDoc.data()?.deleted);
+
           const existingStudentDoc = studentsData.find((student) => student.studentId === targetStudentId) || {};
           const existingScoreSource = activeDuplicateDoc?.data?.() || scoresData.find((item) => String(item.docId || '') === String(modalForm.docId || '')) || {};
           const scoreOwnerName = String(modalForm.owner || existingScoreSource.owner || getManageAssignmentTeacherName() || existingScoreSource.updatedBy || existingScoreSource.createdBy || currentTeacher?.name || '').trim();
@@ -2791,25 +2803,6 @@
             updatedBy: currentTeacher?.name,
             deleted: false,
           };
-
-          const desiredScoreDocId = buildScoreDocId({
-            studentId: targetStudentId,
-            year: manageStudent.year,
-            exam: modalForm.exam,
-            subject: normalizedSubject,
-            detailSubject: normalizedDetailSubject,
-          });
-
-          const duplicateQuery = query(
-            collection(db, getPath('scores')),
-            where('studentId', '==', targetStudentId),
-            where('year', '==', manageStudent.year),
-            where('exam', '==', modalForm.exam),
-            where('subject', '==', normalizedSubject),
-            where('detailSubject', '==', normalizedDetailSubject)
-          );
-          const duplicateSnap = await getDocs(duplicateQuery);
-          const activeDuplicateDoc = duplicateSnap.docs.find((scoreDoc) => !scoreDoc.data()?.deleted);
 
           if (modal.mode === 'edit') {
             const currentDocId = String(modalForm.docId || '');
@@ -2994,7 +2987,8 @@
         try {
           const { updateDoc, doc } = window.FirebaseAPI;
           await updateDoc(doc(db, getPath('scores'), docId), {
-            updatedBy: teacherName,
+            owner: teacherName,
+            updatedBy: currentTeacher?.name || '',
             updatedAt: new Date().toISOString(),
           });
         } catch (error) {
