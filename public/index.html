@@ -914,7 +914,7 @@
     const EXAM_SHORT_LABELS = { '1학기 중간고사':'1학기 중간', '1학기 기말고사':'1학기 기말', '2학기 중간고사':'2학기 중간', '2학기 기말고사':'2학기 기말' };
     const SCHOOL_OPTIONS = ['수억고', '파주고', '문산고', '율곡고', '세경고', '파주여고', '삼광고'];
     const DEFAULT_SUBJECTS = ['국어', '영어', '수학', '과학'];
-    const APP_VERSION = 'OA-R13.7';
+    const APP_VERSION = 'OA-R13.8';
     const DATA_BOOT_TIMEOUT_MS = 15000;
     const AUTO_LOGOUT_MS = 30 * 60 * 1000;
     const YEARS = [2026, 2027, 2028];
@@ -2684,6 +2684,12 @@
         }
       };
 
+      const getManageAssignmentTeacherName = () => {
+        const selectedTeacher = String(manageTeacherFilter || '').trim();
+        if (selectedTeacher && selectedTeacher !== '전체') return selectedTeacher;
+        return String(currentTeacher?.name || '').trim();
+      };
+
       const openScoreModal = (exam, subject = '', record = null) => {
         if (!manageStudent.name || !finalSchoolValue) return alert('상단에서 학생명과 학교를 정확히 입력해주세요.');
         const resolvedSubject = subject || record?.subject || subjectOptions[0] || '';
@@ -2696,7 +2702,7 @@
           setModalForm({ ...record, owner: record.owner || record.updatedBy || record.createdBy || '', subject: record.subject || resolvedSubject, detailSubject: record.detailSubject || lastDetail, className: record.className || lastClass });
           setModal({ isOpen: true, mode: 'edit' });
         } else {
-          setModalForm({ docId: null, exam, subject: resolvedSubject, detailSubject: lastDetail, score: '', tier: '', className: lastClass, owner: currentTeacher?.name || '' });
+          setModalForm({ docId: null, exam, subject: resolvedSubject, detailSubject: lastDetail, score: '', tier: '', className: lastClass, owner: getManageAssignmentTeacherName() || currentTeacher?.name || '' });
           setModal({ isOpen: true, mode: 'add' });
         }
       };
@@ -2736,8 +2742,16 @@
             }, { merge: true });
           }
 
-          let safeTier = Number(modalForm.tier);
-          if (safeTier >= 6 && safeTier <= 9) safeTier = 5; // 6~9등급 자동 5등급 처리
+          const rawTier = String(modalForm.tier ?? '').trim();
+          let safeTier = null;
+          if (rawTier !== '') {
+            safeTier = Number(rawTier);
+            if (Number.isNaN(safeTier) || safeTier < 1 || safeTier > 9) {
+              alert('등급은 비워두거나 1~9 사이로 입력해주세요.');
+              return;
+            }
+            if (safeTier >= 6 && safeTier <= 9) safeTier = 5; // 6~9등급 자동 5등급 처리
+          }
 
           const normalizedSubject = String(modalForm.subject || '').trim();
           const normalizedDetailSubject = String((modalForm.detailSubject === '__custom__' ? modalForm.customDetailSubject : modalForm.detailSubject) || '').trim();
@@ -2746,10 +2760,15 @@
             return;
           }
           const existingStudentDoc = studentsData.find((student) => student.studentId === targetStudentId) || {};
+          const existingScoreSource = activeDuplicateDoc?.data?.() || scoresData.find((item) => String(item.docId || '') === String(modalForm.docId || '')) || {};
+          const scoreOwnerName = String(modalForm.owner || existingScoreSource.owner || getManageAssignmentTeacherName() || existingScoreSource.updatedBy || existingScoreSource.createdBy || currentTeacher?.name || '').trim();
           const nextSubjectStatusMap = { ...(existingStudentDoc.subjectStatusMap || {}) };
+          const nextSubjectOwnerMap = { ...(existingStudentDoc.subjectOwnerMap || {}) };
           nextSubjectStatusMap[normalizedSubject] = 'active';
+          if (scoreOwnerName) nextSubjectOwnerMap[normalizedSubject] = scoreOwnerName;
           await setDoc(doc(db, getPath('students'), targetStudentId), {
             subjectStatusMap: nextSubjectStatusMap,
+            subjectOwnerMap: nextSubjectOwnerMap,
             updatedAt: now,
             updatedBy: currentTeacher?.name || '',
           }, { merge: true });
@@ -2758,7 +2777,6 @@
             await persistDetailCatalog(normalizedSubject, normalizedDetailSubject);
           }
 
-          const existingScoreSource = activeDuplicateDoc?.data?.() || scoresData.find((item) => String(item.docId || '') === String(modalForm.docId || '')) || {};
           const scoreData = {
             studentId: targetStudentId,
             year: manageStudent.year,
@@ -2768,7 +2786,7 @@
             score: Number(modalForm.score),
             tier: safeTier,
             className: modalForm.className,
-            owner: String(modalForm.owner || existingScoreSource.owner || existingScoreSource.updatedBy || existingScoreSource.createdBy || currentTeacher?.name || '').trim(),
+            owner: scoreOwnerName,
             updatedAt: now,
             updatedBy: currentTeacher?.name,
             deleted: false,
@@ -3061,10 +3079,17 @@
       const handleSetStudentSubjectStatus = async (student, subject, nextStatus) => {
         if (!db || !window.FirebaseAPI || !student?.studentId || !subject) return;
         try {
+          const subjectKey = String(subject).trim();
           const nextMap = { ...(student.subjectStatusMap || {}) };
-          nextMap[String(subject).trim()] = nextStatus;
+          const nextOwnerMap = { ...(student.subjectOwnerMap || {}) };
+          nextMap[subjectKey] = nextStatus;
+          if (nextStatus === 'active') {
+            const assignedTeacher = getManageAssignmentTeacherName();
+            if (assignedTeacher) nextOwnerMap[subjectKey] = assignedTeacher;
+          }
           await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, getPath('students'), student.studentId), {
             subjectStatusMap: nextMap,
+            subjectOwnerMap: nextOwnerMap,
             updatedAt: new Date().toISOString(),
             updatedBy: currentTeacher?.name || '',
           });
@@ -4157,13 +4182,17 @@
         const target = manageTeacherFilter;
         const ownedStudentIds = new Set(
           activeJoinedData
-            .filter(r => target !== '전체' && (r.createdBy === target || r.updatedBy === target))
+            .filter(r => target !== '전체' && getScoreOwnerName(r) === target)
             .map(r => r.studentId)
         );
 
         const baseStudents = activeStudents.filter((student) => {
           if (target === '전체') return true;
-          return ownedStudentIds.has(student.studentId);
+          const subjectOwnerMap = student.subjectOwnerMap && typeof student.subjectOwnerMap === 'object' ? student.subjectOwnerMap : {};
+          const hasAssignedSubject = subjectOptions.some((subject) =>
+            getStudentSubjectStatus(student, subject) === 'active' && String(subjectOwnerMap[subject] || '').trim() === target
+          );
+          return ownedStudentIds.has(student.studentId) || hasAssignedSubject;
         });
 
         return baseStudents
